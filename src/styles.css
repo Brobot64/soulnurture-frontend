@@ -161,6 +161,13 @@
   html {
     background-color: var(--color-page);
   }
+
+  /* Tailwind preflight leaves buttons with the default arrow cursor — restore the pointer. */
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }
 
 /* Texts reveal — transitions.dev (18-texts-reveal.md). Lines start translated

@@ -9,6 +9,16 @@ import { TextsReveal } from '#/components/TextsReveal'
 import { getCheckIn, type CheckIn } from '#/lib/journey'
 
 export const Route = createFileRoute('/complete/$checkInId')({
+  head: () => ({
+    meta: [
+      { title: 'Check-in complete · Soul Nurture AI' },
+      {
+        name: 'description',
+        content:
+          'Your check-in is saved. See what might help next — wellbeing resources, ideas for exam stress and better sleep, or talking to a school counsellor.',
+      },
+    ],
+  }),
   component: CheckInComplete,
 })
 

@@ -7,6 +7,16 @@ import { TextsReveal } from '#/components/TextsReveal'
 import { MOODS, readMoodDraft, saveMoodDraft } from '#/lib/journey'
 
 export const Route = createFileRoute('/check-in/')({
+  head: () => ({
+    meta: [
+      { title: 'How are you feeling right now? · Soul Nurture AI' },
+      {
+        name: 'description',
+        content:
+          'Tap the face that feels closest to how you are right now and add a few words if you want to. It takes less than a minute, and you can change your answer any time.',
+      },
+    ],
+  }),
   component: MoodCheckIn,
 })
 

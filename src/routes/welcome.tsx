@@ -4,6 +4,16 @@ import { HeroIllustration } from '#/components/HeroIllustration'
 import { TextsReveal } from '#/components/TextsReveal'
 
 export const Route = createFileRoute('/welcome')({
+  head: () => ({
+    meta: [
+      { title: 'Soul Nurture AI — a calm space to check in with how you feel' },
+      {
+        name: 'description',
+        content:
+          'Take a quiet minute to check in with how you feel. A calm space for students to reflect — with the option to ask to talk to a school counsellor.',
+      },
+    ],
+  }),
   component: Welcome,
 })
 

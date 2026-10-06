@@ -7,6 +7,16 @@ import { TextsReveal } from '#/components/TextsReveal'
 import { MOODS, TRIGGERS, clearMoodDraft, createCheckIn, createConversation, readMoodDraft } from '#/lib/journey'
 
 export const Route = createFileRoute('/check-in/why')({
+  head: () => ({
+    meta: [
+      { title: 'Why do you think you feel that way? · Soul Nurture AI' },
+      {
+        name: 'description',
+        content:
+          'Choose anything that might be behind how you feel — school, friends, relationship, family, sleep, feeling alone, or something else.',
+      },
+    ],
+  }),
   component: WhyCheckIn,
 })
 

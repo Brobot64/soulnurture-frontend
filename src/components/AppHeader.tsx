@@ -1,16 +1,14 @@
 import { Link } from '@tanstack/react-router'
-import { Heart, HeartHandshake, UserRound } from 'lucide-react'
+import { UserRound } from 'lucide-react'
+
+import logo from '#/assets/soul-nurture-logo.png'
 
 export function AppHeader() {
   return (
     <header className="hidden border-b border-hairline lg:block">
       <div className="mx-auto flex h-[76px] w-full max-w-[1440px] items-center justify-between px-20">
         <Link to="/welcome" className="flex items-center gap-3">
-          {/* Brand mark approximated with icons — swap for the official asset. */}
-          <span className="relative inline-flex size-10 items-center justify-center">
-            <HeartHandshake className="size-9 text-action" strokeWidth={1.7} />
-            <Heart className="absolute -bottom-0.5 -left-0.5 size-3.5 fill-accent text-accent" />
-          </span>
+          <img src={logo} alt="" className="size-10 rounded-full" />
           <span className="text-wordmark text-heading">Soul Nurture AI</span>
         </Link>
         <div className="flex items-center gap-4">

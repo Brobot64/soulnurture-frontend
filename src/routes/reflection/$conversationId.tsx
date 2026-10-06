@@ -21,6 +21,16 @@ import {
 } from '#/lib/journey'
 
 export const Route = createFileRoute('/reflection/$conversationId')({
+  head: () => ({
+    meta: [
+      { title: 'Your reflection · Soul Nurture AI' },
+      {
+        name: 'description',
+        content:
+          'A gentle AI-guided reflection based on your check-in. Reflection prompts only — not medical advice, therapy, or an emergency service.',
+      },
+    ],
+  }),
   component: Reflection,
 })
 
