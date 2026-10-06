@@ -42,9 +42,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="bg-page font-sans text-body antialiased">
-        <div className="flex min-h-dvh flex-col">
+        <div className="flex h-dvh flex-col">
           <AppHeader />
-          <main className="flex flex-1 flex-col">{children}</main>
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</main>
           <AppFooter />
         </div>
         <TanStackDevtools
