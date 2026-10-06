@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ChevronRight, Shapes, UserRound } from 'lucide-react'
 
 import { CheckInSummary } from '#/components/CheckInSummary'
@@ -100,9 +100,8 @@ function CheckInComplete() {
               <ChevronRight className="size-5 shrink-0 text-muted" />
             </button>
 
-            <button
-              type="button"
-              onClick={() => flash('Talking to a real person opens in a later step of the journey.')}
+            <Link
+              to="/support"
               className="flex w-full items-center gap-5 rounded-panel border border-blush bg-peach p-6 text-left transition-colors hover:bg-blush/60"
             >
               <span className="grid size-[52px] shrink-0 place-items-center rounded-full bg-counsellor text-white">
@@ -117,7 +116,7 @@ function CheckInComplete() {
                 </span>
               </span>
               <ChevronRight className="size-5 shrink-0 text-peach-ink/70" />
-            </button>
+            </Link>
           </div>
 
           <button

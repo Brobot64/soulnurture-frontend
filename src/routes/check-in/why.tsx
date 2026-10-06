@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import { Flash, useFlash } from '#/components/Flash'
 import { ProgressRow } from '#/components/ProgressRow'
@@ -22,7 +22,7 @@ export const Route = createFileRoute('/check-in/why')({
 
 function WhyCheckIn() {
   const navigate = useNavigate()
-  const { flash, message, hiding } = useFlash()
+  const { message, hiding } = useFlash()
   const [selected, setSelected] = useState<string[]>([])
   const [note, setNote] = useState('')
 
@@ -114,13 +114,12 @@ function WhyCheckIn() {
       />
 
       <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <button
-          type="button"
-          onClick={() => flash('Talking to a real person opens in a later step of the journey.')}
+        <Link
+          to="/support"
           className="order-2 text-center text-button-sm text-action transition-colors hover:text-brand-4 lg:order-1 lg:inline-flex lg:h-[52px] lg:items-center lg:rounded-pill lg:bg-surface lg:px-8 lg:text-brand-4 lg:hover:bg-neutral-10 lg:hover:text-brand-4"
         >
           I would rather talk to a person
-        </button>
+        </Link>
         <button
           type="button"
           onClick={handleNext}

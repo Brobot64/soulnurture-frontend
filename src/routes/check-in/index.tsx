@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import { Flash, useFlash } from '#/components/Flash'
 import { ProgressRow } from '#/components/ProgressRow'
@@ -106,13 +106,12 @@ function MoodCheckIn() {
       />
 
       <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <button
-          type="button"
-          onClick={() => flash('Talking to a real person opens in a later step of the journey.')}
+        <Link
+          to="/support"
           className="order-2 text-center text-button-sm text-action transition-colors hover:text-brand-4 lg:order-1 lg:text-button"
         >
           I would rather talk to a person
-        </button>
+        </Link>
         <button
           type="button"
           onClick={handleContinue}

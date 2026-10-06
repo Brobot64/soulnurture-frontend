@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowRight, ChevronRight, UserRound } from 'lucide-react'
 
 import { CheckInSummary } from '#/components/CheckInSummary'
@@ -50,7 +50,7 @@ function Reflection() {
   const scrollRef = useRef<HTMLDivElement>(null)
   // Only messages added this session stream word by word; restored ones render settled.
   const streamIds = useRef<Set<string>>(new Set())
-  const { flash, message: flashMessage, hiding } = useFlash()
+  const { message: flashMessage, hiding } = useFlash()
 
   useEffect(() => {
     let cancelled = false
@@ -195,7 +195,7 @@ function Reflection() {
 
           <div className="mt-4 shrink-0">
             {done ? (
-              <div className="flex justify-center py-4">
+              <div className="flex flex-col items-center gap-4 py-4">
                 <button
                   type="button"
                   onClick={handleContinue}
@@ -203,6 +203,12 @@ function Reflection() {
                 >
                   Continue
                 </button>
+                <Link
+                  to="/support"
+                  className="text-button-sm text-action transition-colors hover:text-brand-4"
+                >
+                  Or talk to a person on WhatsApp
+                </Link>
               </div>
             ) : (
               <form
@@ -239,9 +245,8 @@ function Reflection() {
         <aside className="hidden w-[356px] shrink-0 lg:block">
           <h2 className="text-section text-heading">Your check-in</h2>
           {checkIn && <CheckInSummary checkIn={checkIn} circle className="mt-8" />}
-          <button
-            type="button"
-            onClick={() => flash('Talking to a real person opens in a later step of the journey.')}
+          <Link
+            to="/support"
             className="mt-12 flex w-full items-center gap-5 rounded-card bg-peach px-6 py-6 text-left transition-colors hover:bg-blush/70"
           >
             <span className="grid size-[52px] shrink-0 place-items-center rounded-full bg-counsellor text-white">
@@ -256,7 +261,7 @@ function Reflection() {
               </span>
             </span>
             <ChevronRight className="size-5 shrink-0 text-peach-ink/70" />
-          </button>
+          </Link>
         </aside>
       </div>
 
