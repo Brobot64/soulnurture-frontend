@@ -1,0 +1,203 @@
+@import "tailwindcss";
+@import "@fontsource-variable/plus-jakarta-sans";
+@import "./motion.css";
+
+@theme {
+  /* Type */
+  --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --text-hero: 52px;
+  --text-hero--line-height: 60px;
+  --text-hero--font-weight: 700;
+  --text-hero-sm: 44px;
+  --text-hero-sm--line-height: 52px;
+  --text-hero-sm--font-weight: 700;
+  --text-title-lg: 40px;
+  --text-title-lg--line-height: 48px;
+  --text-title-lg--font-weight: 700;
+  --text-title: 32px;
+  --text-title--line-height: 40px;
+  --text-title--font-weight: 700;
+  --text-title-sm: 28px;
+  --text-title-sm--line-height: 36px;
+  --text-title-sm--font-weight: 700;
+  --text-section: 24px;
+  --text-section--line-height: 32px;
+  --text-section--font-weight: 600;
+  --text-wordmark: 20px;
+  --text-wordmark--line-height: 25px;
+  --text-wordmark--font-weight: 700;
+  --text-lede: 18px;
+  --text-lede--line-height: 28px;
+  --text-lede--font-weight: 400;
+  --text-copy: 16px;
+  --text-copy--line-height: 24px;
+  --text-copy--font-weight: 400;
+  --text-copy-sm: 16px;
+  --text-copy-sm--line-height: 22px;
+  --text-copy-sm--font-weight: 400;
+  --text-card: 16px;
+  --text-card--line-height: 20px;
+  --text-card--font-weight: 600;
+  --text-bubble: 14px;
+  --text-bubble--line-height: 22px;
+  --text-bubble--font-weight: 500;
+  --text-bubble-lg: 16px;
+  --text-bubble-lg--line-height: 24px;
+  --text-bubble-lg--font-weight: 500;
+  --text-chip: 14px;
+  --text-chip--line-height: 18px;
+  --text-chip--font-weight: 500;
+  --text-button: 18px;
+  --text-button--line-height: 23px;
+  --text-button--font-weight: 500;
+  --text-button-sm: 16px;
+  --text-button-sm--line-height: 22px;
+  --text-button-sm--font-weight: 500;
+  --text-meta: 12px;
+  --text-meta--line-height: 15px;
+  --text-meta--font-weight: 600;
+  --text-caption: 12px;
+  --text-caption--line-height: 18px;
+  --text-caption--font-weight: 400;
+
+  /* Radius */
+  --radius-pill: 100px;
+  --radius-card: 20px;
+  --radius-panel: 24px;
+  --radius-sheet: 28px;
+  --radius-hero: 40px;
+
+  /* Primary ramp — brand green #3E7B5C */
+  --color-brand-1: #020906;
+  --color-brand-2: #103C2B;
+  --color-brand-3: #003625;
+  --color-brand-4: #15563C;
+  --color-brand-5: #28674B;
+  --color-brand-6: #3E7B5C;
+  --color-brand-7: #599A7B;
+  --color-brand-8: #76B797;
+  --color-brand-9: #93D5B0;
+  --color-brand-10: #AEF0CC;
+  --color-brand-11: #C7FFE0;
+  --color-brand-12: #F9FCFA;
+
+  /* Secondary ramp — apricot #E28458 */
+  --color-apricot-1: #050703;
+  --color-apricot-2: #3A1300;
+  --color-apricot-3: #562100;
+  --color-apricot-4: #763208;
+  --color-apricot-5: #91451F;
+  --color-apricot-6: #AD5D32;
+  --color-apricot-7: #CB774A;
+  --color-apricot-8: #EF9060;
+  --color-apricot-9: #FFB794;
+  --color-apricot-10: #FFDBCA;
+  --color-apricot-11: #FFEDE6;
+  --color-apricot-12: #FFFFFF;
+
+  /* Tertiary ramp — deep forest #2D5A43 */
+  --color-forest-1: #000904;
+  --color-forest-2: #002315;
+  --color-forest-3: #063727;
+  --color-forest-4: #204A38;
+  --color-forest-5: #3B6351;
+  --color-forest-6: #507C66;
+  --color-forest-7: #6B9A82;
+  --color-forest-8: #87B99F;
+  --color-forest-9: #9ED6BA;
+  --color-forest-10: #B7EED3;
+  --color-forest-11: #CAFFE3;
+  --color-forest-12: #FFFFFF;
+
+  /* Neutral ramp #1E2922 */
+  --color-neutral-1: #000501;
+  --color-neutral-2: #101B15;
+  --color-neutral-3: #26322B;
+  --color-neutral-4: #3F4B43;
+  --color-neutral-5: #556158;
+  --color-neutral-6: #6B776E;
+  --color-neutral-7: #849087;
+  --color-neutral-8: #9FAA9F;
+  --color-neutral-9: #B9C6BC;
+  --color-neutral-10: #D9E6DB;
+  --color-neutral-11: #E7F4EA;
+  --color-neutral-12: #F9FCFA;
+
+  /* Semantic surfaces & ink */
+  --color-page: #F9FCFA;
+  --color-surface: #DFEBE1;
+  --color-panel: #E7F4EA;
+  --color-panel-2: #E5F2E7;
+  --color-peach: #FFEDE6;
+  --color-peach-ink: #763208;
+  --color-counsellor: #562100;
+  --color-heading: #122018;
+  --color-body: #414D45;
+  --color-muted: #6B776E;
+  --color-ink: #101B15;
+  --color-hairline: #DFEBE1;
+  --color-scrim: #122018;
+  --color-action: #246448;
+  --color-edit: #4D8065;
+  --color-invert: #1E2922;
+  --color-destructive: #BD2328;
+  --color-accent: #E28458;
+  --color-mint: #93D5B0;
+  --color-blush: #FFDBCA;
+
+  /* Mood pastels — match the order of the eight check-in faces */
+  --color-mood-normal: #F9F0FC;
+  --color-mood-great: #FBFCF0;
+  --color-mood-sad: #FBF7EF;
+  --color-mood-angry: #F0FBFC;
+  --color-mood-confused: #F1FCF0;
+  --color-mood-indifferent: #EFF4FB;
+  --color-mood-strange: #FCF0F4;
+  --color-mood-distraught: #FCF4F0;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-page);
+  }
+}
+
+/* Texts reveal — transitions.dev (18-texts-reveal.md). Lines start translated
+   down + blurred + invisible; .is-shown on the parent flips them to resting.
+   Exit is a single quiet fade so dismissing never replays the stagger. */
+.t-stagger-line {
+  display: block;
+  opacity: 0;
+  transform: translateY(var(--stagger-distance));
+  filter: blur(var(--stagger-blur));
+  transition:
+    opacity var(--stagger-dur) var(--stagger-ease),
+    transform var(--stagger-dur) var(--stagger-ease),
+    filter var(--stagger-dur) var(--stagger-ease);
+  will-change: transform, opacity, filter;
+}
+.t-stagger-line--2 {
+  transition-delay: var(--stagger-stagger);
+}
+.t-stagger.is-shown .t-stagger-line {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+.t-stagger.is-hiding .t-stagger-line {
+  opacity: 0;
+  transform: translateY(0);
+  filter: blur(0);
+  transition:
+    opacity 200ms ease,
+    transform 0s linear,
+    filter 0s linear;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-stagger-line {
+    transition: none !important;
+  }
+}
