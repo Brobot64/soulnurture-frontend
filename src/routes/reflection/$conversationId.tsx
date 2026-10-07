@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowRight, ChevronRight, RefreshCw, UserRound } from 'lucide-react'
+import { ArrowRight, ChevronRight, Loader2, Mic, RefreshCw, Square, UserRound, X } from 'lucide-react'
 
 import { CheckInSummary } from '#/components/CheckInSummary'
 import { Flash, useFlash } from '#/components/Flash'
@@ -26,6 +26,7 @@ import {
   type HumanCareRecommendation,
   type Message,
 } from '#/lib/journey'
+import { VoiceRecorder, isVoiceSupported, transcribeVoice } from '#/lib/voice'
 
 export const Route = createFileRoute('/reflection/$conversationId')({
   head: () => ({
@@ -47,6 +48,9 @@ const LOAD_STATES = ['Opening your check-in', 'Finding where you left off'] as c
 /** The bounded flow wraps up after this many student turns. */
 const FULL_FLOW_TURNS = 3
 
+/** Voice notes stop automatically at this length. */
+const VOICE_MAX_SECONDS = 120
+
 // Guards against a double mount re-sending the stashed opening message.
 const openingInFlight = new Set<string>()
 
@@ -65,13 +69,18 @@ function Reflection() {
   const [attempt, setAttempt] = useState(0)
   const [thinking, setThinking] = useState(false)
   const [input, setInput] = useState('')
-  const [sendError, setSendError] = useState<string | null>(null)
+  const [composerError, setComposerError] = useState<string | null>(null)
   const [recommendation, setRecommendation] = useState<HumanCareRecommendation | null>(null)
   const [closing, setClosing] = useState(false)
+  const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'transcribing'>('idle')
+  const [voiceElapsed, setVoiceElapsed] = useState(0)
+  const [voiceReady, setVoiceReady] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   // Only messages added this session stream word by word; restored ones render settled.
   const streamIds = useRef<Set<string>>(new Set())
+  const recorderRef = useRef<VoiceRecorder | null>(null)
+  const voiceTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (authStatus !== 'ready') return
@@ -159,7 +168,7 @@ function Reflection() {
           })
           return
         }
-        setSendError(
+        setComposerError(
           caught instanceof ApiError
             ? caught.message
             : 'Your reflection could not start. Please try again.',
@@ -180,6 +189,15 @@ function Reflection() {
     el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, thinking])
 
+  useEffect(() => {
+    setVoiceReady(isVoiceSupported())
+    return () => {
+      if (voiceTimerRef.current !== null) window.clearInterval(voiceTimerRef.current)
+      recorderRef.current?.cancel()
+      recorderRef.current = null
+    }
+  }, [])
+
   const userTurns = messages.filter((entry) => entry.role === 'USER').length
   const done = conversationStatus !== 'ACTIVE' || (!thinking && userTurns >= FULL_FLOW_TURNS)
   const last = messages[messages.length - 1]
@@ -188,7 +206,7 @@ function Reflection() {
     const content = raw.trim()
     if (!content || thinking || done) return
     setInput('')
-    setSendError(null)
+    setComposerError(null)
     const tempId = newId('msg')
     setMessages((prev) => [
       ...prev,
@@ -215,7 +233,7 @@ function Reflection() {
       }
       setMessages((prev) => prev.filter((entry) => entry.id !== tempId))
       setInput(content)
-      setSendError(
+      setComposerError(
         caught instanceof ApiError
           ? caught.message
           : 'Your message could not be sent. Please try again.',
@@ -223,6 +241,87 @@ function Reflection() {
     } finally {
       setThinking(false)
     }
+  }
+
+  const stopVoiceTimer = () => {
+    if (voiceTimerRef.current !== null) {
+      window.clearInterval(voiceTimerRef.current)
+      voiceTimerRef.current = null
+    }
+  }
+
+  const startRecording = async () => {
+    if (voiceState !== 'idle' || thinking || done) return
+    setComposerError(null)
+    let recorder: VoiceRecorder
+    try {
+      recorder = await VoiceRecorder.start()
+    } catch {
+      setComposerError(
+        'Microphone access was blocked. Allow it in your browser settings, or type your reply instead.',
+      )
+      return
+    }
+    recorderRef.current = recorder
+    setVoiceElapsed(0)
+    setVoiceState('recording')
+    voiceTimerRef.current = window.setInterval(() => {
+      const active = recorderRef.current
+      if (!active) return
+      const seconds = active.elapsedSeconds()
+      setVoiceElapsed(seconds)
+      if (seconds >= VOICE_MAX_SECONDS) void finishRecording()
+    }, 250)
+  }
+
+  const finishRecording = async () => {
+    const recorder = recorderRef.current
+    if (!recorder) return
+    stopVoiceTimer()
+    recorderRef.current = null
+    setVoiceState('transcribing')
+    const clip = await recorder.stop()
+    if (!clip) {
+      setVoiceState('idle')
+      return
+    }
+    try {
+      const result = await transcribeVoice(clip)
+      setVoiceState('idle')
+      const text = result.text.trim()
+      if (!text) {
+        setComposerError(
+          "We couldn't make out any speech in that recording — try again or type your reply.",
+        )
+        return
+      }
+      // The transcript lands in the composer for review — the student decides to send it.
+      setInput((current) => (current ? `${current.trimEnd()} ${text}` : text))
+    } catch (caught) {
+      setVoiceState('idle')
+      if (caught instanceof ApiError && caught.status === 401) {
+        navigate({
+          to: '/signin',
+          search: { redirect: `/reflection/${conversationId}` },
+          replace: true,
+        })
+        return
+      }
+      setComposerError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'That voice note could not be transcribed. Try again, or type your reply.',
+      )
+    }
+  }
+
+  const cancelRecording = () => {
+    stopVoiceTimer()
+    const recorder = recorderRef.current
+    recorderRef.current = null
+    recorder?.cancel()
+    setVoiceElapsed(0)
+    setVoiceState('idle')
   }
 
   const handleContinue = async () => {
@@ -300,7 +399,7 @@ function Reflection() {
                 </div>
               )}
 
-              {!loading && !loadFailed && !thinking && !sendError && messages.length === 0 && (
+              {!loading && !loadFailed && !thinking && !composerError && messages.length === 0 && (
                 <p className="mx-auto mt-10 max-w-[440px] text-center text-copy text-body">
                   You're in a private reflection. When you're ready, say whatever is on your mind —
                   there's no right way to start.
@@ -350,7 +449,12 @@ function Reflection() {
                 </div>
               )}
 
-              {!loading && !loadFailed && !thinking && !done && last?.role === 'ASSISTANT' && (
+              {!loading &&
+                !loadFailed &&
+                !thinking &&
+                !done &&
+                voiceState === 'idle' &&
+                last?.role === 'ASSISTANT' && (
                 <div className="pl-11 lg:pl-12">
                   <p className="text-copy font-medium text-body">Choose a reply</p>
                   <div className="mt-3 flex flex-wrap gap-2.5">
@@ -390,9 +494,9 @@ function Reflection() {
               </div>
             )}
 
-            {sendError && (
+            {composerError && (
               <div className="mb-4">
-                <StatusBadge tone="error">{sendError}</StatusBadge>
+                <StatusBadge tone="error">{composerError}</StatusBadge>
               </div>
             )}
 
@@ -415,7 +519,38 @@ function Reflection() {
               </div>
             )}
 
-            {!loading && !loadFailed && !done && (
+            {!loading && !loadFailed && !done && voiceState === 'recording' && (
+              <div className="flex h-[60px] items-center gap-3 rounded-pill border-[1.5px] border-accent bg-white pl-7 pr-2.5">
+                <span className="relative grid size-3 shrink-0 place-items-center" aria-hidden="true">
+                  <span className="absolute size-3 animate-ping rounded-full bg-accent opacity-60" />
+                  <span className="relative size-3 rounded-full bg-accent" />
+                </span>
+                <span className="tabular-nums text-copy font-medium text-ink">
+                  {Math.floor(voiceElapsed / 60)}:{String(Math.floor(voiceElapsed % 60)).padStart(2, '0')}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-copy-sm text-muted">
+                  Recording your voice note…
+                </span>
+                <button
+                  type="button"
+                  onClick={cancelRecording}
+                  aria-label="Cancel recording"
+                  className="grid size-10 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-panel hover:text-ink"
+                >
+                  <X className="size-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void finishRecording()}
+                  aria-label="Stop and transcribe"
+                  className="grid size-10 shrink-0 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4"
+                >
+                  <Square className="size-4 fill-current" />
+                </button>
+              </div>
+            )}
+
+            {!loading && !loadFailed && !done && voiceState !== 'recording' && (
               <form
                 onSubmit={(event) => {
                   event.preventDefault()
@@ -427,13 +562,32 @@ function Reflection() {
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   maxLength={4000}
-                  placeholder="Type a reply…"
+                  disabled={voiceState === 'transcribing'}
+                  placeholder={
+                    voiceState === 'transcribing' ? 'Transcribing your voice note…' : 'Type a reply…'
+                  }
                   aria-label="Type a reply"
-                  className="h-[60px] w-full rounded-pill border border-hairline bg-white pl-7 pr-16 text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action"
+                  className={`h-[60px] w-full rounded-pill border border-hairline bg-white pl-7 ${voiceReady ? 'pr-28' : 'pr-16'} text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action disabled:opacity-60`}
                 />
+                {voiceReady && (
+                  <button
+                    type="button"
+                    onClick={() => void startRecording()}
+                    disabled={thinking || voiceState === 'transcribing'}
+                    aria-label="Record a voice note"
+                    title="Record a voice note"
+                    className="absolute right-[60px] top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-panel text-action transition-colors hover:bg-blush disabled:opacity-40"
+                  >
+                    {voiceState === 'transcribing' ? (
+                      <Loader2 className="size-5 animate-spin" />
+                    ) : (
+                      <Mic className="size-5" />
+                    )}
+                  </button>
+                )}
                 <button
                   type="submit"
-                  disabled={!input.trim() || thinking}
+                  disabled={!input.trim() || thinking || voiceState === 'transcribing'}
                   aria-label="Send"
                   className="absolute right-2.5 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4 disabled:opacity-40"
                 >
