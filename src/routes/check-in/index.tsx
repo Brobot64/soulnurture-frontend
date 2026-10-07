@@ -4,6 +4,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Flash, useFlash } from '#/components/Flash'
 import { ProgressRow } from '#/components/ProgressRow'
 import { TextsReveal } from '#/components/TextsReveal'
+import { useSession } from '#/lib/auth'
 import { MOODS, readMoodDraft, saveMoodDraft } from '#/lib/journey'
 
 export const Route = createFileRoute('/check-in/')({
@@ -23,8 +24,16 @@ export const Route = createFileRoute('/check-in/')({
 function MoodCheckIn() {
   const navigate = useNavigate()
   const { flash, message, hiding } = useFlash()
+  const { user, status: authStatus } = useSession()
   const [selected, setSelected] = useState<string | null>(null)
   const [note, setNote] = useState('')
+
+  useEffect(() => {
+    if (authStatus !== 'ready') return
+    if (!user) {
+      navigate({ to: '/signin', search: { redirect: '/check-in' }, replace: true })
+    }
+  }, [authStatus, user, navigate])
 
   useEffect(() => {
     const draft = readMoodDraft()
@@ -40,6 +49,14 @@ function MoodCheckIn() {
     }
     saveMoodDraft({ moodId: selected, note: note.trim() })
     navigate({ to: '/check-in/why' })
+  }
+
+  if (authStatus !== 'ready' || !user) {
+    return (
+      <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:px-8 lg:py-14">
+        <ProgressRow step={1} backTo="/welcome" />
+      </div>
+    )
   }
 
   return (

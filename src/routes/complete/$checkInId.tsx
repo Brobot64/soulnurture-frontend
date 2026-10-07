@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ChevronRight, Shapes, UserRound } from 'lucide-react'
+import { ChevronRight, RefreshCw, Shapes, UserRound } from 'lucide-react'
 
 import { CheckInSummary } from '#/components/CheckInSummary'
 import { Flash, useFlash } from '#/components/Flash'
 import { ProgressRow } from '#/components/ProgressRow'
 import { TextsReveal } from '#/components/TextsReveal'
+import { ThinkLine } from '#/components/ThinkLine'
+import { ApiError } from '#/lib/api'
+import { useSession } from '#/lib/auth'
 import { getCheckIn, type CheckIn } from '#/lib/journey'
 
 export const Route = createFileRoute('/complete/$checkInId')({
@@ -22,24 +25,96 @@ export const Route = createFileRoute('/complete/$checkInId')({
   component: CheckInComplete,
 })
 
+const LOAD_STATES = ['Fetching your check-in'] as const
+
 function CheckInComplete() {
   const { checkInId } = Route.useParams()
   const navigate = useNavigate()
+  const { user, status: authStatus } = useSession()
 
   const [checkIn, setCheckIn] = useState<CheckIn | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [checked, setChecked] = useState(false)
   const { flash, message, hiding } = useFlash()
 
   useEffect(() => {
-    const found = getCheckIn(checkInId)
-    if (!found) {
-      navigate({ to: '/check-in', replace: true })
+    if (authStatus !== 'ready') return
+    if (!user) {
+      navigate({ to: '/signin', search: { redirect: `/complete/${checkInId}` }, replace: true })
       return
     }
-    setCheckIn(found)
+    let cancelled = false
+    setFailed(false)
+    setLoading(true)
+    getCheckIn(checkInId)
+      .then((found) => {
+        if (cancelled) return
+        if (!found) {
+          navigate({ to: '/check-in', replace: true })
+          return
+        }
+        setCheckIn(found)
+        setLoading(false)
+      })
+      .catch((caught) => {
+        if (cancelled) return
+        if (caught instanceof ApiError && caught.status === 401) {
+          navigate({ to: '/signin', search: { redirect: `/complete/${checkInId}` }, replace: true })
+          return
+        }
+        setFailed(true)
+        setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [authStatus, user, checkInId, navigate, attempt])
+
+  useEffect(() => {
+    if (!checkIn) return
     const timer = window.setTimeout(() => setChecked(true), 150)
     return () => window.clearTimeout(timer)
-  }, [checkInId, navigate])
+  }, [checkIn])
+
+  if (authStatus !== 'ready' || !user) {
+    return (
+      <div className="mx-auto flex w-full max-w-[1000px] flex-1 flex-col px-6 py-10 lg:px-8 lg:py-14">
+        <ProgressRow step={3} />
+      </div>
+    )
+  }
+
+  if (loading || failed) {
+    return (
+      <div className="mx-auto flex w-full max-w-[1000px] flex-1 flex-col px-6 py-10 lg:px-8 lg:py-14">
+        <ProgressRow step={3} />
+        <div className="mt-10 rounded-panel border border-hairline bg-white p-8 lg:mt-14">
+          {loading ? (
+            <p className="text-copy text-body">
+              <ThinkLine states={LOAD_STATES} />
+            </p>
+          ) : (
+            <>
+              <p className="text-copy text-ink">We couldn't load your check-in right now.</p>
+              <p className="mt-2 text-copy-sm text-muted">
+                Check your connection and try again in a moment.
+              </p>
+              <button
+                type="button"
+                onClick={() => setAttempt((current) => current + 1)}
+                className="mt-6 inline-flex h-[52px] items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4"
+              >
+                <RefreshCw className="size-5" />
+                Try again
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[1000px] flex-1 flex-col px-6 py-10 lg:px-8 lg:py-14">

@@ -1,15 +1,12 @@
-// Mock journey transport.
-//
-// Mirrors the Natlas backend contract so a real fetch client can replace this
-// module later without touching the screens:
+// Journey transport — authenticated against the Natlas backend.
 //   POST /v1/check-ins                   CreateCheckInDto
+//   GET  /v1/check-ins/:id
 //   POST /v1/conversations               { checkInId }
-//   POST /v1/conversations/:id/messages  SendMessageDto
+//   GET  /v1/conversations/:id           conversation + messages (asc)
+//   POST /v1/conversations/:id/messages  SendMessageDto — AI orchestrated
 //   POST /v1/conversations/:id/close     queues the AI session summary
-//
-// State lives in sessionStorage so a refresh inside the same tab keeps the
-// flow. No auth is wired yet — swap this for the authenticated client once
-// the better-auth session lands.
+
+import { apiFetch, ApiError } from '#/lib/api'
 
 export type FeelingLabel =
   | 'OVERWHELMED'
@@ -45,7 +42,7 @@ export interface CheckIn {
   id: string
   feeling: FeelingLabel
   intensity: FeelingIntensity
-  description?: string
+  description?: string | null
   triggers: string[]
   createdAt: string
 }
@@ -59,12 +56,26 @@ export interface Message {
 
 export interface Conversation {
   id: string
-  checkInId: string
+  checkInId: string | null
   status: ConversationStatus
+}
+
+export interface ConversationDetail extends Conversation {
   messages: Message[]
-  /** Mock-only bookkeeping — the real backend tracks the bounded flow server-side. */
-  turns: number
-  done: boolean
+}
+
+export interface HumanCareRecommendation {
+  show: boolean
+  message?: string | null
+  professionalName?: string | null
+  professionalId?: string | null
+}
+
+export interface SendMessageResult {
+  userMessage: Message
+  assistantMessage: Message
+  humanCareRecommendation: HumanCareRecommendation | null
+  aiPending: boolean
 }
 
 export interface MoodOption {
@@ -117,41 +128,6 @@ export function newId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-/* ── Store ──────────────────────────────────────────────────────────────── */
-
-interface JourneyDb {
-  checkIns: CheckIn[]
-  conversations: Conversation[]
-}
-
-const DB_KEY = 'soul-nurture.journey'
-let db: JourneyDb | null = null
-
-function loadDb(): JourneyDb {
-  if (typeof window === 'undefined') return { checkIns: [], conversations: [] }
-  try {
-    const raw = sessionStorage.getItem(DB_KEY)
-    if (raw) return JSON.parse(raw) as JourneyDb
-  } catch {
-    // corrupted or unavailable storage — start fresh
-  }
-  return { checkIns: [], conversations: [] }
-}
-
-function store(): JourneyDb {
-  if (!db) db = loadDb()
-  return db
-}
-
-function persist(): void {
-  if (typeof window === 'undefined') return
-  try {
-    sessionStorage.setItem(DB_KEY, JSON.stringify(store()))
-  } catch {
-    // storage full or blocked — the in-memory store still works for this tab
-  }
-}
-
 /* ── Check-in draft (carried between the two check-in screens) ──────────── */
 
 export interface MoodDraft {
@@ -187,54 +163,47 @@ export function clearMoodDraft(): void {
   }
 }
 
-/* ── API ────────────────────────────────────────────────────────────────── */
+/* ── Pending opening message ────────────────────────────────────────────── */
+// The backend has no server-generated opening turn, so the reflection screen
+// sends the composed "why" as the student's first message. It is stashed here
+// while the flow navigates from the why screen to the chat.
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const OPENING_KEY = 'soul-nurture.pending-opening'
 
-export function createCheckIn(dto: CreateCheckInDto): CheckIn {
-  const checkIn: CheckIn = {
-    id: newId('chk'),
-    feeling: dto.feeling,
-    intensity: dto.intensity,
-    description: dto.description,
-    triggers: dto.triggers ?? [],
-    createdAt: new Date().toISOString(),
+interface PendingOpening {
+  conversationId: string
+  content: string
+}
+
+export function savePendingOpening(opening: PendingOpening): void {
+  try {
+    sessionStorage.setItem(OPENING_KEY, JSON.stringify(opening))
+  } catch {
+    // ignore — the reflection screen falls back to an empty chat
   }
-  store().checkIns.push(checkIn)
-  persist()
-  return checkIn
 }
 
-export function getCheckIn(id: string): CheckIn | undefined {
-  return store().checkIns.find((checkIn) => checkIn.id === id)
-}
-
-export function createConversation(checkInId: string): Conversation {
-  const conversation: Conversation = {
-    id: newId('cnv'),
-    checkInId,
-    status: 'ACTIVE',
-    messages: [],
-    turns: 0,
-    done: false,
+export function readPendingOpening(conversationId: string): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(OPENING_KEY)
+    if (!raw) return null
+    const opening = JSON.parse(raw) as PendingOpening
+    return opening.conversationId === conversationId ? opening.content : null
+  } catch {
+    return null
   }
-  store().conversations.push(conversation)
-  persist()
-  return conversation
 }
 
-export function getConversation(id: string): Conversation | undefined {
-  return store().conversations.find((conversation) => conversation.id === id)
+export function clearPendingOpening(): void {
+  try {
+    sessionStorage.removeItem(OPENING_KEY)
+  } catch {
+    // ignore
+  }
 }
 
-export function closeConversation(id: string): void {
-  const conversation = getConversation(id)
-  if (!conversation) return
-  conversation.status = 'CLOSED'
-  persist()
-}
-
-/* ── Bounded reflection script ──────────────────────────────────────────── */
+/* ── Opening message composed from the "why" step ───────────────────────── */
 
 function listPhrase(items: string[]): string {
   if (items.length <= 1) return items[0] ?? ''
@@ -242,84 +211,70 @@ function listPhrase(items: string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
 }
 
-function openingMessage(checkIn: CheckIn): string {
-  const mood = getMoodByFeeling(checkIn.feeling)
-  const label = (mood?.label ?? checkIn.feeling).toLowerCase()
-  const triggers = checkIn.triggers.map((trigger) => trigger.toLowerCase())
-  const onMind = triggers.length > 0 ? `, with ${listPhrase(triggers)} on your mind` : ''
-  return `Thanks for sharing. You said you're feeling ${label}${onMind}. What part feels heaviest right now?`
-}
-
-const REPLIES = {
-  more: "I'm listening. There's no rush at all — you can put it in your own words, or just sit with it for a moment.",
-  idea: 'One small idea many students find helpful: pick the easiest task you can finish tonight, and let the rest wait until tomorrow. Does that sound doable?',
-  person:
-    "That's a brave step to take. I've noted that you'd like to talk with someone — a school counsellor can meet you in person, and they are there to help, not to judge.",
-  generic: [
-    'Thank you for telling me that. What would feel most useful right now — saying a little more, or thinking about one small next step?',
-    "That makes sense. You don't have to solve everything tonight; noticing it is already a real step.",
-    'I hear you. If it helps, we can stay with this a little longer, or think about one thing that could make tonight feel a bit lighter.',
-  ],
-  closing:
-    'Thanks for taking this time. Your check-in is saved to your wellbeing history, and you can come back to it any time.',
-}
-
-function assistantMessage(content: string): Message {
-  return { id: newId('msg'), role: 'ASSISTANT', content, createdAt: new Date().toISOString() }
-}
-
-export async function openConversation(conversationId: string): Promise<Message> {
-  const conversation = getConversation(conversationId)
-  if (!conversation) throw new Error('Conversation not found')
-  const existing = conversation.messages.find((message) => message.role === 'ASSISTANT')
-  if (existing) return existing
-
-  await delay(900)
-  const checkIn = getCheckIn(conversation.checkInId)
-  const message = assistantMessage(
-    checkIn ? openingMessage(checkIn) : 'Thanks for sharing. What part feels heaviest right now?',
-  )
-  conversation.messages.push(message)
-  persist()
-  return message
-}
-
-export async function sendMessage(
-  conversationId: string,
-  dto: SendMessageDto,
-): Promise<{ messages: Message[]; done: boolean }> {
-  const conversation = getConversation(conversationId)
-  if (!conversation) throw new Error('Conversation not found')
-
-  const content = dto.content.trim()
-  conversation.messages.push({
-    id: newId('msg'),
-    role: 'USER',
-    content,
-    createdAt: new Date().toISOString(),
-  })
-  conversation.turns += 1
-  persist()
-
-  await delay(1100 + Math.random() * 500)
-
-  const lowered = content.toLowerCase()
-  const replies: string[] = []
-  if (lowered.includes('talk to someone') || lowered.includes('talk to a person')) {
-    replies.push(REPLIES.person)
-    conversation.done = true
-  } else if (lowered.includes('idea')) {
-    replies.push(REPLIES.idea)
-  } else if (lowered.includes('tell you more')) {
-    replies.push(REPLIES.more)
-  } else {
-    replies.push(REPLIES.generic[conversation.turns % REPLIES.generic.length])
+export function composeOpeningMessage(input: {
+  moodLabel: string
+  triggers: string[]
+  notes: string[]
+}): string {
+  const parts = [`I'm feeling ${input.moodLabel.toLowerCase()}.`]
+  if (input.triggers.length > 0) {
+    parts.push(
+      `I think it's because of ${listPhrase(input.triggers.map((trigger) => trigger.toLowerCase()))}.`,
+    )
   }
-  if (!conversation.done && conversation.turns >= 3) conversation.done = true
-  if (conversation.done) replies.push(REPLIES.closing)
+  const note = input.notes
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .join(' ')
+  if (note) parts.push(note)
+  return parts.join(' ')
+}
 
-  const messages = replies.map((reply) => assistantMessage(reply))
-  conversation.messages.push(...messages)
-  persist()
-  return { messages, done: conversation.done }
+/* ── API ────────────────────────────────────────────────────────────────── */
+
+export async function createCheckIn(dto: CreateCheckInDto): Promise<CheckIn> {
+  return apiFetch<CheckIn>('/api/v1/check-ins', {
+    method: 'POST',
+    body: JSON.stringify(dto),
+  })
+}
+
+export async function getCheckIn(id: string): Promise<CheckIn | null> {
+  try {
+    return await apiFetch<CheckIn>(`/api/v1/check-ins/${encodeURIComponent(id)}`)
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.status === 404) return null
+    throw caught
+  }
+}
+
+export async function startConversation(checkInId: string): Promise<Conversation> {
+  return apiFetch<Conversation>('/api/v1/conversations', {
+    method: 'POST',
+    body: JSON.stringify({ checkInId }),
+  })
+}
+
+export async function fetchConversation(id: string): Promise<ConversationDetail | null> {
+  try {
+    return await apiFetch<ConversationDetail>(`/api/v1/conversations/${encodeURIComponent(id)}`)
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.status === 404) return null
+    throw caught
+  }
+}
+
+export async function sendMessage(id: string, dto: SendMessageDto): Promise<SendMessageResult> {
+  return apiFetch<SendMessageResult>(
+    `/api/v1/conversations/${encodeURIComponent(id)}/messages`,
+    { method: 'POST', body: JSON.stringify(dto) },
+  )
+}
+
+export async function closeConversation(id: string): Promise<Conversation> {
+  const result = await apiFetch<{ conversation: Conversation; summaryQueued: boolean }>(
+    `/api/v1/conversations/${encodeURIComponent(id)}/close`,
+    { method: 'POST' },
+  )
+  return result.conversation
 }

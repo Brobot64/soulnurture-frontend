@@ -1,10 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import { Flash, useFlash } from '#/components/Flash'
 import { ProgressRow } from '#/components/ProgressRow'
+import { StatusBadge, Spinner } from '#/components/StatusBadge'
 import { TextsReveal } from '#/components/TextsReveal'
-import { MOODS, TRIGGERS, clearMoodDraft, createCheckIn, createConversation, readMoodDraft } from '#/lib/journey'
+import { ApiError } from '#/lib/api'
+import { useSession } from '#/lib/auth'
+import {
+  MOODS,
+  TRIGGERS,
+  clearMoodDraft,
+  composeOpeningMessage,
+  createCheckIn,
+  readMoodDraft,
+  savePendingOpening,
+  startConversation,
+} from '#/lib/journey'
 
 export const Route = createFileRoute('/check-in/why')({
   head: () => ({
@@ -23,8 +35,18 @@ export const Route = createFileRoute('/check-in/why')({
 function WhyCheckIn() {
   const navigate = useNavigate()
   const { message, hiding } = useFlash()
+  const { user, status: authStatus } = useSession()
   const [selected, setSelected] = useState<string[]>([])
   const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (authStatus !== 'ready') return
+    if (!user) {
+      navigate({ to: '/signin', search: { redirect: '/check-in/why' }, replace: true })
+    }
+  }, [authStatus, user, navigate])
 
   const toggle = (trigger: string) => {
     setSelected((prev) =>
@@ -32,22 +54,49 @@ function WhyCheckIn() {
     )
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (busy) return
     const draft = readMoodDraft()
     const mood = draft ? MOODS.find((item) => item.id === draft.moodId) : undefined
     if (!draft || !mood) {
       navigate({ to: '/check-in', replace: true })
       return
     }
-    const checkIn = createCheckIn({
-      feeling: mood.feeling,
-      intensity: mood.intensity,
-      description: [draft.note, note.trim()].filter(Boolean).join('\n\n') || undefined,
-      triggers: selected.length > 0 ? selected : undefined,
-    })
-    const conversation = createConversation(checkIn.id)
-    clearMoodDraft()
-    navigate({ to: '/reflection/$conversationId', params: { conversationId: conversation.id } })
+    setBusy(true)
+    setError(null)
+    const notes = [draft.note, note.trim()].filter(Boolean)
+    try {
+      const checkIn = await createCheckIn({
+        feeling: mood.feeling,
+        intensity: mood.intensity,
+        description: notes.join('\n\n') || undefined,
+        triggers: selected.length > 0 ? selected : undefined,
+      })
+      const conversation = await startConversation(checkIn.id)
+      savePendingOpening({
+        conversationId: conversation.id,
+        content: composeOpeningMessage({ moodLabel: mood.label, triggers: selected, notes }),
+      })
+      clearMoodDraft()
+      navigate({ to: '/reflection/$conversationId', params: { conversationId: conversation.id } })
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 401) {
+        navigate({ to: '/signin', search: { redirect: '/check-in/why' }, replace: true })
+        return
+      }
+      setBusy(false)
+      setError(
+        caught instanceof ApiError ? caught.message : 'Something went wrong. Please try again.',
+      )
+    }
+  }
+
+  if (authStatus !== 'ready' || !user) {
+    return (
+      <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:px-8 lg:py-14">
+        <ProgressRow step={1} backTo="/check-in" />
+      </div>
+    )
   }
 
   return (
@@ -113,6 +162,12 @@ function WhyCheckIn() {
         className="mt-8 min-h-[130px] w-full resize-none rounded-3xl border border-hairline bg-white px-6 py-5 text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action lg:mt-10"
       />
 
+      {error && (
+        <div className="mt-8">
+          <StatusBadge tone="error">{error}</StatusBadge>
+        </div>
+      )}
+
       <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <Link
           to="/support"
@@ -123,9 +178,17 @@ function WhyCheckIn() {
         <button
           type="button"
           onClick={handleNext}
-          className="order-1 inline-flex h-[52px] w-full items-center justify-center whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 lg:order-2 lg:h-[60px] lg:w-auto lg:px-16 lg:text-button"
+          disabled={busy}
+          className="order-1 inline-flex h-[52px] w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:order-2 lg:h-[60px] lg:w-auto lg:px-16 lg:text-button"
         >
-          Next
+          {busy ? (
+            <>
+              <Spinner />
+              Setting up your reflection…
+            </>
+          ) : (
+            'Next'
+          )}
         </button>
       </div>
 
