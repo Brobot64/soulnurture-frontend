@@ -29,13 +29,15 @@ function extractMessage(payload: unknown): { message?: string; code?: string } {
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  // FormData bodies must let the browser set Content-Type itself (multipart boundary).
+  const jsonBody = init?.body !== undefined && !(init.body instanceof FormData)
   let response: Response
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       credentials: 'include',
       headers: {
-        ...(init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(jsonBody ? { 'Content-Type': 'application/json' } : {}),
         ...(init?.headers ?? {}),
       },
     })
