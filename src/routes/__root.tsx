@@ -6,6 +6,7 @@ import { AppFooter } from '#/components/AppFooter'
 import { AppHeader } from '#/components/AppHeader'
 
 import appCss from '../styles.css?url'
+import logoUrl from '#/assets/soul-nurture-logo.png'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -18,17 +19,74 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
+        name: 'theme-color',
+        content: '#F9FCFA',
+      },
+      {
         title: 'Soul Nurture AI',
       },
       {
         name: 'description',
         content: 'Soul Nurture AI — a calm space for students to check in with how they feel.',
       },
+      {
+        property: 'og:type',
+        content: 'website',
+      },
+      {
+        property: 'og:site_name',
+        content: 'Soul Nurture AI',
+      },
+      {
+        property: 'og:title',
+        content: 'Soul Nurture AI',
+      },
+      {
+        property: 'og:description',
+        content: 'Soul Nurture AI — a calm space for students to check in with how they feel.',
+      },
+      {
+        property: 'og:image',
+        content: logoUrl,
+      },
+      {
+        name: 'twitter:card',
+        content: 'summary',
+      },
+      {
+        name: 'twitter:title',
+        content: 'Soul Nurture AI',
+      },
+      {
+        name: 'twitter:description',
+        content: 'Soul Nurture AI — a calm space for students to check in with how they feel.',
+      },
+      {
+        name: 'twitter:image',
+        content: logoUrl,
+      },
+      {
+        'script:ld+json': {
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'Soul Nurture AI',
+          description: 'Soul Nurture AI — a calm space for students to check in with how they feel.',
+        },
+      },
     ],
     links: [
       {
         rel: 'stylesheet',
         href: appCss,
+      },
+      {
+        rel: 'icon',
+        type: 'image/png',
+        href: logoUrl,
+      },
+      {
+        rel: 'apple-touch-icon',
+        href: logoUrl,
       },
     ],
   }),
@@ -42,9 +100,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="bg-page font-sans text-body antialiased">
-        <div className="flex min-h-dvh flex-col">
+        <div className="flex h-dvh flex-col">
           <AppHeader />
-          <main className="flex flex-1 flex-col">{children}</main>
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</main>
           <AppFooter />
         </div>
         <TanStackDevtools

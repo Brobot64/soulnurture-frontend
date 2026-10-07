@@ -10,6 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SigninRouteImport } from './routes/signin'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SupportRouteImport } from './routes/support'
+import { Route as VerifyRouteImport } from './routes/verify'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as CheckInIndexRouteImport } from './routes/check-in/index'
 import { Route as CheckInWhyRouteImport } from './routes/check-in/why'
@@ -19,6 +23,26 @@ import { Route as ReflectionConversationIdRouteImport } from './routes/reflectio
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SigninRoute = SigninRouteImport.update({
+  id: '/signin',
+  path: '/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyRoute = VerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WelcomeRoute = WelcomeRouteImport.update({
@@ -50,6 +74,10 @@ const ReflectionConversationIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/signin': typeof SigninRoute
+  '/signup': typeof SignupRoute
+  '/support': typeof SupportRoute
+  '/verify': typeof VerifyRoute
   '/welcome': typeof WelcomeRoute
   '/check-in/why': typeof CheckInWhyRoute
   '/complete/$checkInId': typeof CompleteCheckInIdRoute
@@ -58,6 +86,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/signin': typeof SigninRoute
+  '/signup': typeof SignupRoute
+  '/support': typeof SupportRoute
+  '/verify': typeof VerifyRoute
   '/welcome': typeof WelcomeRoute
   '/check-in/why': typeof CheckInWhyRoute
   '/complete/$checkInId': typeof CompleteCheckInIdRoute
@@ -67,6 +99,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/signin': typeof SigninRoute
+  '/signup': typeof SignupRoute
+  '/support': typeof SupportRoute
+  '/verify': typeof VerifyRoute
   '/welcome': typeof WelcomeRoute
   '/check-in/why': typeof CheckInWhyRoute
   '/complete/$checkInId': typeof CompleteCheckInIdRoute
@@ -77,6 +113,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/signin'
+    | '/signup'
+    | '/support'
+    | '/verify'
     | '/welcome'
     | '/check-in/why'
     | '/complete/$checkInId'
@@ -85,6 +125,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/signin'
+    | '/signup'
+    | '/support'
+    | '/verify'
     | '/welcome'
     | '/check-in/why'
     | '/complete/$checkInId'
@@ -93,6 +137,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/signin'
+    | '/signup'
+    | '/support'
+    | '/verify'
     | '/welcome'
     | '/check-in/why'
     | '/complete/$checkInId'
@@ -102,6 +150,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SigninRoute: typeof SigninRoute
+  SignupRoute: typeof SignupRoute
+  SupportRoute: typeof SupportRoute
+  VerifyRoute: typeof VerifyRoute
   WelcomeRoute: typeof WelcomeRoute
   CheckInWhyRoute: typeof CheckInWhyRoute
   CompleteCheckInIdRoute: typeof CompleteCheckInIdRoute
@@ -116,6 +168,34 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signin': {
+      id: '/signin'
+      path: '/signin'
+      fullPath: '/signin'
+      preLoaderRoute: typeof SigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify': {
+      id: '/verify'
+      path: '/verify'
+      fullPath: '/verify'
+      preLoaderRoute: typeof VerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/welcome': {
@@ -158,6 +238,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SigninRoute: SigninRoute,
+  SignupRoute: SignupRoute,
+  SupportRoute: SupportRoute,
+  VerifyRoute: VerifyRoute,
   WelcomeRoute: WelcomeRoute,
   CheckInWhyRoute: CheckInWhyRoute,
   CompleteCheckInIdRoute: CompleteCheckInIdRoute,

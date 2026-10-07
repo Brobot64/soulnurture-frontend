@@ -4,6 +4,16 @@ import { HeroIllustration } from '#/components/HeroIllustration'
 import { TextsReveal } from '#/components/TextsReveal'
 
 export const Route = createFileRoute('/welcome')({
+  head: () => ({
+    meta: [
+      { title: 'Soul Nurture AI — a calm space to check in with how you feel' },
+      {
+        name: 'description',
+        content:
+          'Take a quiet minute to check in with how you feel. A calm space for students to reflect — with the option to ask to talk to a school counsellor.',
+      },
+    ],
+  }),
   component: Welcome,
 })
 
@@ -54,6 +64,21 @@ function Welcome() {
               Maybe later
             </button>
           </div>
+          <p className="mt-6 text-center text-copy-sm text-body lg:text-left">
+            <Link
+              to="/signup"
+              className="font-medium text-action transition-colors hover:text-brand-4"
+            >
+              Create an account
+            </Link>
+            <span className="text-muted"> · </span>
+            <Link
+              to="/signin"
+              className="font-medium text-action transition-colors hover:text-brand-4"
+            >
+              Sign in
+            </Link>
+          </p>
           <p className="mt-8 text-center text-caption text-muted lg:mt-6 lg:text-left">
             Soul Nurture AI is not an emergency service. If you are in danger, tell a trusted adult right away.
           </p>
