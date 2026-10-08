@@ -28,9 +28,9 @@ export function ProgressRow({ step, of = 3, backTo }: ProgressRowProps) {
         <Link
           to={backTo}
           aria-label="Go back"
-          className="grid size-12 shrink-0 place-items-center rounded-full bg-surface text-ink transition-colors hover:bg-neutral-10 lg:size-11"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-surface text-ink transition-colors hover:bg-neutral-10 lg:size-11"
         >
-          <ChevronLeft className="size-5" />
+          <ChevronLeft className="size-4 lg:size-5" />
         </Link>
       ) : null}
       <div className="h-1.5 flex-1 overflow-hidden rounded-pill bg-surface">
