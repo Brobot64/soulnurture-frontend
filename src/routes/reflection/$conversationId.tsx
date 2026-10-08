@@ -481,8 +481,8 @@ function Reflection() {
             })
         const body = (
           <>
-            <p className="text-copy font-semibold text-ink">{label}</p>
-            <p className="mt-1 line-clamp-3 text-copy-sm text-muted">
+            <p className="text-chip font-semibold text-ink lg:text-copy">{label}</p>
+            <p className="mt-1 line-clamp-2 text-copy-sm text-muted lg:line-clamp-3">
               {entry.summary?.trim() || 'Summary on its way — check back soon.'}
             </p>
           </>
@@ -498,14 +498,14 @@ function Reflection() {
                 params: { conversationId: targetId },
               })
             }
-            className="rounded-2xl border border-hairline bg-white px-4 py-3 text-left transition-colors hover:border-action/40"
+            className="rounded-2xl border border-hairline bg-white px-3.5 py-2.5 text-left transition-colors hover:border-action/40 lg:px-4 lg:py-3"
           >
             {body}
           </button>
         ) : (
           <div
             key={entry.checkInId}
-            className="rounded-2xl border border-hairline bg-white px-4 py-3"
+            className="rounded-2xl border border-hairline bg-white px-3.5 py-2.5 lg:px-4 lg:py-3"
           >
             {body}
           </div>
@@ -516,44 +516,44 @@ function Reflection() {
 
   if (authStatus !== 'ready' || !user) {
     return (
-      <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-6 py-6 lg:px-10 lg:py-8">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-4 py-4 lg:px-10 lg:py-8">
         <ProgressRow step={2} backTo="/check-in/why" />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-6 py-6 lg:px-10 lg:py-8">
+    <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-4 py-4 lg:px-10 lg:py-8">
       <ProgressRow step={2} backTo="/check-in/why" />
 
-      <div className="mt-6 flex min-h-0 flex-1 flex-col lg:mt-8 lg:flex-row lg:gap-12">
+      <div className="mt-3 flex min-h-0 flex-1 flex-col lg:mt-8 lg:flex-row lg:gap-12">
         <div className="flex min-h-0 flex-1 flex-col">
           {/* Mobile past-reflections accordion — desktop renders the sidebar in the aside. */}
-          <div className="mb-4 shrink-0 lg:hidden">
+          <div className="mb-2.5 shrink-0 lg:hidden">
             <button
               type="button"
               onClick={() => setHistoryOpen((open) => !open)}
-              className="inline-flex h-[46px] w-full items-center justify-between rounded-pill border border-hairline bg-white px-6 text-button-sm text-ink transition-colors hover:border-action/40"
+              className="inline-flex h-[40px] w-full items-center justify-between rounded-pill border border-hairline bg-white px-4 text-chip text-ink transition-colors hover:border-action/40"
             >
               Past reflections
               <ChevronDown
-                className={`size-5 transition-transform ${historyOpen ? 'rotate-180' : ''}`}
+                className={`size-4 transition-transform ${historyOpen ? 'rotate-180' : ''}`}
               />
             </button>
             {historyOpen && (
-              <div className="mt-2 max-h-[240px] overflow-y-auto rounded-panel border border-hairline bg-white p-3">
+              <div className="mt-2 max-h-[240px] overflow-y-auto rounded-panel border border-hairline bg-white p-2.5">
                 {historyList}
               </div>
             )}
           </div>
 
-          <p className="mx-auto flex w-fit items-center gap-2.5 rounded-pill bg-peach px-5 py-2 text-chip text-peach-ink">
-            <span className="size-2 rounded-full bg-accent" aria-hidden="true" />
+          <p className="mx-auto flex w-fit items-center gap-2 rounded-pill bg-peach px-4 py-1.5 text-caption text-peach-ink lg:gap-2.5 lg:px-5 lg:py-2 lg:text-chip">
+            <span className="size-1.5 rounded-full bg-accent lg:size-2" aria-hidden="true" />
             AI-guided reflection · not a therapist or doctor
           </p>
 
-          <div ref={scrollRef} role="log" className="mt-6 min-h-0 flex-1 overflow-y-auto">
-            <div className="flex flex-col gap-7 pb-4">
+          <div ref={scrollRef} role="log" className="mt-3 min-h-0 flex-1 overflow-y-auto lg:mt-6">
+            <div className="flex flex-col gap-5 pb-4 lg:gap-7">
               {loading && (
                 <div className="flex items-start gap-3">
                   <span
@@ -562,7 +562,7 @@ function Reflection() {
                   >
                     <span className="size-2.5 rounded-full bg-accent" />
                   </span>
-                  <p className="min-w-0 flex-1 pt-1 text-copy text-body sm:text-lede">
+                  <p className="min-w-0 flex-1 pt-1 text-copy sm:text-lede">
                     <ThinkLine states={LOAD_STATES} />
                   </p>
                 </div>
@@ -586,7 +586,7 @@ function Reflection() {
               )}
 
               {!loading && !loadFailed && !thinking && !composerError && messages.length === 0 && (
-                <p className="mx-auto mt-10 max-w-[440px] text-center text-copy text-body">
+                <p className="mx-auto mt-10 max-w-[440px] text-center text-copy">
                   You're in a private reflection. When you're ready, say whatever is on your mind —
                   there's no right way to start.
                 </p>
@@ -596,7 +596,7 @@ function Reflection() {
                 messages.map((entry) =>
                   entry.role === 'USER' ? (
                     <Reveal key={entry.id} className="flex justify-end">
-                      <div className="max-w-[85%] rounded-[20px] bg-action px-5 py-3.5 text-copy text-white sm:text-lede">
+                      <div className="max-w-[85%] rounded-[16px] bg-action px-4 py-2.5 text-copy text-white sm:text-lede lg:rounded-[20px] lg:px-5 lg:py-3.5">
                         {entry.content}
                       </div>
                     </Reveal>
@@ -629,7 +629,7 @@ function Reflection() {
                   >
                     <span className="size-2.5 rounded-full bg-accent" />
                   </span>
-                  <p className="min-w-0 flex-1 pt-1 text-copy text-body sm:text-lede">
+                  <p className="min-w-0 flex-1 pt-1 text-copy sm:text-lede">
                     <ThinkLine states={THINK_STATES} />
                   </p>
                 </div>
@@ -642,31 +642,50 @@ function Reflection() {
                 voiceState === 'idle' &&
                 last?.role === 'ASSISTANT' && (
                 <div className="pl-11 lg:pl-12">
-                  <p className="text-copy font-medium text-body">Choose a reply</p>
-                  <div className="mt-3 flex flex-wrap gap-2.5">
-                    {QUICK_REPLIES.map((reply) => (
-                      <button
-                        key={reply.value}
-                        type="button"
-                        onClick={() => void send(reply.label, reply.value)}
-                        className={`inline-flex h-[46px] items-center whitespace-nowrap rounded-pill border bg-white px-6 text-button-sm transition-colors ${
-                          reply.value === 'TALK_TO_SOMEONE'
-                            ? 'border-[1.5px] border-accent text-peach-ink hover:bg-peach/50'
-                            : 'border-hairline text-ink hover:border-action/40'
-                        }`}
-                      >
-                        {reply.label}
-                      </button>
-                    ))}
+                  <p className="text-chip font-medium text-muted lg:text-copy lg:text-ink">
+                    Choose a reply
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2 lg:mt-3 lg:gap-2.5">
+                    {/* Mobile: the two reflection prompts sit side by side as quiet tinted
+                        chips and the human-help action drops to its own row. At lg the
+                        wrappers dissolve so all three share one row exactly as before. */}
+                    <div className="flex flex-wrap gap-2 lg:contents">
+                      {QUICK_REPLIES.filter((reply) => reply.value !== 'TALK_TO_SOMEONE').map(
+                        (reply) => (
+                          <button
+                            key={reply.value}
+                            type="button"
+                            onClick={() => void send(reply.label, reply.value)}
+                            className="inline-flex h-[38px] items-center whitespace-nowrap rounded-pill border border-transparent bg-panel px-4 text-chip text-ink transition-colors hover:bg-blush lg:h-[46px] lg:border-hairline lg:bg-white lg:px-6 lg:text-button-sm lg:hover:border-action/40 lg:hover:bg-white"
+                          >
+                            {reply.label}
+                          </button>
+                        ),
+                      )}
+                    </div>
+                    <div className="w-full lg:contents">
+                      {QUICK_REPLIES.filter((reply) => reply.value === 'TALK_TO_SOMEONE').map(
+                        (reply) => (
+                          <button
+                            key={reply.value}
+                            type="button"
+                            onClick={() => void send(reply.label, reply.value)}
+                            className="inline-flex h-[38px] items-center whitespace-nowrap rounded-pill border-[1.5px] border-accent/40 bg-peach/50 px-4 text-chip text-peach-ink transition-colors hover:bg-peach lg:h-[46px] lg:border-accent lg:bg-white lg:px-6 lg:text-button-sm lg:hover:bg-peach/50"
+                          >
+                            {reply.label}
+                          </button>
+                        ),
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="mt-4 shrink-0">
+          <div className="mt-3 shrink-0 lg:mt-4">
             {recommendation?.show && (
-              <div className="mb-4 rounded-panel bg-peach px-6 py-5">
+              <div className="mb-4 rounded-panel bg-peach px-5 py-4 lg:px-6 lg:py-5">
                 <p className="text-copy text-peach-ink">
                   {recommendation.message ??
                     'It might help to talk with someone at your school.'}
@@ -687,12 +706,12 @@ function Reflection() {
             )}
 
             {!loading && !loadFailed && done && !readOnly && (
-              <div className="flex flex-col items-center gap-4 py-4">
+              <div className="flex flex-col items-center gap-3 py-3 lg:gap-4 lg:py-4">
                 <button
                   type="button"
                   onClick={() => void handleContinue()}
                   disabled={closing}
-                  className="inline-flex h-[52px] items-center justify-center whitespace-nowrap rounded-pill bg-action px-10 text-button text-white transition-colors hover:bg-brand-4 disabled:opacity-50"
+                  className="inline-flex h-[46px] items-center justify-center whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:h-[52px] lg:px-10 lg:text-button"
                 >
                   {closing ? 'Finishing…' : 'Continue'}
                 </button>
@@ -706,13 +725,13 @@ function Reflection() {
             )}
 
             {!loading && !loadFailed && readOnly && (
-              <div className="flex flex-col items-center gap-4 py-4">
+              <div className="flex flex-col items-center gap-3 py-3 lg:gap-4 lg:py-4">
                 <p className="text-center text-copy text-muted">
                   This conversation has ended — you can read it back any time.
                 </p>
                 <Link
                   to="/check-in"
-                  className="inline-flex h-[52px] items-center justify-center whitespace-nowrap rounded-pill bg-action px-10 text-button text-white transition-colors hover:bg-brand-4"
+                  className="inline-flex h-[46px] items-center justify-center whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 lg:h-[52px] lg:px-10 lg:text-button"
                 >
                   Start a new check-in
                 </Link>
@@ -720,7 +739,7 @@ function Reflection() {
             )}
 
             {!loading && !loadFailed && !done && voiceState === 'recording' && (
-              <div className="flex h-[60px] items-center gap-3 rounded-pill border-[1.5px] border-accent bg-white pl-7 pr-2.5">
+              <div className="flex h-[48px] items-center gap-3 rounded-pill border-[1.5px] border-accent bg-white pl-5 pr-2 lg:h-[60px] lg:pl-7 lg:pr-2.5">
                 <span className="relative grid size-3 shrink-0 place-items-center" aria-hidden="true">
                   <span className="absolute size-3 animate-ping rounded-full bg-accent opacity-60" />
                   <span className="relative size-3 rounded-full bg-accent" />
@@ -735,15 +754,15 @@ function Reflection() {
                   type="button"
                   onClick={cancelRecording}
                   aria-label="Cancel recording"
-                  className="grid size-10 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-panel hover:text-ink"
+                  className="grid size-9 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-panel hover:text-ink lg:size-10"
                 >
-                  <X className="size-5" />
+                  <X className="size-4 lg:size-5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => void finishRecording()}
                   aria-label="Stop and transcribe"
-                  className="grid size-10 shrink-0 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4"
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4 lg:size-10"
                 >
                   <Square className="size-4 fill-current" />
                 </button>
@@ -767,7 +786,11 @@ function Reflection() {
                     voiceState === 'transcribing' ? 'Transcribing your voice note…' : 'Type a reply…'
                   }
                   aria-label="Type a reply"
-                  className={`h-[60px] w-full rounded-pill border border-hairline bg-white pl-7 ${voiceReady ? 'pr-28' : 'pr-16'} text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action disabled:opacity-60`}
+                  className={`h-[48px] w-full rounded-pill border border-hairline bg-white pl-5 ${
+                    voiceReady ? 'pr-[94px]' : 'pr-[52px]'
+                  } text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action disabled:opacity-60 lg:h-[60px] lg:pl-7 ${
+                    voiceReady ? 'lg:pr-28' : 'lg:pr-16'
+                  }`}
                 />
                 {voiceReady && (
                   <button
@@ -776,12 +799,12 @@ function Reflection() {
                     disabled={thinking || voiceState === 'transcribing'}
                     aria-label="Record a voice note"
                     title="Record a voice note"
-                    className="absolute right-[60px] top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-panel text-action transition-colors hover:bg-blush disabled:opacity-40"
+                    className="absolute right-[50px] top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-panel text-action transition-colors hover:bg-blush disabled:opacity-40 lg:right-[60px] lg:size-10"
                   >
                     {voiceState === 'transcribing' ? (
-                      <Loader2 className="size-5 animate-spin" />
+                      <Loader2 className="size-4 animate-spin lg:size-5" />
                     ) : (
-                      <Mic className="size-5" />
+                      <Mic className="size-4 lg:size-5" />
                     )}
                   </button>
                 )}
@@ -789,14 +812,14 @@ function Reflection() {
                   type="submit"
                   disabled={!input.trim() || thinking || voiceState === 'transcribing'}
                   aria-label="Send"
-                  className="absolute right-2.5 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4 disabled:opacity-40"
+                  className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4 disabled:opacity-40 lg:right-2.5 lg:size-10"
                 >
-                  <ArrowRight className="size-5" />
+                  <ArrowRight className="size-4 lg:size-5" />
                 </button>
               </form>
             )}
 
-            <p className="mt-5 text-center text-caption text-muted">
+            <p className="mt-2 text-center text-caption text-muted lg:mt-5">
               Reflection prompts only. Not medical advice or therapy.
             </p>
           </div>
