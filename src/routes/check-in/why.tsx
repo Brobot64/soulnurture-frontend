@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import { Flash, useFlash } from '#/components/Flash'
+import { ConsentGate, useAiConsent } from '#/components/ConsentGate'
 import { ProgressRow } from '#/components/ProgressRow'
 import { StatusBadge, Spinner } from '#/components/StatusBadge'
 import { TextsReveal } from '#/components/TextsReveal'
 import { ApiError } from '#/lib/api'
 import { useSession } from '#/lib/auth'
+import { isConsentRequired } from '#/lib/consent'
 import {
   MOODS,
   TRIGGERS,
@@ -40,6 +42,9 @@ function WhyCheckIn() {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Backstop for the /check-in gate — this screen is the one that actually
+  // creates the conversation, so it re-checks before handing off to the AI.
+  const consent = useAiConsent(authStatus === 'ready' && !!user)
 
   useEffect(() => {
     if (authStatus !== 'ready') return
@@ -85,6 +90,12 @@ function WhyCheckIn() {
         return
       }
       setBusy(false)
+      if (isConsentRequired(caught)) {
+        // The explanation was withdrawn or bumped — re-open the gate instead of
+        // showing a raw permission error.
+        consent.recheck()
+        return
+      }
       setError(
         caught instanceof ApiError ? caught.message : 'Something went wrong. Please try again.',
       )
@@ -193,6 +204,13 @@ function WhyCheckIn() {
       </div>
 
       <Flash message={message} hiding={hiding} />
+
+      {consent.state === 'required' && (
+        <ConsentGate
+          onAccepted={consent.accept}
+          onDeclined={() => navigate({ to: '/welcome', replace: true })}
+        />
+      )}
     </div>
   )
 }

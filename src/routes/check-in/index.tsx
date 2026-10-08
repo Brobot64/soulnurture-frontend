@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import { Flash, useFlash } from '#/components/Flash'
+import { ConsentGate, useAiConsent } from '#/components/ConsentGate'
 import { ProgressRow } from '#/components/ProgressRow'
 import { TextsReveal } from '#/components/TextsReveal'
 import { useSession } from '#/lib/auth'
@@ -27,6 +28,8 @@ function MoodCheckIn() {
   const { user, status: authStatus } = useSession()
   const [selected, setSelected] = useState<string | null>(null)
   const [note, setNote] = useState('')
+  // Pre-chat consent gate — the journey cannot reach the AI without it.
+  const consent = useAiConsent(authStatus === 'ready' && !!user)
 
   useEffect(() => {
     if (authStatus !== 'ready') return
@@ -139,6 +142,13 @@ function MoodCheckIn() {
       </div>
 
       <Flash message={message} hiding={hiding} />
+
+      {consent.state === 'required' && (
+        <ConsentGate
+          onAccepted={consent.accept}
+          onDeclined={() => navigate({ to: '/welcome', replace: true })}
+        />
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowRight, ChevronDown, ChevronRight, Loader2, Mic, RefreshCw, Square, UserRound, X } from 'lucide-react'
 
 import { CheckInSummary } from '#/components/CheckInSummary'
+import { ConsentGate, useAiConsent } from '#/components/ConsentGate'
 import { Flash, useFlash } from '#/components/Flash'
 import { ProgressRow } from '#/components/ProgressRow'
 import { Reveal } from '#/components/Reveal'
@@ -11,6 +12,7 @@ import { StreamText } from '#/components/StreamText'
 import { ThinkLine } from '#/components/ThinkLine'
 import { ApiError } from '#/lib/api'
 import { useSession } from '#/lib/auth'
+import { isConsentRequired } from '#/lib/consent'
 import {
   QUICK_REPLIES,
   clearPendingOpening,
@@ -67,6 +69,13 @@ function Reflection() {
   const navigate = useNavigate()
   const { flash, message: flashMessage, hiding } = useFlash()
   const { user, status: authStatus } = useSession()
+  // Backstop for the check-in gate: the backend refuses AI turns without an
+  // accepted disclosure, so this route re-checks and re-opens the modal.
+  const {
+    state: consentState,
+    accept: acceptConsent,
+    recheck: recheckConsent,
+  } = useAiConsent(authStatus === 'ready' && !!user)
 
   const [messages, setMessages] = useState<Message[]>([])
   const [checkIn, setCheckIn] = useState<CheckIn | null>(null)
@@ -106,6 +115,10 @@ function Reflection() {
       })
       return
     }
+    // While the explanation is outstanding the chat stays sealed. Accepting
+    // flips consentState and re-runs this effect, which then opens the
+    // stashed first message as normal.
+    if (consentState === 'required') return
     let cancelled = false
     setLoadFailed(false)
     setLoading(true)
@@ -190,6 +203,12 @@ function Reflection() {
           })
           return
         }
+        if (isConsentRequired(caught)) {
+          // The gate re-opens; the stashed opening survives for the retry once
+          // the student agrees, so nothing is lost and no raw 403 is shown.
+          recheckConsent()
+          return
+        }
         setComposerError(
           caught instanceof ApiError
             ? caught.message
@@ -205,7 +224,7 @@ function Reflection() {
       cancelled = true
       if (pollTimerRef.current !== null) window.clearInterval(pollTimerRef.current)
     }
-  }, [authStatus, user, conversationId, navigate, flash, attempt])
+  }, [authStatus, user, conversationId, navigate, flash, attempt, consentState])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -311,6 +330,14 @@ function Reflection() {
           search: { redirect: `/reflection/${conversationId}` },
           replace: true,
         })
+        return
+      }
+      if (isConsentRequired(caught)) {
+        // A bumped disclosure version invalidates the earlier acceptance —
+        // re-open the gate and hand the half-typed turn back to the student.
+        setMessages((prev) => prev.filter((entry) => entry.id !== tempId))
+        setInput(content)
+        recheckConsent()
         return
       }
       if (caught instanceof ApiError && caught.status === 409) {
@@ -801,6 +828,13 @@ function Reflection() {
           </div>
         </aside>
       </div>
+
+      {consentState === 'required' && (
+        <ConsentGate
+          onAccepted={acceptConsent}
+          onDeclined={() => navigate({ to: '/welcome', replace: true })}
+        />
+      )}
 
       <Flash message={flashMessage} hiding={hiding} />
     </div>
