@@ -2,6 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 
 import { HeroIllustration } from '#/components/HeroIllustration'
 import { TextsReveal } from '#/components/TextsReveal'
+import { useSession } from '#/lib/auth'
 
 export const Route = createFileRoute('/welcome')({
   head: () => ({
@@ -24,6 +25,8 @@ const bullets = [
 ]
 
 function Welcome() {
+  const { user, status } = useSession()
+
   return (
     <div className="flex flex-1 items-center justify-center">
       <div className="mx-auto grid w-full max-w-[1440px] items-center gap-8 px-6 py-10 lg:grid-cols-2 lg:gap-20 lg:px-[120px] lg:py-16">
@@ -64,21 +67,23 @@ function Welcome() {
               Maybe later
             </button>
           </div>
-          <p className="mt-6 text-center text-copy-sm text-body lg:text-left">
-            <Link
-              to="/signup"
-              className="font-medium text-action transition-colors hover:text-brand-4"
-            >
-              Create an account
-            </Link>
-            <span className="text-muted"> · </span>
-            <Link
-              to="/signin"
-              className="font-medium text-action transition-colors hover:text-brand-4"
-            >
-              Sign in
-            </Link>
-          </p>
+          {status === 'ready' && !user && (
+            <p className="mt-6 text-center text-copy-sm text-body lg:text-left">
+              <Link
+                to="/signup"
+                className="font-medium text-action transition-colors hover:text-brand-4"
+              >
+                Create an account
+              </Link>
+              <span className="text-muted"> · </span>
+              <Link
+                to="/signin"
+                className="font-medium text-action transition-colors hover:text-brand-4"
+              >
+                Sign in
+              </Link>
+            </p>
+          )}
           <p className="mt-8 text-center text-caption text-muted lg:mt-6 lg:text-left">
             Soul Nurture AI is not an emergency service. If you are in danger, tell a trusted adult right away.
           </p>
