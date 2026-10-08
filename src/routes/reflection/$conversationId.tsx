@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowRight, ChevronRight, Loader2, Mic, RefreshCw, Square, UserRound, X } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronRight, Loader2, Mic, RefreshCw, Square, UserRound, X } from 'lucide-react'
 
 import { CheckInSummary } from '#/components/CheckInSummary'
 import { Flash, useFlash } from '#/components/Flash'
@@ -15,16 +15,19 @@ import {
   QUICK_REPLIES,
   clearPendingOpening,
   closeConversation,
+  fetchCheckInHistory,
   fetchConversation,
   getCheckIn,
   newId,
   readPendingOpening,
   sendMessage,
   type CheckIn,
+  type CheckInHistoryEntry,
   type ConversationDetail,
   type ConversationStatus,
   type HumanCareRecommendation,
   type Message,
+  type QuickReplyValue,
 } from '#/lib/journey'
 import { VoiceRecorder, isVoiceSupported, transcribeVoice } from '#/lib/voice'
 
@@ -45,11 +48,16 @@ export const Route = createFileRoute('/reflection/$conversationId')({
 const THINK_STATES = ['Thinking', 'Reflecting', 'Finding the right words'] as const
 const LOAD_STATES = ['Opening your check-in', 'Finding where you left off'] as const
 
-/** The bounded flow wraps up after this many student turns. */
-const FULL_FLOW_TURNS = 3
-
 /** Voice notes stop automatically at this length. */
 const VOICE_MAX_SECONDS = 120
+
+/** Mirrors the backend guided budget: 3 free-text turns, extended to 5 once "Tell you more" is used. */
+const BASE_TURN_BUDGET = 3
+const EXTENDED_TURN_BUDGET = 5
+
+/** aiPending polling: refetch the conversation on this interval until the assistant reply is COMPLETE. */
+const POLL_INTERVAL_MS = 4000
+const POLL_MAX_MS = 90_000
 
 // Guards against a double mount re-sending the stashed opening message.
 const openingInFlight = new Set<string>()
@@ -75,12 +83,18 @@ function Reflection() {
   const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'transcribing'>('idle')
   const [voiceElapsed, setVoiceElapsed] = useState(0)
   const [voiceReady, setVoiceReady] = useState(false)
+  const [history, setHistory] = useState<CheckInHistoryEntry[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   // Only messages added this session stream word by word; restored ones render settled.
   const streamIds = useRef<Set<string>>(new Set())
   const recorderRef = useRef<VoiceRecorder | null>(null)
   const voiceTimerRef = useRef<number | null>(null)
+  const pollTimerRef = useRef<number | null>(null)
+  const pollDeadlineRef = useRef(0)
+  // True while a send is in flight — the completion poll must not clobber it.
+  const sendingRef = useRef(false)
 
   useEffect(() => {
     if (authStatus !== 'ready') return
@@ -95,6 +109,14 @@ function Reflection() {
     let cancelled = false
     setLoadFailed(false)
     setLoading(true)
+
+    fetchCheckInHistory()
+      .then((result) => {
+        if (!cancelled) setHistory(result.items)
+      })
+      .catch(() => {
+        // the history sidebar is optional — the chat works without it
+      })
 
     void (async () => {
       let conversation: ConversationDetail | null
@@ -156,7 +178,7 @@ function Reflection() {
           result.assistantMessage,
         ])
         if (result.humanCareRecommendation?.show) setRecommendation(result.humanCareRecommendation)
-        if (result.aiPending) flash('The AI is taking a moment — its reply will arrive shortly.')
+        if (result.aiPending) startCompletionPoll()
       } catch (caught) {
         if (cancelled) return
         setMessages([])
@@ -181,6 +203,7 @@ function Reflection() {
 
     return () => {
       cancelled = true
+      if (pollTimerRef.current !== null) window.clearInterval(pollTimerRef.current)
     }
   }, [authStatus, user, conversationId, navigate, flash, attempt])
 
@@ -198,30 +221,85 @@ function Reflection() {
     }
   }, [])
 
-  const userTurns = messages.filter((entry) => entry.role === 'USER').length
-  const done = conversationStatus !== 'ACTIVE' || (!thinking && userTurns >= FULL_FLOW_TURNS)
+  const freeTextTurns = messages.filter(
+    (entry) => entry.role === 'USER' && !entry.quickReply,
+  ).length
+  const hadTellMore = messages.some((entry) => entry.quickReply === 'TELL_MORE')
+  const turnBudget = hadTellMore ? EXTENDED_TURN_BUDGET : BASE_TURN_BUDGET
+  const readOnly = conversationStatus !== 'ACTIVE'
+  const done = readOnly || (!thinking && freeTextTurns >= turnBudget)
   const last = messages[messages.length - 1]
 
-  const send = async (raw: string) => {
+  const stopPolling = () => {
+    if (pollTimerRef.current !== null) {
+      window.clearInterval(pollTimerRef.current)
+      pollTimerRef.current = null
+    }
+  }
+
+  // A failed AI generation returns a holding reply with aiPending — the worker
+  // regenerates later, so poll until the assistant payload turns COMPLETE.
+  const startCompletionPoll = () => {
+    stopPolling()
+    pollDeadlineRef.current = Date.now() + POLL_MAX_MS
+    pollTimerRef.current = window.setInterval(() => {
+      if (sendingRef.current) return
+      if (Date.now() > pollDeadlineRef.current) {
+        stopPolling()
+        flash('The AI is still thinking — its full reply will appear here shortly.')
+        return
+      }
+      void (async () => {
+        try {
+          const conversation = await fetchConversation(conversationId)
+          if (!conversation || pollTimerRef.current === null) return
+          const latestAssistant = [...conversation.messages]
+            .reverse()
+            .find((entry) => entry.role === 'ASSISTANT')
+          if (latestAssistant?.aiPayload?.asyncState === 'COMPLETE') {
+            stopPolling()
+            setMessages(conversation.messages)
+            setConversationStatus(conversation.status)
+          }
+        } catch {
+          // transient network error — the next tick retries until the deadline
+        }
+      })()
+    }, POLL_INTERVAL_MS)
+  }
+
+  const send = async (raw: string, quickReply?: QuickReplyValue) => {
     const content = raw.trim()
     if (!content || thinking || done) return
+    stopPolling()
+    sendingRef.current = true
     setInput('')
     setComposerError(null)
     const tempId = newId('msg')
     setMessages((prev) => [
       ...prev,
-      { id: tempId, role: 'USER', content, createdAt: new Date().toISOString() },
+      {
+        id: tempId,
+        role: 'USER',
+        content,
+        quickReply: quickReply ?? null,
+        createdAt: new Date().toISOString(),
+      },
     ])
     setThinking(true)
     try {
-      const result = await sendMessage(conversationId, { content, language: 'en' })
+      const result = await sendMessage(conversationId, {
+        content,
+        language: 'en',
+        ...(quickReply ? { quickReply } : {}),
+      })
       streamIds.current.add(result.assistantMessage.id)
       setMessages((prev) => [
         ...prev.map((entry) => (entry.id === tempId ? result.userMessage : entry)),
         result.assistantMessage,
       ])
       if (result.humanCareRecommendation?.show) setRecommendation(result.humanCareRecommendation)
-      if (result.aiPending) flash('The AI is taking a moment — its reply will arrive shortly.')
+      if (result.aiPending) startCompletionPoll()
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 401) {
         navigate({
@@ -231,6 +309,10 @@ function Reflection() {
         })
         return
       }
+      if (caught instanceof ApiError && caught.status === 409) {
+        // the conversation was closed elsewhere — flip the screen to read-only
+        setConversationStatus('CLOSED')
+      }
       setMessages((prev) => prev.filter((entry) => entry.id !== tempId))
       setInput(content)
       setComposerError(
@@ -239,6 +321,7 @@ function Reflection() {
           : 'Your message could not be sent. Please try again.',
       )
     } finally {
+      sendingRef.current = false
       setThinking(false)
     }
   }
@@ -347,6 +430,59 @@ function Reflection() {
     }
   }
 
+  // Shared by the mobile accordion and the desktop sidebar — closed
+  // conversations only, each opening read-only in the chat.
+  const historyList = (
+    <div className="flex flex-col gap-2.5">
+      {history.length === 0 && (
+        <p className="text-copy-sm text-muted">
+          No past reflections yet — your closed conversations will show up here.
+        </p>
+      )}
+      {history.map((entry) => {
+        const when = new Date(entry.createdAt)
+        const label = Number.isNaN(when.getTime())
+          ? entry.createdAt
+          : when.toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })
+        const body = (
+          <>
+            <p className="text-copy font-semibold text-ink">{label}</p>
+            <p className="mt-1 line-clamp-3 text-copy-sm text-muted">
+              {entry.summary?.trim() || 'Summary on its way — check back soon.'}
+            </p>
+          </>
+        )
+        const targetId = entry.conversationId
+        return targetId ? (
+          <button
+            key={entry.checkInId}
+            type="button"
+            onClick={() =>
+              navigate({
+                to: '/reflection/$conversationId',
+                params: { conversationId: targetId },
+              })
+            }
+            className="rounded-2xl border border-hairline bg-white px-4 py-3 text-left transition-colors hover:border-action/40"
+          >
+            {body}
+          </button>
+        ) : (
+          <div
+            key={entry.checkInId}
+            className="rounded-2xl border border-hairline bg-white px-4 py-3"
+          >
+            {body}
+          </div>
+        )
+      })}
+    </div>
+  )
+
   if (authStatus !== 'ready' || !user) {
     return (
       <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-6 py-6 lg:px-10 lg:py-8">
@@ -361,6 +497,25 @@ function Reflection() {
 
       <div className="mt-6 flex min-h-0 flex-1 flex-col lg:mt-8 lg:flex-row lg:gap-12">
         <div className="flex min-h-0 flex-1 flex-col">
+          {/* Mobile past-reflections accordion — desktop renders the sidebar in the aside. */}
+          <div className="mb-4 shrink-0 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((open) => !open)}
+              className="inline-flex h-[46px] w-full items-center justify-between rounded-pill border border-hairline bg-white px-6 text-button-sm text-ink transition-colors hover:border-action/40"
+            >
+              Past reflections
+              <ChevronDown
+                className={`size-5 transition-transform ${historyOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {historyOpen && (
+              <div className="mt-2 max-h-[240px] overflow-y-auto rounded-panel border border-hairline bg-white p-3">
+                {historyList}
+              </div>
+            )}
+          </div>
+
           <p className="mx-auto flex w-fit items-center gap-2.5 rounded-pill bg-peach px-5 py-2 text-chip text-peach-ink">
             <span className="size-2 rounded-full bg-accent" aria-hidden="true" />
             AI-guided reflection · not a therapist or doctor
@@ -460,16 +615,16 @@ function Reflection() {
                   <div className="mt-3 flex flex-wrap gap-2.5">
                     {QUICK_REPLIES.map((reply) => (
                       <button
-                        key={reply}
+                        key={reply.value}
                         type="button"
-                        onClick={() => void send(reply)}
+                        onClick={() => void send(reply.label, reply.value)}
                         className={`inline-flex h-[46px] items-center whitespace-nowrap rounded-pill border bg-white px-6 text-button-sm transition-colors ${
-                          reply.includes('talk to someone')
+                          reply.value === 'TALK_TO_SOMEONE'
                             ? 'border-[1.5px] border-accent text-peach-ink hover:bg-peach/50'
                             : 'border-hairline text-ink hover:border-action/40'
                         }`}
                       >
-                        {reply}
+                        {reply.label}
                       </button>
                     ))}
                   </div>
@@ -500,7 +655,7 @@ function Reflection() {
               </div>
             )}
 
-            {!loading && !loadFailed && done && (
+            {!loading && !loadFailed && done && !readOnly && (
               <div className="flex flex-col items-center gap-4 py-4">
                 <button
                   type="button"
@@ -515,6 +670,20 @@ function Reflection() {
                   className="text-button-sm text-action transition-colors hover:text-brand-4"
                 >
                   Or talk to a person on WhatsApp
+                </Link>
+              </div>
+            )}
+
+            {!loading && !loadFailed && readOnly && (
+              <div className="flex flex-col items-center gap-4 py-4">
+                <p className="text-center text-copy text-muted">
+                  This conversation has ended — you can read it back any time.
+                </p>
+                <Link
+                  to="/check-in"
+                  className="inline-flex h-[52px] items-center justify-center whitespace-nowrap rounded-pill bg-action px-10 text-button text-white transition-colors hover:bg-brand-4"
+                >
+                  Start a new check-in
                 </Link>
               </div>
             )}
@@ -622,6 +791,10 @@ function Reflection() {
             </span>
             <ChevronRight className="size-5 shrink-0 text-peach-ink/70" />
           </Link>
+          <div className="mt-10">
+            <h3 className="text-section text-heading">Past reflections</h3>
+            <div className="mt-4 max-h-[340px] overflow-y-auto pr-1">{historyList}</div>
+          </div>
         </aside>
       </div>
 
