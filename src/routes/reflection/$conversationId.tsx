@@ -51,7 +51,7 @@ const LOAD_STATES = ['Opening your check-in', 'Finding where you left off'] as c
 /** Voice notes stop automatically at this length. */
 const VOICE_MAX_SECONDS = 120
 
-/** Mirrors the backend guided budget: 3 free-text turns, extended to 5 once "Tell you more" is used. */
+/** Mirrors the backend guided budget: 3 free-text turns (5 once "Tell you more" was used), hard-capped at 5 total turns — quick-reply taps count toward the cap. */
 const BASE_TURN_BUDGET = 3
 const EXTENDED_TURN_BUDGET = 5
 
@@ -224,10 +224,14 @@ function Reflection() {
   const freeTextTurns = messages.filter(
     (entry) => entry.role === 'USER' && !entry.quickReply,
   ).length
+  const totalTurns = messages.filter((entry) => entry.role === 'USER').length
   const hadTellMore = messages.some((entry) => entry.quickReply === 'TELL_MORE')
   const turnBudget = hadTellMore ? EXTENDED_TURN_BUDGET : BASE_TURN_BUDGET
   const readOnly = conversationStatus !== 'ACTIVE'
-  const done = readOnly || (!thinking && freeTextTurns >= turnBudget)
+  const done =
+    readOnly ||
+    (!thinking &&
+      (totalTurns >= EXTENDED_TURN_BUDGET || freeTextTurns >= turnBudget))
   const last = messages[messages.length - 1]
 
   const stopPolling = () => {
