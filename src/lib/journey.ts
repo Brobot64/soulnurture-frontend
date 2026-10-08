@@ -25,6 +25,8 @@ export type FeelingLabel =
 export type FeelingIntensity = 'A_LITTLE' | 'SOMEWHAT' | 'A_LOT'
 export type MessageRole = 'USER' | 'ASSISTANT' | 'SYSTEM'
 export type ConversationStatus = 'ACTIVE' | 'CLOSED' | 'ARCHIVED'
+/** Mirrors the backend QUICK_REPLY_VALUES enum on SendMessageDto. */
+export type QuickReplyValue = 'TELL_MORE' | 'SHOW_IDEA' | 'TALK_TO_SOMEONE'
 
 export interface CreateCheckInDto {
   feeling: FeelingLabel
@@ -36,6 +38,8 @@ export interface CreateCheckInDto {
 export interface SendMessageDto {
   content: string
   language?: string
+  /** Guided-reply marker — the backend reads the enum while content stays required. */
+  quickReply?: QuickReplyValue
 }
 
 export interface CheckIn {
@@ -47,10 +51,24 @@ export interface CheckIn {
   createdAt: string
 }
 
+/** One row of the guided check-in history — a check-in whose conversation closed. */
+export interface CheckInHistoryEntry {
+  checkInId: string
+  feeling: FeelingLabel
+  triggers: string[]
+  createdAt: string
+  conversationId: string | null
+  summary: string | null
+}
+
 export interface Message {
   id: string
   role: MessageRole
   content: string
+  /** Present on user messages sent via a quick-reply tap; null/absent for free text. */
+  quickReply?: string | null
+  /** Present on assistant messages — asyncState COMPLETE means the AI reply is final. */
+  aiPayload?: { asyncState?: string } | null
   createdAt: string
 }
 
@@ -114,10 +132,15 @@ export const TRIGGERS = [
   'Something else',
 ]
 
-export const QUICK_REPLIES = [
-  'Tell you more',
-  'Show me an idea',
-  'I would like to talk to someone',
+export interface QuickReply {
+  label: string
+  value: QuickReplyValue
+}
+
+export const QUICK_REPLIES: QuickReply[] = [
+  { label: 'Tell you more', value: 'TELL_MORE' },
+  { label: 'Show me an idea', value: 'SHOW_IDEA' },
+  { label: 'I would like to talk to someone', value: 'TALK_TO_SOMEONE' },
 ]
 
 export function getMoodByFeeling(feeling: FeelingLabel): MoodOption | undefined {
@@ -246,6 +269,10 @@ export async function getCheckIn(id: string): Promise<CheckIn | null> {
     if (caught instanceof ApiError && caught.status === 404) return null
     throw caught
   }
+}
+
+export async function fetchCheckInHistory(): Promise<{ items: CheckInHistoryEntry[] }> {
+  return apiFetch<{ items: CheckInHistoryEntry[] }>('/api/v1/check-ins/history')
 }
 
 export async function startConversation(checkInId: string): Promise<Conversation> {
