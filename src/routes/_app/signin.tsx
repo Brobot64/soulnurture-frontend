@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import { AuthField, AuthShell } from '#/components/AuthShell'
 import { Spinner, StatusBadge } from '#/components/StatusBadge'
@@ -71,10 +71,7 @@ function SignIn() {
       subtitle="Sign in to pick up where you left off."
       footer={
         <p className="mt-7 text-copy text-body">
-          New here?{' '}
-          <Link to="/signup" className="font-medium text-action transition-colors hover:text-brand-4">
-            Create an account
-          </Link>
+          New here? Accounts are set up by your school — ask your school office.
         </p>
       }
     >
