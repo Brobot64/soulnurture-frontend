@@ -33,7 +33,7 @@ import {
 } from '#/lib/journey'
 import { VoiceRecorder, isVoiceSupported, transcribeVoice } from '#/lib/voice'
 
-export const Route = createFileRoute('/reflection/$conversationId')({
+export const Route = createFileRoute('/_app/reflection/$conversationId')({
   head: () => ({
     meta: [
       { title: 'Your reflection · Soul Nurture AI' },

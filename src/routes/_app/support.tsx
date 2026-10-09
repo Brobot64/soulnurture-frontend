@@ -18,7 +18,7 @@ import {
   type SupportPerson,
 } from '#/lib/support'
 
-export const Route = createFileRoute('/support')({
+export const Route = createFileRoute('/_app/support')({
   head: () => ({
     meta: [
       { title: 'Talk to a real person · Soul Nurture AI' },

@@ -4,7 +4,7 @@ import { HeroIllustration } from '#/components/HeroIllustration'
 import { TextsReveal } from '#/components/TextsReveal'
 import { useSession } from '#/lib/auth'
 
-export const Route = createFileRoute('/welcome')({
+export const Route = createFileRoute('/_app/welcome')({
   head: () => ({
     meta: [
       { title: 'Soul Nurture AI — a calm space to check in with how you feel' },

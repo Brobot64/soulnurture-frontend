@@ -156,6 +156,16 @@
   --color-mood-indifferent: #EFF4FB;
   --color-mood-strange: #FCF0F4;
   --color-mood-distraught: #FCF4F0;
+
+  /* Chart tones — the eight MoodId faces, saturated for stroke/fill use */
+  --color-chart-great: #3E7B5C;
+  --color-chart-normal: #93D5B0;
+  --color-chart-sad: #AD5D32;
+  --color-chart-angry: #EF9060;
+  --color-chart-confused: #6B9A82;
+  --color-chart-indifferent: #849087;
+  --color-chart-strange: #FFB794;
+  --color-chart-distraught: #204A38;
 }
 
 @layer base {

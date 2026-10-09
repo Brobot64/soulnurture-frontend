@@ -20,7 +20,7 @@ import {
   startConversation,
 } from '#/lib/journey'
 
-export const Route = createFileRoute('/check-in/why')({
+export const Route = createFileRoute('/_app/check-in/why')({
   head: () => ({
     meta: [
       { title: 'Why do you think you feel that way? · Soul Nurture AI' },
