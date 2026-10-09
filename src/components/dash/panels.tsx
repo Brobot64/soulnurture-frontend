@@ -307,7 +307,8 @@ export function ChatThreadsPanel({
 
 // --- Recent users ----------------------------------------------------------
 
-function userDetail(user: SchoolUserRow): string | null {
+/** The one-line identity detail shown for a school user — code·class or title·dept. */
+export function userDetail(user: SchoolUserRow): string | null {
   if (user.studentProfile) {
     return (
       [user.studentProfile.studentCode, user.studentProfile.classLabel]

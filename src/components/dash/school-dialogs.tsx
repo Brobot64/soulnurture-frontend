@@ -28,13 +28,13 @@ export interface SchoolRef {
   status: SchoolStatus
 }
 
-function messageOf(caught: unknown): string {
+export function messageOf(caught: unknown): string {
   return caught instanceof ApiError || caught instanceof Error
     ? caught.message
     : 'Something went wrong. Please try again.'
 }
 
-function SuccessPanel({
+export function SuccessPanel({
   title,
   children,
 }: {
@@ -379,13 +379,7 @@ export function CreateSchoolAdminDialog({
       })
       onCreated()
     } catch (caught) {
-      if (caught instanceof ApiError && caught.code === 'SCHOOL_DEFAULT_PASSWORD_REQUIRED') {
-        setError(
-          'This school has no default password yet. Set one in the school settings before onboarding users.',
-        )
-      } else {
-        setError(messageOf(caught))
-      }
+      setError(messageOf(caught))
     } finally {
       setBusy(false)
     }
