@@ -8,7 +8,7 @@ import { TextsReveal } from '#/components/TextsReveal'
 import { useSession } from '#/lib/auth'
 import { MOODS, readMoodDraft, saveMoodDraft } from '#/lib/journey'
 
-export const Route = createFileRoute('/check-in/')({
+export const Route = createFileRoute('/_app/check-in/')({
   head: () => ({
     meta: [
       { title: 'How are you feeling right now? · Soul Nurture AI' },

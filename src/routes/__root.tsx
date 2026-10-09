@@ -2,9 +2,6 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
-import { AppFooter } from '#/components/AppFooter'
-import { AppHeader } from '#/components/AppHeader'
-
 import appCss from '../styles.css?url'
 import logoUrl from '#/assets/soul-nurture-logo.png'
 
@@ -100,11 +97,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="bg-page font-sans text-body antialiased">
-        <div className="flex h-dvh flex-col">
-          <AppHeader />
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</main>
-          <AppFooter />
-        </div>
+        {children}
         <TanStackDevtools
           config={{
             position: 'bottom-right',

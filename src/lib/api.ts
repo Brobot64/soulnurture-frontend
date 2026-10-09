@@ -2,7 +2,7 @@
 // Nest routes respond wrapped in { success, statusCode, message, data, path, timestamp };
 // better-auth routes (/api/auth/*) respond raw. Both are handled here.
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
 
 export class ApiError extends Error {
   status: number

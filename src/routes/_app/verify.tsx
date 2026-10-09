@@ -6,7 +6,7 @@ import { AuthField, AuthShell } from '#/components/AuthShell'
 import { Spinner, StatusBadge, type StatusTone } from '#/components/StatusBadge'
 import { refreshSession, resendVerification } from '#/lib/auth'
 
-export const Route = createFileRoute('/verify')({
+export const Route = createFileRoute('/_app/verify')({
   validateSearch: (search: Record<string, unknown>): { email?: string; created?: '1' } => ({
     email:
       typeof search.email === 'string' && search.email.includes('@') ? search.email : undefined,

@@ -11,7 +11,7 @@ import { ApiError } from '#/lib/api'
 import { useSession } from '#/lib/auth'
 import { getCheckIn, type CheckIn } from '#/lib/journey'
 
-export const Route = createFileRoute('/complete/$checkInId')({
+export const Route = createFileRoute('/_app/complete/$checkInId')({
   head: () => ({
     meta: [
       { title: 'Check-in complete · Soul Nurture AI' },
