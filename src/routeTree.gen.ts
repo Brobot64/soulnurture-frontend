@@ -15,21 +15,23 @@ import { Route as FirstPasswordRouteImport } from './routes/first-password'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppSigninRouteImport } from './routes/_app/signin'
 import { Route as AppSignupRouteImport } from './routes/_app/signup'
-import { Route as AppSupportRouteImport } from './routes/_app/support'
 import { Route as AppVerifyRouteImport } from './routes/_app/verify'
 import { Route as AppWelcomeRouteImport } from './routes/_app/welcome'
 import { Route as AppCheckInIndexRouteImport } from './routes/_app/check-in/index'
 import { Route as AppCheckInWhyRouteImport } from './routes/_app/check-in/why'
 import { Route as AppCompleteCheckInIdRouteImport } from './routes/_app/complete/$checkInId'
 import { Route as AppReflectionConversationIdRouteImport } from './routes/_app/reflection/$conversationId'
+import { Route as AppSupportIndexRouteImport } from './routes/_app/support.index'
+import { Route as AppSupportThreadIdRouteImport } from './routes/_app/support.$threadId'
 import { Route as DashAdminIndexRouteImport } from './routes/_dash/admin/index'
 import { Route as DashAdminUsersRouteImport } from './routes/_dash/admin/users'
 import { Route as DashSchoolIndexRouteImport } from './routes/_dash/school/index'
-import { Route as DashSchoolInboxRouteImport } from './routes/_dash/school/inbox'
 import { Route as DashSchoolSettingsRouteImport } from './routes/_dash/school/settings'
 import { Route as DashSchoolUsersRouteImport } from './routes/_dash/school/users'
 import { Route as DashAdminSchoolsIndexRouteImport } from './routes/_dash/admin/schools.index'
 import { Route as DashAdminSchoolsIdRouteImport } from './routes/_dash/admin/schools.$id'
+import { Route as DashSchoolInboxIndexRouteImport } from './routes/_dash/school/inbox.index'
+import { Route as DashSchoolInboxThreadIdRouteImport } from './routes/_dash/school/inbox.$threadId'
 
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
@@ -57,11 +59,6 @@ const AppSigninRoute = AppSigninRouteImport.update({
 const AppSignupRoute = AppSignupRouteImport.update({
   id: '/signup',
   path: '/signup',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppSupportRoute = AppSupportRouteImport.update({
-  id: '/support',
-  path: '/support',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppVerifyRoute = AppVerifyRouteImport.update({
@@ -95,6 +92,16 @@ const AppReflectionConversationIdRoute =
     path: '/reflection/$conversationId',
     getParentRoute: () => AppRouteRoute,
   } as any)
+const AppSupportIndexRoute = AppSupportIndexRouteImport.update({
+  id: '/support/',
+  path: '/support/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSupportThreadIdRoute = AppSupportThreadIdRouteImport.update({
+  id: '/support/$threadId',
+  path: '/support/$threadId',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const DashAdminIndexRoute = DashAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
@@ -108,11 +115,6 @@ const DashAdminUsersRoute = DashAdminUsersRouteImport.update({
 const DashSchoolIndexRoute = DashSchoolIndexRouteImport.update({
   id: '/school/',
   path: '/school/',
-  getParentRoute: () => DashRouteRoute,
-} as any)
-const DashSchoolInboxRoute = DashSchoolInboxRouteImport.update({
-  id: '/school/inbox',
-  path: '/school/inbox',
   getParentRoute: () => DashRouteRoute,
 } as any)
 const DashSchoolSettingsRoute = DashSchoolSettingsRouteImport.update({
@@ -135,48 +137,62 @@ const DashAdminSchoolsIdRoute = DashAdminSchoolsIdRouteImport.update({
   path: '/admin/schools/$id',
   getParentRoute: () => DashRouteRoute,
 } as any)
+const DashSchoolInboxIndexRoute = DashSchoolInboxIndexRouteImport.update({
+  id: '/school/inbox/',
+  path: '/school/inbox/',
+  getParentRoute: () => DashRouteRoute,
+} as any)
+const DashSchoolInboxThreadIdRoute = DashSchoolInboxThreadIdRouteImport.update({
+  id: '/school/inbox/$threadId',
+  path: '/school/inbox/$threadId',
+  getParentRoute: () => DashRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/first-password': typeof FirstPasswordRoute
   '/signin': typeof AppSigninRoute
   '/signup': typeof AppSignupRoute
-  '/support': typeof AppSupportRoute
   '/verify': typeof AppVerifyRoute
   '/welcome': typeof AppWelcomeRoute
   '/check-in/why': typeof AppCheckInWhyRoute
   '/complete/$checkInId': typeof AppCompleteCheckInIdRoute
   '/reflection/$conversationId': typeof AppReflectionConversationIdRoute
+  '/support/$threadId': typeof AppSupportThreadIdRoute
   '/admin/users': typeof DashAdminUsersRoute
-  '/school/inbox': typeof DashSchoolInboxRoute
   '/school/settings': typeof DashSchoolSettingsRoute
   '/school/users': typeof DashSchoolUsersRoute
   '/check-in/': typeof AppCheckInIndexRoute
+  '/support/': typeof AppSupportIndexRoute
   '/admin/': typeof DashAdminIndexRoute
   '/school/': typeof DashSchoolIndexRoute
   '/admin/schools/$id': typeof DashAdminSchoolsIdRoute
+  '/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
   '/admin/schools/': typeof DashAdminSchoolsIndexRoute
+  '/school/inbox/': typeof DashSchoolInboxIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/first-password': typeof FirstPasswordRoute
   '/signin': typeof AppSigninRoute
   '/signup': typeof AppSignupRoute
-  '/support': typeof AppSupportRoute
   '/verify': typeof AppVerifyRoute
   '/welcome': typeof AppWelcomeRoute
   '/check-in/why': typeof AppCheckInWhyRoute
   '/complete/$checkInId': typeof AppCompleteCheckInIdRoute
   '/reflection/$conversationId': typeof AppReflectionConversationIdRoute
+  '/support/$threadId': typeof AppSupportThreadIdRoute
   '/admin/users': typeof DashAdminUsersRoute
-  '/school/inbox': typeof DashSchoolInboxRoute
   '/school/settings': typeof DashSchoolSettingsRoute
   '/school/users': typeof DashSchoolUsersRoute
   '/check-in': typeof AppCheckInIndexRoute
+  '/support': typeof AppSupportIndexRoute
   '/admin': typeof DashAdminIndexRoute
   '/school': typeof DashSchoolIndexRoute
   '/admin/schools/$id': typeof DashAdminSchoolsIdRoute
+  '/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
   '/admin/schools': typeof DashAdminSchoolsIndexRoute
+  '/school/inbox': typeof DashSchoolInboxIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -185,22 +201,24 @@ export interface FileRoutesById {
   '/first-password': typeof FirstPasswordRoute
   '/_app/signin': typeof AppSigninRoute
   '/_app/signup': typeof AppSignupRoute
-  '/_app/support': typeof AppSupportRoute
   '/_app/verify': typeof AppVerifyRoute
   '/_app/welcome': typeof AppWelcomeRoute
   '/_app/': typeof AppIndexRoute
   '/_app/check-in/why': typeof AppCheckInWhyRoute
   '/_app/complete/$checkInId': typeof AppCompleteCheckInIdRoute
   '/_app/reflection/$conversationId': typeof AppReflectionConversationIdRoute
+  '/_app/support/$threadId': typeof AppSupportThreadIdRoute
   '/_dash/admin/users': typeof DashAdminUsersRoute
-  '/_dash/school/inbox': typeof DashSchoolInboxRoute
   '/_dash/school/settings': typeof DashSchoolSettingsRoute
   '/_dash/school/users': typeof DashSchoolUsersRoute
   '/_app/check-in/': typeof AppCheckInIndexRoute
+  '/_app/support/': typeof AppSupportIndexRoute
   '/_dash/admin/': typeof DashAdminIndexRoute
   '/_dash/school/': typeof DashSchoolIndexRoute
   '/_dash/admin/schools/$id': typeof DashAdminSchoolsIdRoute
+  '/_dash/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
   '/_dash/admin/schools/': typeof DashAdminSchoolsIndexRoute
+  '/_dash/school/inbox/': typeof DashSchoolInboxIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -209,42 +227,46 @@ export interface FileRouteTypes {
     | '/first-password'
     | '/signin'
     | '/signup'
-    | '/support'
     | '/verify'
     | '/welcome'
     | '/check-in/why'
     | '/complete/$checkInId'
     | '/reflection/$conversationId'
+    | '/support/$threadId'
     | '/admin/users'
-    | '/school/inbox'
     | '/school/settings'
     | '/school/users'
     | '/check-in/'
+    | '/support/'
     | '/admin/'
     | '/school/'
     | '/admin/schools/$id'
+    | '/school/inbox/$threadId'
     | '/admin/schools/'
+    | '/school/inbox/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/first-password'
     | '/signin'
     | '/signup'
-    | '/support'
     | '/verify'
     | '/welcome'
     | '/check-in/why'
     | '/complete/$checkInId'
     | '/reflection/$conversationId'
+    | '/support/$threadId'
     | '/admin/users'
-    | '/school/inbox'
     | '/school/settings'
     | '/school/users'
     | '/check-in'
+    | '/support'
     | '/admin'
     | '/school'
     | '/admin/schools/$id'
+    | '/school/inbox/$threadId'
     | '/admin/schools'
+    | '/school/inbox'
   id:
     | '__root__'
     | '/_app'
@@ -252,22 +274,24 @@ export interface FileRouteTypes {
     | '/first-password'
     | '/_app/signin'
     | '/_app/signup'
-    | '/_app/support'
     | '/_app/verify'
     | '/_app/welcome'
     | '/_app/'
     | '/_app/check-in/why'
     | '/_app/complete/$checkInId'
     | '/_app/reflection/$conversationId'
+    | '/_app/support/$threadId'
     | '/_dash/admin/users'
-    | '/_dash/school/inbox'
     | '/_dash/school/settings'
     | '/_dash/school/users'
     | '/_app/check-in/'
+    | '/_app/support/'
     | '/_dash/admin/'
     | '/_dash/school/'
     | '/_dash/admin/schools/$id'
+    | '/_dash/school/inbox/$threadId'
     | '/_dash/admin/schools/'
+    | '/_dash/school/inbox/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -320,13 +344,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSignupRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/support': {
-      id: '/_app/support'
-      path: '/support'
-      fullPath: '/support'
-      preLoaderRoute: typeof AppSupportRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
     '/_app/verify': {
       id: '/_app/verify'
       path: '/verify'
@@ -369,6 +386,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReflectionConversationIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/support/': {
+      id: '/_app/support/'
+      path: '/support'
+      fullPath: '/support/'
+      preLoaderRoute: typeof AppSupportIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/support/$threadId': {
+      id: '/_app/support/$threadId'
+      path: '/support/$threadId'
+      fullPath: '/support/$threadId'
+      preLoaderRoute: typeof AppSupportThreadIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_dash/admin/': {
       id: '/_dash/admin/'
       path: '/admin'
@@ -388,13 +419,6 @@ declare module '@tanstack/react-router' {
       path: '/school'
       fullPath: '/school/'
       preLoaderRoute: typeof DashSchoolIndexRouteImport
-      parentRoute: typeof DashRouteRoute
-    }
-    '/_dash/school/inbox': {
-      id: '/_dash/school/inbox'
-      path: '/school/inbox'
-      fullPath: '/school/inbox'
-      preLoaderRoute: typeof DashSchoolInboxRouteImport
       parentRoute: typeof DashRouteRoute
     }
     '/_dash/school/settings': {
@@ -425,33 +449,49 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashAdminSchoolsIdRouteImport
       parentRoute: typeof DashRouteRoute
     }
+    '/_dash/school/inbox/': {
+      id: '/_dash/school/inbox/'
+      path: '/school/inbox'
+      fullPath: '/school/inbox/'
+      preLoaderRoute: typeof DashSchoolInboxIndexRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
+    '/_dash/school/inbox/$threadId': {
+      id: '/_dash/school/inbox/$threadId'
+      path: '/school/inbox/$threadId'
+      fullPath: '/school/inbox/$threadId'
+      preLoaderRoute: typeof DashSchoolInboxThreadIdRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
   }
 }
 
 interface AppRouteRouteChildren {
   AppSigninRoute: typeof AppSigninRoute
   AppSignupRoute: typeof AppSignupRoute
-  AppSupportRoute: typeof AppSupportRoute
   AppVerifyRoute: typeof AppVerifyRoute
   AppWelcomeRoute: typeof AppWelcomeRoute
   AppIndexRoute: typeof AppIndexRoute
   AppCheckInWhyRoute: typeof AppCheckInWhyRoute
   AppCompleteCheckInIdRoute: typeof AppCompleteCheckInIdRoute
   AppReflectionConversationIdRoute: typeof AppReflectionConversationIdRoute
+  AppSupportThreadIdRoute: typeof AppSupportThreadIdRoute
   AppCheckInIndexRoute: typeof AppCheckInIndexRoute
+  AppSupportIndexRoute: typeof AppSupportIndexRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppSigninRoute: AppSigninRoute,
   AppSignupRoute: AppSignupRoute,
-  AppSupportRoute: AppSupportRoute,
   AppVerifyRoute: AppVerifyRoute,
   AppWelcomeRoute: AppWelcomeRoute,
   AppIndexRoute: AppIndexRoute,
   AppCheckInWhyRoute: AppCheckInWhyRoute,
   AppCompleteCheckInIdRoute: AppCompleteCheckInIdRoute,
   AppReflectionConversationIdRoute: AppReflectionConversationIdRoute,
+  AppSupportThreadIdRoute: AppSupportThreadIdRoute,
   AppCheckInIndexRoute: AppCheckInIndexRoute,
+  AppSupportIndexRoute: AppSupportIndexRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
@@ -460,24 +500,26 @@ const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
 
 interface DashRouteRouteChildren {
   DashAdminUsersRoute: typeof DashAdminUsersRoute
-  DashSchoolInboxRoute: typeof DashSchoolInboxRoute
   DashSchoolSettingsRoute: typeof DashSchoolSettingsRoute
   DashSchoolUsersRoute: typeof DashSchoolUsersRoute
   DashAdminIndexRoute: typeof DashAdminIndexRoute
   DashSchoolIndexRoute: typeof DashSchoolIndexRoute
   DashAdminSchoolsIdRoute: typeof DashAdminSchoolsIdRoute
+  DashSchoolInboxThreadIdRoute: typeof DashSchoolInboxThreadIdRoute
   DashAdminSchoolsIndexRoute: typeof DashAdminSchoolsIndexRoute
+  DashSchoolInboxIndexRoute: typeof DashSchoolInboxIndexRoute
 }
 
 const DashRouteRouteChildren: DashRouteRouteChildren = {
   DashAdminUsersRoute: DashAdminUsersRoute,
-  DashSchoolInboxRoute: DashSchoolInboxRoute,
   DashSchoolSettingsRoute: DashSchoolSettingsRoute,
   DashSchoolUsersRoute: DashSchoolUsersRoute,
   DashAdminIndexRoute: DashAdminIndexRoute,
   DashSchoolIndexRoute: DashSchoolIndexRoute,
   DashAdminSchoolsIdRoute: DashAdminSchoolsIdRoute,
+  DashSchoolInboxThreadIdRoute: DashSchoolInboxThreadIdRoute,
   DashAdminSchoolsIndexRoute: DashAdminSchoolsIndexRoute,
+  DashSchoolInboxIndexRoute: DashSchoolInboxIndexRoute,
 }
 
 const DashRouteRouteWithChildren = DashRouteRoute._addFileChildren(

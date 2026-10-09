@@ -76,9 +76,19 @@ export function NotificationBell() {
       return
     }
     if (item.type.startsWith('CHAT')) {
-      void navigate({
-        to: isChatStaff(user?.role) ? '/school/inbox' : '/support',
-      })
+      const threadId = item.data?.threadId
+      if (isChatStaff(user?.role)) {
+        // A PENDING request isn't the professional's thread yet — the pool is where it lives.
+        if (threadId && item.type !== 'CHAT_REQUEST') {
+          void navigate({ to: '/school/inbox/$threadId', params: { threadId } })
+        } else {
+          void navigate({ to: '/school/inbox' })
+        }
+      } else if (threadId) {
+        void navigate({ to: '/support/$threadId', params: { threadId } })
+      } else {
+        void navigate({ to: '/support' })
+      }
     }
   }
 
