@@ -53,8 +53,26 @@ export function useApiQuery<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick])
 
+  // Focus refetch: dashboards are glanceable — coming back to the tab should
+  // show fresh numbers without any polling.
+  useEffect(() => {
+    const onFocus = () => setTick((n) => n + 1)
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
   const reload = useCallback(() => setTick((n) => n + 1), [])
   return { data, error, loading, reload }
+}
+
+/** Trailing-edge debounce for search fields — 300ms by default. */
+export function useDebouncedValue<T>(value: T, delay = 300): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay)
+    return () => window.clearTimeout(timer)
+  }, [value, delay])
+  return debounced
 }
 
 // --- School suspended (403 SCHOOL_SUSPENDED) -------------------------------
