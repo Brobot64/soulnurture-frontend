@@ -69,13 +69,7 @@ function Welcome() {
           </div>
           {status === 'ready' && !user && (
             <p className="mt-6 text-center text-copy-sm text-body lg:text-left">
-              <Link
-                to="/signup"
-                className="font-medium text-action transition-colors hover:text-brand-4"
-              >
-                Create an account
-              </Link>
-              <span className="text-muted"> · </span>
+              Already have your school account?{' '}
               <Link
                 to="/signin"
                 className="font-medium text-action transition-colors hover:text-brand-4"

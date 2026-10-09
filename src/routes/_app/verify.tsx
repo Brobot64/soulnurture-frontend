@@ -7,10 +7,9 @@ import { Spinner, StatusBadge, type StatusTone } from '#/components/StatusBadge'
 import { refreshSession, resendVerification } from '#/lib/auth'
 
 export const Route = createFileRoute('/_app/verify')({
-  validateSearch: (search: Record<string, unknown>): { email?: string; created?: '1' } => ({
+  validateSearch: (search: Record<string, unknown>): { email?: string } => ({
     email:
       typeof search.email === 'string' && search.email.includes('@') ? search.email : undefined,
-    created: search.created === '1' ? '1' : undefined,
   }),
   head: () => ({
     meta: [
@@ -32,7 +31,7 @@ interface Notice {
 
 function Verify() {
   const navigate = useNavigate()
-  const { email: emailParam, created } = Route.useSearch()
+  const { email: emailParam } = Route.useSearch()
   const [email, setEmail] = useState(emailParam ?? '')
   const [sending, setSending] = useState(false)
   const [checking, setChecking] = useState(false)
@@ -66,14 +65,7 @@ function Verify() {
     })
   }
 
-  const badge: Notice | null =
-    notice ??
-    (created && emailParam
-      ? {
-          tone: 'success',
-          text: `Account created — we sent a verification link to ${emailParam}.`,
-        }
-      : null)
+  const badge: Notice | null = notice
 
   return (
     <AuthShell
@@ -92,12 +84,8 @@ function Verify() {
       footer={
         <p className="mt-7 text-copy text-body">
           Wrong email?{' '}
-          <Link to="/signup" className="font-medium text-action transition-colors hover:text-brand-4">
-            Create one with a different address
-          </Link>
-          <span className="text-muted"> · </span>
           <Link to="/signin" className="font-medium text-action transition-colors hover:text-brand-4">
-            Sign in
+            Back to sign in
           </Link>
         </p>
       }

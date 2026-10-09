@@ -14,7 +14,6 @@ import { Route as DashRouteRouteImport } from './routes/_dash/route'
 import { Route as FirstPasswordRouteImport } from './routes/first-password'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppSigninRouteImport } from './routes/_app/signin'
-import { Route as AppSignupRouteImport } from './routes/_app/signup'
 import { Route as AppVerifyRouteImport } from './routes/_app/verify'
 import { Route as AppWelcomeRouteImport } from './routes/_app/welcome'
 import { Route as AppCheckInIndexRouteImport } from './routes/_app/check-in/index'
@@ -54,11 +53,6 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppSigninRoute = AppSigninRouteImport.update({
   id: '/signin',
   path: '/signin',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppSignupRoute = AppSignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppVerifyRoute = AppVerifyRouteImport.update({
@@ -152,7 +146,6 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/first-password': typeof FirstPasswordRoute
   '/signin': typeof AppSigninRoute
-  '/signup': typeof AppSignupRoute
   '/verify': typeof AppVerifyRoute
   '/welcome': typeof AppWelcomeRoute
   '/check-in/why': typeof AppCheckInWhyRoute
@@ -175,7 +168,6 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/first-password': typeof FirstPasswordRoute
   '/signin': typeof AppSigninRoute
-  '/signup': typeof AppSignupRoute
   '/verify': typeof AppVerifyRoute
   '/welcome': typeof AppWelcomeRoute
   '/check-in/why': typeof AppCheckInWhyRoute
@@ -200,7 +192,6 @@ export interface FileRoutesById {
   '/_dash': typeof DashRouteRouteWithChildren
   '/first-password': typeof FirstPasswordRoute
   '/_app/signin': typeof AppSigninRoute
-  '/_app/signup': typeof AppSignupRoute
   '/_app/verify': typeof AppVerifyRoute
   '/_app/welcome': typeof AppWelcomeRoute
   '/_app/': typeof AppIndexRoute
@@ -226,7 +217,6 @@ export interface FileRouteTypes {
     | '/'
     | '/first-password'
     | '/signin'
-    | '/signup'
     | '/verify'
     | '/welcome'
     | '/check-in/why'
@@ -249,7 +239,6 @@ export interface FileRouteTypes {
     | '/'
     | '/first-password'
     | '/signin'
-    | '/signup'
     | '/verify'
     | '/welcome'
     | '/check-in/why'
@@ -273,7 +262,6 @@ export interface FileRouteTypes {
     | '/_dash'
     | '/first-password'
     | '/_app/signin'
-    | '/_app/signup'
     | '/_app/verify'
     | '/_app/welcome'
     | '/_app/'
@@ -335,13 +323,6 @@ declare module '@tanstack/react-router' {
       path: '/signin'
       fullPath: '/signin'
       preLoaderRoute: typeof AppSigninRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/signup': {
-      id: '/_app/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof AppSignupRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/verify': {
@@ -468,7 +449,6 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteRouteChildren {
   AppSigninRoute: typeof AppSigninRoute
-  AppSignupRoute: typeof AppSignupRoute
   AppVerifyRoute: typeof AppVerifyRoute
   AppWelcomeRoute: typeof AppWelcomeRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -482,7 +462,6 @@ interface AppRouteRouteChildren {
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppSigninRoute: AppSigninRoute,
-  AppSignupRoute: AppSignupRoute,
   AppVerifyRoute: AppVerifyRoute,
   AppWelcomeRoute: AppWelcomeRoute,
   AppIndexRoute: AppIndexRoute,

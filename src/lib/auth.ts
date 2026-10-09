@@ -126,18 +126,6 @@ export async function refreshSession(): Promise<SessionUser | null> {
   }
 }
 
-export async function signUp(input: {
-  name: string
-  email: string
-  password: string
-  phone?: string
-}): Promise<void> {
-  await apiFetch('/api/auth/sign-up/email', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
-}
-
 export async function signIn(input: {
   email: string
   password: string
