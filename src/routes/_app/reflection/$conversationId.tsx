@@ -182,7 +182,7 @@ function Reflection() {
       ])
       setThinking(true)
       try {
-        const result = await sendMessage(conversationId, { content: pending, language: 'en' })
+        const result = await sendMessage(conversationId, { content: pending })
         if (cancelled) return
         clearPendingOpening()
         streamIds.current.add(result.assistantMessage.id)
@@ -313,7 +313,6 @@ function Reflection() {
     try {
       const result = await sendMessage(conversationId, {
         content,
-        language: 'en',
         ...(quickReply ? { quickReply } : {}),
       })
       streamIds.current.add(result.assistantMessage.id)
