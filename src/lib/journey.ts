@@ -37,7 +37,6 @@ export interface CreateCheckInDto {
 
 export interface SendMessageDto {
   content: string
-  language?: string
   /** Guided-reply marker — the backend reads the enum while content stays required. */
   quickReply?: QuickReplyValue
 }
