@@ -13,6 +13,7 @@ import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as DashRouteRouteImport } from './routes/_dash/route'
 import { Route as FirstPasswordRouteImport } from './routes/first-password'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppPrivacyRouteImport } from './routes/_app/privacy'
 import { Route as AppSigninRouteImport } from './routes/_app/signin'
 import { Route as AppVerifyRouteImport } from './routes/_app/verify'
 import { Route as AppWelcomeRouteImport } from './routes/_app/welcome'
@@ -48,6 +49,11 @@ const FirstPasswordRoute = FirstPasswordRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppPrivacyRoute = AppPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppSigninRoute = AppSigninRouteImport.update({
@@ -145,6 +151,7 @@ const DashSchoolInboxThreadIdRoute = DashSchoolInboxThreadIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/first-password': typeof FirstPasswordRoute
+  '/privacy': typeof AppPrivacyRoute
   '/signin': typeof AppSigninRoute
   '/verify': typeof AppVerifyRoute
   '/welcome': typeof AppWelcomeRoute
@@ -167,6 +174,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/first-password': typeof FirstPasswordRoute
+  '/privacy': typeof AppPrivacyRoute
   '/signin': typeof AppSigninRoute
   '/verify': typeof AppVerifyRoute
   '/welcome': typeof AppWelcomeRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteRouteWithChildren
   '/_dash': typeof DashRouteRouteWithChildren
   '/first-password': typeof FirstPasswordRoute
+  '/_app/privacy': typeof AppPrivacyRoute
   '/_app/signin': typeof AppSigninRoute
   '/_app/verify': typeof AppVerifyRoute
   '/_app/welcome': typeof AppWelcomeRoute
@@ -216,6 +225,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/first-password'
+    | '/privacy'
     | '/signin'
     | '/verify'
     | '/welcome'
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/first-password'
+    | '/privacy'
     | '/signin'
     | '/verify'
     | '/welcome'
@@ -261,6 +272,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_dash'
     | '/first-password'
+    | '/_app/privacy'
     | '/_app/signin'
     | '/_app/verify'
     | '/_app/welcome'
@@ -316,6 +328,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/privacy': {
+      id: '/_app/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof AppPrivacyRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/signin': {
@@ -448,6 +467,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteRouteChildren {
+  AppPrivacyRoute: typeof AppPrivacyRoute
   AppSigninRoute: typeof AppSigninRoute
   AppVerifyRoute: typeof AppVerifyRoute
   AppWelcomeRoute: typeof AppWelcomeRoute
@@ -461,6 +481,7 @@ interface AppRouteRouteChildren {
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppPrivacyRoute: AppPrivacyRoute,
   AppSigninRoute: AppSigninRoute,
   AppVerifyRoute: AppVerifyRoute,
   AppWelcomeRoute: AppWelcomeRoute,
