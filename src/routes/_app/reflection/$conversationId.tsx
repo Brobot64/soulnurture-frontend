@@ -104,6 +104,9 @@ function Reflection() {
   const pollDeadlineRef = useRef(0)
   // True while a send is in flight — the completion poll must not clobber it.
   const sendingRef = useRef(false)
+  // True while the composer holds an unsent transcript — marks the next send
+  // as a voice turn for the pilot analytics.
+  const voiceDraftRef = useRef(false)
 
   useEffect(() => {
     if (authStatus !== 'ready') return
@@ -291,7 +294,7 @@ function Reflection() {
     }, POLL_INTERVAL_MS)
   }
 
-  const send = async (raw: string, quickReply?: QuickReplyValue) => {
+  const send = async (raw: string, quickReply?: QuickReplyValue, viaVoice = false) => {
     const content = raw.trim()
     if (!content || thinking || done) return
     stopPolling()
@@ -314,7 +317,9 @@ function Reflection() {
       const result = await sendMessage(conversationId, {
         content,
         ...(quickReply ? { quickReply } : {}),
+        ...(viaVoice ? { viaVoice: true } : {}),
       })
+      voiceDraftRef.current = false
       streamIds.current.add(result.assistantMessage.id)
       setMessages((prev) => [
         ...prev.map((entry) => (entry.id === tempId ? result.userMessage : entry)),
@@ -410,6 +415,7 @@ function Reflection() {
       }
       // The transcript lands in the composer for review — the student decides to send it.
       setInput((current) => (current ? `${current.trimEnd()} ${text}` : text))
+      voiceDraftRef.current = true
     } catch (caught) {
       setVoiceState('idle')
       if (caught instanceof ApiError && caught.status === 401) {
@@ -772,13 +778,16 @@ function Reflection() {
               <form
                 onSubmit={(event) => {
                   event.preventDefault()
-                  void send(input)
+                  void send(input, undefined, voiceDraftRef.current)
                 }}
                 className="relative"
               >
                 <input
                   value={input}
-                  onChange={(event) => setInput(event.target.value)}
+                  onChange={(event) => {
+                    setInput(event.target.value)
+                    if (!event.target.value.trim()) voiceDraftRef.current = false
+                  }}
                   maxLength={4000}
                   disabled={voiceState === 'transcribing'}
                   placeholder={
