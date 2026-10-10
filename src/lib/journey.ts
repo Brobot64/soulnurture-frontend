@@ -39,6 +39,9 @@ export interface SendMessageDto {
   content: string
   /** Guided-reply marker — the backend reads the enum while content stays required. */
   quickReply?: QuickReplyValue
+  /** Set when the turn started from a transcribed voice note — feeds the pilot
+   * voice-interaction analytics; reply behaviour is unaffected. */
+  viaVoice?: boolean
 }
 
 export interface CheckIn {

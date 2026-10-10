@@ -24,6 +24,7 @@ import { Route as AppReflectionConversationIdRouteImport } from './routes/_app/r
 import { Route as AppSupportIndexRouteImport } from './routes/_app/support.index'
 import { Route as AppSupportThreadIdRouteImport } from './routes/_app/support.$threadId'
 import { Route as DashAdminIndexRouteImport } from './routes/_dash/admin/index'
+import { Route as DashAdminPilotRouteImport } from './routes/_dash/admin/pilot'
 import { Route as DashAdminUsersRouteImport } from './routes/_dash/admin/users'
 import { Route as DashSchoolIndexRouteImport } from './routes/_dash/school/index'
 import { Route as DashSchoolSettingsRouteImport } from './routes/_dash/school/settings'
@@ -107,6 +108,11 @@ const DashAdminIndexRoute = DashAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => DashRouteRoute,
 } as any)
+const DashAdminPilotRoute = DashAdminPilotRouteImport.update({
+  id: '/admin/pilot',
+  path: '/admin/pilot',
+  getParentRoute: () => DashRouteRoute,
+} as any)
 const DashAdminUsersRoute = DashAdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
@@ -159,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/complete/$checkInId': typeof AppCompleteCheckInIdRoute
   '/reflection/$conversationId': typeof AppReflectionConversationIdRoute
   '/support/$threadId': typeof AppSupportThreadIdRoute
+  '/admin/pilot': typeof DashAdminPilotRoute
   '/admin/users': typeof DashAdminUsersRoute
   '/school/settings': typeof DashSchoolSettingsRoute
   '/school/users': typeof DashSchoolUsersRoute
@@ -182,6 +189,7 @@ export interface FileRoutesByTo {
   '/complete/$checkInId': typeof AppCompleteCheckInIdRoute
   '/reflection/$conversationId': typeof AppReflectionConversationIdRoute
   '/support/$threadId': typeof AppSupportThreadIdRoute
+  '/admin/pilot': typeof DashAdminPilotRoute
   '/admin/users': typeof DashAdminUsersRoute
   '/school/settings': typeof DashSchoolSettingsRoute
   '/school/users': typeof DashSchoolUsersRoute
@@ -208,6 +216,7 @@ export interface FileRoutesById {
   '/_app/complete/$checkInId': typeof AppCompleteCheckInIdRoute
   '/_app/reflection/$conversationId': typeof AppReflectionConversationIdRoute
   '/_app/support/$threadId': typeof AppSupportThreadIdRoute
+  '/_dash/admin/pilot': typeof DashAdminPilotRoute
   '/_dash/admin/users': typeof DashAdminUsersRoute
   '/_dash/school/settings': typeof DashSchoolSettingsRoute
   '/_dash/school/users': typeof DashSchoolUsersRoute
@@ -233,6 +242,7 @@ export interface FileRouteTypes {
     | '/complete/$checkInId'
     | '/reflection/$conversationId'
     | '/support/$threadId'
+    | '/admin/pilot'
     | '/admin/users'
     | '/school/settings'
     | '/school/users'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/complete/$checkInId'
     | '/reflection/$conversationId'
     | '/support/$threadId'
+    | '/admin/pilot'
     | '/admin/users'
     | '/school/settings'
     | '/school/users'
@@ -281,6 +292,7 @@ export interface FileRouteTypes {
     | '/_app/complete/$checkInId'
     | '/_app/reflection/$conversationId'
     | '/_app/support/$threadId'
+    | '/_dash/admin/pilot'
     | '/_dash/admin/users'
     | '/_dash/school/settings'
     | '/_dash/school/users'
@@ -407,6 +419,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashAdminIndexRouteImport
       parentRoute: typeof DashRouteRoute
     }
+    '/_dash/admin/pilot': {
+      id: '/_dash/admin/pilot'
+      path: '/admin/pilot'
+      fullPath: '/admin/pilot'
+      preLoaderRoute: typeof DashAdminPilotRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
     '/_dash/admin/users': {
       id: '/_dash/admin/users'
       path: '/admin/users'
@@ -499,6 +518,7 @@ const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
 )
 
 interface DashRouteRouteChildren {
+  DashAdminPilotRoute: typeof DashAdminPilotRoute
   DashAdminUsersRoute: typeof DashAdminUsersRoute
   DashSchoolSettingsRoute: typeof DashSchoolSettingsRoute
   DashSchoolUsersRoute: typeof DashSchoolUsersRoute
@@ -511,6 +531,7 @@ interface DashRouteRouteChildren {
 }
 
 const DashRouteRouteChildren: DashRouteRouteChildren = {
+  DashAdminPilotRoute: DashAdminPilotRoute,
   DashAdminUsersRoute: DashAdminUsersRoute,
   DashSchoolSettingsRoute: DashSchoolSettingsRoute,
   DashSchoolUsersRoute: DashSchoolUsersRoute,

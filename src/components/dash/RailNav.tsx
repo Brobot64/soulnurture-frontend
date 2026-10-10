@@ -5,6 +5,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import {
   Inbox,
   LayoutDashboard,
+  LineChart,
   School,
   Settings,
   Users,
@@ -19,6 +20,7 @@ type RailPath =
   | '/admin'
   | '/admin/schools'
   | '/admin/users'
+  | '/admin/pilot'
   | '/school'
   | '/school/users'
   | '/school/settings'
@@ -36,6 +38,7 @@ function itemsForRole(role?: string | null): RailItem[] {
       { to: '/admin', label: 'Overview', icon: LayoutDashboard },
       { to: '/admin/schools', label: 'Schools', icon: School },
       { to: '/admin/users', label: 'Users', icon: Users },
+      { to: '/admin/pilot', label: 'Pilot analytics', icon: LineChart },
     ]
   }
   if (role === 'SCHOOL_ADMIN') {
