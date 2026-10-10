@@ -18,13 +18,13 @@ export function AppHeader() {
   }, [user])
 
   const handleSignOut = () => {
-    void signOut().then(() => navigate({ to: '/welcome' }))
+    void signOut().then(() => navigate({ to: '/' }))
   }
 
   return (
     <header className="hidden border-b border-hairline lg:block">
       <div className="mx-auto flex h-[76px] w-full max-w-[1440px] items-center justify-between px-20">
-        <Link to="/welcome" className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-3">
           <img src={logo} alt="" className="size-10 rounded-full" />
           <span className="text-wordmark text-heading">Soul Nurture AI</span>
         </Link>
