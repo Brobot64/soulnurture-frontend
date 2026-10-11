@@ -33,6 +33,7 @@ import { Route as DashAdminSchoolsIndexRouteImport } from './routes/_dash/admin/
 import { Route as DashAdminSchoolsIdRouteImport } from './routes/_dash/admin/schools.$id'
 import { Route as DashSchoolInboxIndexRouteImport } from './routes/_dash/school/inbox.index'
 import { Route as DashSchoolInboxThreadIdRouteImport } from './routes/_dash/school/inbox.$threadId'
+import { Route as DashSchoolRequestsIndexRouteImport } from './routes/_dash/school/requests.index'
 
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
@@ -153,6 +154,11 @@ const DashSchoolInboxThreadIdRoute = DashSchoolInboxThreadIdRouteImport.update({
   path: '/school/inbox/$threadId',
   getParentRoute: () => DashRouteRoute,
 } as any)
+const DashSchoolRequestsIndexRoute = DashSchoolRequestsIndexRouteImport.update({
+  id: '/school/requests/',
+  path: '/school/requests/',
+  getParentRoute: () => DashRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
   '/admin/schools/': typeof DashAdminSchoolsIndexRoute
   '/school/inbox/': typeof DashSchoolInboxIndexRoute
+  '/school/requests/': typeof DashSchoolRequestsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
   '/admin/schools': typeof DashAdminSchoolsIndexRoute
   '/school/inbox': typeof DashSchoolInboxIndexRoute
+  '/school/requests': typeof DashSchoolRequestsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -228,6 +236,7 @@ export interface FileRoutesById {
   '/_dash/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
   '/_dash/admin/schools/': typeof DashAdminSchoolsIndexRoute
   '/_dash/school/inbox/': typeof DashSchoolInboxIndexRoute
+  '/_dash/school/requests/': typeof DashSchoolRequestsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -254,6 +263,7 @@ export interface FileRouteTypes {
     | '/school/inbox/$threadId'
     | '/admin/schools/'
     | '/school/inbox/'
+    | '/school/requests/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/school/inbox/$threadId'
     | '/admin/schools'
     | '/school/inbox'
+    | '/school/requests'
   id:
     | '__root__'
     | '/_app'
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/_dash/school/inbox/$threadId'
     | '/_dash/admin/schools/'
     | '/_dash/school/inbox/'
+    | '/_dash/school/requests/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -482,6 +494,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashSchoolInboxThreadIdRouteImport
       parentRoute: typeof DashRouteRoute
     }
+    '/_dash/school/requests/': {
+      id: '/_dash/school/requests/'
+      path: '/school/requests'
+      fullPath: '/school/requests/'
+      preLoaderRoute: typeof DashSchoolRequestsIndexRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
   }
 }
 
@@ -528,6 +547,7 @@ interface DashRouteRouteChildren {
   DashSchoolInboxThreadIdRoute: typeof DashSchoolInboxThreadIdRoute
   DashAdminSchoolsIndexRoute: typeof DashAdminSchoolsIndexRoute
   DashSchoolInboxIndexRoute: typeof DashSchoolInboxIndexRoute
+  DashSchoolRequestsIndexRoute: typeof DashSchoolRequestsIndexRoute
 }
 
 const DashRouteRouteChildren: DashRouteRouteChildren = {
@@ -541,6 +561,7 @@ const DashRouteRouteChildren: DashRouteRouteChildren = {
   DashSchoolInboxThreadIdRoute: DashSchoolInboxThreadIdRoute,
   DashAdminSchoolsIndexRoute: DashAdminSchoolsIndexRoute,
   DashSchoolInboxIndexRoute: DashSchoolInboxIndexRoute,
+  DashSchoolRequestsIndexRoute: DashSchoolRequestsIndexRoute,
 }
 
 const DashRouteRouteWithChildren = DashRouteRoute._addFileChildren(
