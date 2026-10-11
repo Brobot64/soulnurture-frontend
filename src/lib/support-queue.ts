@@ -48,6 +48,7 @@ export interface SupportQueueItem {
   followUpId: string | null
   followUpDueAt: string | null
   followUpCompletedAt: string | null
+  conversationId: string | null
   student: SupportQueueStudent
   supportPerson: { id: string; name: string; type: string } | null
 }

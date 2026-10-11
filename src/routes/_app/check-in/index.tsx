@@ -6,7 +6,13 @@ import { ConsentGate, useAiConsent } from '#/components/ConsentGate'
 import { ProgressRow } from '#/components/ProgressRow'
 import { TextsReveal } from '#/components/TextsReveal'
 import { useSession } from '#/lib/auth'
-import { MOODS, readMoodDraft, saveMoodDraft } from '#/lib/journey'
+import {
+  MOODS,
+  readMoodDraft,
+  saveMoodDraft,
+  fetchCheckInHistory,
+  type CheckInHistoryEntry,
+} from '#/lib/journey'
 
 export const Route = createFileRoute('/_app/check-in/')({
   head: () => ({
@@ -28,6 +34,10 @@ function MoodCheckIn() {
   const { user, status: authStatus } = useSession()
   const [selected, setSelected] = useState<string | null>(null)
   const [note, setNote] = useState('')
+  // Previous conversations stay reachable from the very first step — the
+  // student never has to start a new check-in to get back to a past one.
+  const [history, setHistory] = useState<CheckInHistoryEntry[]>([])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   // Pre-chat consent gate — the journey cannot reach the AI without it.
   const consent = useAiConsent(authStatus === 'ready' && !!user)
 
@@ -37,6 +47,24 @@ function MoodCheckIn() {
       navigate({ to: '/signin', search: { redirect: '/check-in' }, replace: true })
     }
   }, [authStatus, user, navigate])
+
+  useEffect(() => {
+    if (authStatus !== 'ready' || !user) return
+    let cancelled = false
+    fetchCheckInHistory()
+      .then((result) => {
+        if (!cancelled) {
+          setHistory(result.items)
+          setHistoryLoaded(true)
+        }
+      })
+      .catch(() => {
+        // the history strip is optional — the check-in works without it
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [authStatus, user])
 
   useEffect(() => {
     const draft = readMoodDraft()
@@ -142,6 +170,54 @@ function MoodCheckIn() {
       </div>
 
       <Flash message={message} hiding={hiding} />
+
+      {historyLoaded && (
+        <section className="mt-12 lg:mt-16" aria-label="Past reflections">
+          <h2 className="text-section text-heading">Past reflections</h2>
+          <div className="mt-4 flex flex-col gap-2.5">
+            {history.length === 0 && (
+              <p className="text-copy-sm text-muted">
+                No past reflections yet — your closed conversations will show up here.
+              </p>
+            )}
+            {history.map((entry) => {
+              const when = new Date(entry.createdAt)
+              const label = Number.isNaN(when.getTime())
+                ? entry.createdAt
+                : when.toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })
+              const body = (
+                <>
+                  <p className="text-chip font-semibold text-ink lg:text-copy">{label}</p>
+                  <p className="mt-1 line-clamp-2 text-copy-sm text-muted lg:line-clamp-3">
+                    {entry.summary?.trim() || 'Summary on its way — check back soon.'}
+                  </p>
+                </>
+              )
+              return entry.conversationId ? (
+                <Link
+                  key={entry.checkInId}
+                  to="/reflection/$conversationId"
+                  params={{ conversationId: entry.conversationId }}
+                  className="rounded-2xl border border-hairline bg-white px-3.5 py-2.5 text-left transition-colors hover:border-action/40 lg:px-4 lg:py-3"
+                >
+                  {body}
+                </Link>
+              ) : (
+                <div
+                  key={entry.checkInId}
+                  className="rounded-2xl border border-hairline bg-white px-3.5 py-2.5 lg:px-4 lg:py-3"
+                >
+                  {body}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {consent.state === 'required' && (
         <ConsentGate

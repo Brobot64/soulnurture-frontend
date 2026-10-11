@@ -67,7 +67,9 @@ export function getSocket(): Socket | null {
     socket = io(API_BASE_URL || window.location.origin, {
       path: SOCKET_PATH,
       withCredentials: true,
-      transports: ['websocket', 'polling'],
+      // Server is websocket-only: engine.io's long-polling cannot intercept
+      // requests through Fastify, so polling handshakes 404 by design.
+      transports: ['websocket'],
     })
   }
   return socket

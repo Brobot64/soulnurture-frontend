@@ -5,7 +5,7 @@
 // PATCH /v1/follow-ups/:id (complete a follow-up).
 
 import { useEffect, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { ChevronRight, CircleAlert, Inbox } from 'lucide-react'
 
 import { DashHeader } from '#/components/dash/DashHeader'
@@ -17,7 +17,7 @@ import {
   Skeleton,
   Tag,
 } from '#/components/dash/ui'
-import { CHAT_STAFF_ROLES, useSession } from '#/lib/auth'
+import { CHAT_STAFF_ROLES } from '#/lib/auth'
 import { useApiQuery, useRoleGuard } from '#/lib/dash'
 import { ApiError } from '#/lib/api'
 import {
@@ -380,6 +380,17 @@ function ReviewDialog({
           <blockquote className="rounded-card bg-panel-2/60 px-4 py-3 text-copy-sm text-body">
             “{item.note}”
           </blockquote>
+        )}
+
+        {item.conversationId && (
+          <Link
+            to="/school/requests/$conversationId"
+            params={{ conversationId: item.conversationId }}
+            className="inline-flex items-center gap-1.5 text-chip font-medium text-action transition-colors hover:text-brand-4"
+          >
+            View the conversation this request came from
+            <ChevronRight aria-hidden="true" className="size-4" />
+          </Link>
         )}
 
         {item.followUpId && item.queueStatus === 'FOLLOW_UP_REQUIRED' && (
