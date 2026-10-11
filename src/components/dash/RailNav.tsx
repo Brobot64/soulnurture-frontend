@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
+  HeartHandshake,
   Inbox,
   LayoutDashboard,
   LineChart,
@@ -25,6 +26,7 @@ type RailPath =
   | '/school/users'
   | '/school/settings'
   | '/school/inbox'
+  | '/school/requests'
 
 interface RailItem {
   to: RailPath
@@ -49,7 +51,10 @@ function itemsForRole(role?: string | null): RailItem[] {
     ]
   }
   if (isChatStaff(role)) {
-    return [{ to: '/school/inbox', label: 'Inbox', icon: Inbox }]
+    return [
+      { to: '/school/inbox', label: 'Inbox', icon: Inbox },
+      { to: '/school/requests', label: 'Support requests', icon: HeartHandshake },
+    ]
   }
   return []
 }
