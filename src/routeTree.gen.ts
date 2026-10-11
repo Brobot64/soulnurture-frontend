@@ -34,6 +34,7 @@ import { Route as DashAdminSchoolsIdRouteImport } from './routes/_dash/admin/sch
 import { Route as DashSchoolInboxIndexRouteImport } from './routes/_dash/school/inbox.index'
 import { Route as DashSchoolInboxThreadIdRouteImport } from './routes/_dash/school/inbox.$threadId'
 import { Route as DashSchoolRequestsIndexRouteImport } from './routes/_dash/school/requests.index'
+import { Route as DashSchoolRequestsConversationIdRouteImport } from './routes/_dash/school/requests.$conversationId'
 
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
@@ -159,6 +160,12 @@ const DashSchoolRequestsIndexRoute = DashSchoolRequestsIndexRouteImport.update({
   path: '/school/requests/',
   getParentRoute: () => DashRouteRoute,
 } as any)
+const DashSchoolRequestsConversationIdRoute =
+  DashSchoolRequestsConversationIdRouteImport.update({
+    id: '/school/requests/$conversationId',
+    path: '/school/requests/$conversationId',
+    getParentRoute: () => DashRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByFullPath {
   '/school/': typeof DashSchoolIndexRoute
   '/admin/schools/$id': typeof DashAdminSchoolsIdRoute
   '/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
+  '/school/requests/$conversationId': typeof DashSchoolRequestsConversationIdRoute
   '/admin/schools/': typeof DashAdminSchoolsIndexRoute
   '/school/inbox/': typeof DashSchoolInboxIndexRoute
   '/school/requests/': typeof DashSchoolRequestsIndexRoute
@@ -206,6 +214,7 @@ export interface FileRoutesByTo {
   '/school': typeof DashSchoolIndexRoute
   '/admin/schools/$id': typeof DashAdminSchoolsIdRoute
   '/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
+  '/school/requests/$conversationId': typeof DashSchoolRequestsConversationIdRoute
   '/admin/schools': typeof DashAdminSchoolsIndexRoute
   '/school/inbox': typeof DashSchoolInboxIndexRoute
   '/school/requests': typeof DashSchoolRequestsIndexRoute
@@ -234,6 +243,7 @@ export interface FileRoutesById {
   '/_dash/school/': typeof DashSchoolIndexRoute
   '/_dash/admin/schools/$id': typeof DashAdminSchoolsIdRoute
   '/_dash/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
+  '/_dash/school/requests/$conversationId': typeof DashSchoolRequestsConversationIdRoute
   '/_dash/admin/schools/': typeof DashAdminSchoolsIndexRoute
   '/_dash/school/inbox/': typeof DashSchoolInboxIndexRoute
   '/_dash/school/requests/': typeof DashSchoolRequestsIndexRoute
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/school/'
     | '/admin/schools/$id'
     | '/school/inbox/$threadId'
+    | '/school/requests/$conversationId'
     | '/admin/schools/'
     | '/school/inbox/'
     | '/school/requests/'
@@ -286,6 +297,7 @@ export interface FileRouteTypes {
     | '/school'
     | '/admin/schools/$id'
     | '/school/inbox/$threadId'
+    | '/school/requests/$conversationId'
     | '/admin/schools'
     | '/school/inbox'
     | '/school/requests'
@@ -313,6 +325,7 @@ export interface FileRouteTypes {
     | '/_dash/school/'
     | '/_dash/admin/schools/$id'
     | '/_dash/school/inbox/$threadId'
+    | '/_dash/school/requests/$conversationId'
     | '/_dash/admin/schools/'
     | '/_dash/school/inbox/'
     | '/_dash/school/requests/'
@@ -501,6 +514,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashSchoolRequestsIndexRouteImport
       parentRoute: typeof DashRouteRoute
     }
+    '/_dash/school/requests/$conversationId': {
+      id: '/_dash/school/requests/$conversationId'
+      path: '/school/requests/$conversationId'
+      fullPath: '/school/requests/$conversationId'
+      preLoaderRoute: typeof DashSchoolRequestsConversationIdRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
   }
 }
 
@@ -545,6 +565,7 @@ interface DashRouteRouteChildren {
   DashSchoolIndexRoute: typeof DashSchoolIndexRoute
   DashAdminSchoolsIdRoute: typeof DashAdminSchoolsIdRoute
   DashSchoolInboxThreadIdRoute: typeof DashSchoolInboxThreadIdRoute
+  DashSchoolRequestsConversationIdRoute: typeof DashSchoolRequestsConversationIdRoute
   DashAdminSchoolsIndexRoute: typeof DashAdminSchoolsIndexRoute
   DashSchoolInboxIndexRoute: typeof DashSchoolInboxIndexRoute
   DashSchoolRequestsIndexRoute: typeof DashSchoolRequestsIndexRoute
@@ -559,6 +580,7 @@ const DashRouteRouteChildren: DashRouteRouteChildren = {
   DashSchoolIndexRoute: DashSchoolIndexRoute,
   DashAdminSchoolsIdRoute: DashAdminSchoolsIdRoute,
   DashSchoolInboxThreadIdRoute: DashSchoolInboxThreadIdRoute,
+  DashSchoolRequestsConversationIdRoute: DashSchoolRequestsConversationIdRoute,
   DashAdminSchoolsIndexRoute: DashAdminSchoolsIndexRoute,
   DashSchoolInboxIndexRoute: DashSchoolInboxIndexRoute,
   DashSchoolRequestsIndexRoute: DashSchoolRequestsIndexRoute,
