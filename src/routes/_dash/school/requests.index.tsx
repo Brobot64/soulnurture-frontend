@@ -5,7 +5,7 @@
 // PATCH /v1/follow-ups/:id (complete a follow-up).
 
 import { useEffect, useState } from 'react'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ChevronRight, CircleAlert, Inbox } from 'lucide-react'
 
 import { DashHeader } from '#/components/dash/DashHeader'
@@ -290,6 +290,7 @@ function ReviewDialog({
   const [reviewNote, setReviewNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!item) return
@@ -311,11 +312,18 @@ function ReviewDialog({
     setSaving(true)
     setError(null)
     try {
-      await reviewSupportRequest(item.id, {
+      const result = await reviewSupportRequest(item.id, {
         status,
         reviewNote: reviewNote.trim() || undefined,
       })
       onChanged()
+      // Accepting opens the staff↔student chat — land straight in it.
+      if (status === 'ACCEPTED' && result.chatThreadId) {
+        void navigate({
+          to: '/school/inbox/$threadId',
+          params: { threadId: result.chatThreadId },
+        })
+      }
     } catch (caught) {
       setSaving(false)
       setError(caught instanceof ApiError ? caught.message : 'Could not save the review.')

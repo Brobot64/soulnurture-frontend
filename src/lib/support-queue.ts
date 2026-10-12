@@ -98,14 +98,22 @@ export async function fetchSupportQueue(filters: {
   return apiFetch<SupportQueueResponse>(`/api/v1/support-requests/queue${suffix}`)
 }
 
+/** ACCEPTED reviews return the staff↔student chat opened for the request. */
+export interface ReviewSupportRequestResult {
+  chatThreadId?: string | null
+}
+
 export async function reviewSupportRequest(
   id: string,
   body: { status: ReviewStatus; reviewNote?: string },
-): Promise<unknown> {
-  return apiFetch(`/api/v1/support-requests/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(body),
-  })
+): Promise<ReviewSupportRequestResult> {
+  return apiFetch<ReviewSupportRequestResult>(
+    `/api/v1/support-requests/${id}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    },
+  )
 }
 
 export async function completeFollowUp(id: string): Promise<unknown> {
