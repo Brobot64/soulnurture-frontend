@@ -4,7 +4,7 @@
 
 import { useSyncExternalStore } from 'react'
 
-import { apiFetch } from '#/lib/api'
+import { ApiError, apiFetch } from '#/lib/api'
 
 export const CHAT_STAFF_ROLES = ['COUNSELLOR', 'PSYCHOLOGIST', 'SUPPORT_STAFF'] as const
 
@@ -134,7 +134,18 @@ export async function signIn(input: {
     method: 'POST',
     body: JSON.stringify(input),
   })
-  return refreshSession()
+  // The sign-in succeeded but the session did not come back: the browser
+  // dropped the cookie. Say so, instead of sending the student back to the
+  // sign-in form with no explanation.
+  const user = await refreshSession()
+  if (!user) {
+    throw new ApiError(
+      'Signed in, but your browser did not keep the session. Try again, or use a different browser.',
+      0,
+      'SESSION_NOT_STORED',
+    )
+  }
+  return user
 }
 
 /**
