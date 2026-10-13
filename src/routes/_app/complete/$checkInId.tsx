@@ -4,6 +4,7 @@ import { ChevronRight, RefreshCw, Shapes, UserRound } from 'lucide-react'
 
 import { CheckInSummary } from '#/components/CheckInSummary'
 import { Flash, useFlash } from '#/components/Flash'
+import { MoodFeedback } from '#/components/MoodFeedback'
 import { ProgressRow } from '#/components/ProgressRow'
 import { TextsReveal } from '#/components/TextsReveal'
 import { ThinkLine } from '#/components/ThinkLine'
@@ -151,6 +152,7 @@ function CheckInComplete() {
           </TextsReveal>
 
           {checkIn && <CheckInSummary checkIn={checkIn} className="mt-10" />}
+          {checkIn && <MoodFeedback checkInId={checkIn.id} />}
         </div>
 
         <div>

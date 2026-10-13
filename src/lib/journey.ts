@@ -277,6 +277,38 @@ export async function fetchCheckInHistory(): Promise<{ items: CheckInHistoryEntr
   return apiFetch<{ items: CheckInHistoryEntry[] }>('/api/v1/check-ins/history')
 }
 
+/* ── Post-check-in mood feedback ────────────────────────────────────────── */
+
+export interface CheckInFeedback {
+  id: string
+  checkInId: string
+  feeling: FeelingLabel
+  intensity: FeelingIntensity
+  createdAt: string
+}
+
+export interface CreateCheckInFeedbackDto {
+  feeling: FeelingLabel
+  intensity: FeelingIntensity
+}
+
+export async function submitCheckInFeedback(
+  checkInId: string,
+  dto: CreateCheckInFeedbackDto,
+): Promise<CheckInFeedback> {
+  return apiFetch<CheckInFeedback>(`/api/v1/check-ins/${encodeURIComponent(checkInId)}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify(dto),
+  })
+}
+
+export async function fetchCheckInFeedback(checkInId: string): Promise<CheckInFeedback | null> {
+  const result = await apiFetch<{ feedback: CheckInFeedback | null }>(
+    `/api/v1/check-ins/${encodeURIComponent(checkInId)}/feedback`,
+  )
+  return result.feedback
+}
+
 export async function startConversation(checkInId: string): Promise<Conversation> {
   return apiFetch<Conversation>('/api/v1/conversations', {
     method: 'POST',
