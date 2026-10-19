@@ -3,7 +3,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ChevronRight, RefreshCw, Shapes, UserRound } from 'lucide-react'
 
 import { CheckInSummary } from '#/components/CheckInSummary'
-import { Flash, useFlash } from '#/components/Flash'
+import { MoodFeedback } from '#/components/MoodFeedback'
 import { ProgressRow } from '#/components/ProgressRow'
 import { TextsReveal } from '#/components/TextsReveal'
 import { ThinkLine } from '#/components/ThinkLine'
@@ -37,7 +37,6 @@ function CheckInComplete() {
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [checked, setChecked] = useState(false)
-  const { flash, message, hiding } = useFlash()
 
   useEffect(() => {
     if (authStatus !== 'ready') return
@@ -151,14 +150,15 @@ function CheckInComplete() {
           </TextsReveal>
 
           {checkIn && <CheckInSummary checkIn={checkIn} className="mt-10" />}
+          {checkIn && <MoodFeedback checkInId={checkIn.id} />}
         </div>
 
         <div>
           <h2 className="text-section text-heading">What would help next?</h2>
           <div className="mt-7 flex flex-col gap-5">
-            <button
-              type="button"
-              onClick={() => flash('Wellbeing resources open in a later step of the journey.')}
+            <Link
+              to="/resources"
+              search={{}}
               className="flex w-full items-center gap-5 rounded-panel border border-hairline bg-white p-6 text-left transition-colors hover:border-action/30"
             >
               <span className="grid size-[52px] shrink-0 place-items-center rounded-full bg-brand-4 text-white">
@@ -173,7 +173,7 @@ function CheckInComplete() {
                 </span>
               </span>
               <ChevronRight className="size-5 shrink-0 text-muted" />
-            </button>
+            </Link>
 
             <Link
               to="/support"
@@ -203,8 +203,6 @@ function CheckInComplete() {
           </button>
         </div>
       </div>
-
-      <Flash message={message} hiding={hiding} />
     </div>
   )
 }

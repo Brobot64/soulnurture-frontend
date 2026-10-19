@@ -99,6 +99,9 @@ function Reflection() {
   // Only messages added this session stream word by word; restored ones render settled.
   const streamIds = useRef<Set<string>>(new Set())
   const recorderRef = useRef<VoiceRecorder | null>(null)
+  // Timers and microphone permission prompts must see the latest consent state.
+  const consentStateRef = useRef(consentState)
+  consentStateRef.current = consentState
   const voiceTimerRef = useRef<number | null>(null)
   const pollTimerRef = useRef<number | null>(null)
   const pollDeadlineRef = useRef(0)
@@ -118,10 +121,9 @@ function Reflection() {
       })
       return
     }
-    // While the explanation is outstanding the chat stays sealed. Accepting
-    // flips consentState and re-runs this effect, which then opens the
-    // stashed first message as normal.
-    if (consentState === 'required') return
+    // Loading is also a closed gate: only confirmed consent may open the
+    // stashed first message or initiate an AI turn.
+    if (consentState !== 'accepted') return
     let cancelled = false
     setLoadFailed(false)
     setLoading(true)
@@ -243,6 +245,16 @@ function Reflection() {
     }
   }, [])
 
+  useEffect(() => {
+    if (consentState === 'accepted') return
+    if (voiceTimerRef.current !== null) window.clearInterval(voiceTimerRef.current)
+    voiceTimerRef.current = null
+    recorderRef.current?.cancel()
+    recorderRef.current = null
+    setVoiceState('idle')
+    setVoiceElapsed(0)
+  }, [consentState])
+
   const freeTextTurns = messages.filter(
     (entry) => entry.role === 'USER' && !entry.quickReply,
   ).length
@@ -267,8 +279,13 @@ function Reflection() {
   // regenerates later, so poll until the assistant payload turns COMPLETE.
   const startCompletionPoll = () => {
     stopPolling()
+    if (consentStateRef.current !== 'accepted') return
     pollDeadlineRef.current = Date.now() + POLL_MAX_MS
     pollTimerRef.current = window.setInterval(() => {
+      if (consentStateRef.current !== 'accepted') {
+        stopPolling()
+        return
+      }
       if (sendingRef.current) return
       if (Date.now() > pollDeadlineRef.current) {
         stopPolling()
@@ -296,7 +313,7 @@ function Reflection() {
 
   const send = async (raw: string, quickReply?: QuickReplyValue, viaVoice = false) => {
     const content = raw.trim()
-    if (!content || thinking || done) return
+    if (!content || thinking || done || consentStateRef.current !== 'accepted') return
     stopPolling()
     sendingRef.current = true
     setInput('')
@@ -369,7 +386,7 @@ function Reflection() {
   }
 
   const startRecording = async () => {
-    if (voiceState !== 'idle' || thinking || done) return
+    if (voiceState !== 'idle' || thinking || done || consentStateRef.current !== 'accepted') return
     setComposerError(null)
     let recorder: VoiceRecorder
     try {
@@ -378,6 +395,10 @@ function Reflection() {
       setComposerError(
         'Microphone access was blocked. Allow it in your browser settings, or type your reply instead.',
       )
+      return
+    }
+    if (consentStateRef.current !== 'accepted') {
+      recorder.cancel()
       return
     }
     recorderRef.current = recorder
@@ -399,7 +420,7 @@ function Reflection() {
     recorderRef.current = null
     setVoiceState('transcribing')
     const clip = await recorder.stop()
-    if (!clip) {
+    if (!clip || consentStateRef.current !== 'accepted') {
       setVoiceState('idle')
       return
     }
@@ -426,6 +447,10 @@ function Reflection() {
         })
         return
       }
+      if (isConsentRequired(caught)) {
+        recheckConsent()
+        return
+      }
       setComposerError(
         caught instanceof ApiError
           ? caught.message
@@ -444,7 +469,7 @@ function Reflection() {
   }
 
   const handleContinue = async () => {
-    if (closing) return
+    if (closing || consentStateRef.current !== 'accepted') return
     setClosing(true)
     try {
       await closeConversation(conversationId)
@@ -455,6 +480,11 @@ function Reflection() {
           search: { redirect: `/reflection/${conversationId}` },
           replace: true,
         })
+        return
+      }
+      if (isConsentRequired(caught)) {
+        setClosing(false)
+        recheckConsent()
         return
       }
       // completing does not depend on the close call — the summary can queue later
@@ -582,7 +612,8 @@ function Reflection() {
                   <button
                     type="button"
                     onClick={() => setAttempt((current) => current + 1)}
-                    className="mt-6 inline-flex h-[52px] items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4"
+                    disabled={consentState !== 'accepted'}
+                    className="mt-6 inline-flex h-[52px] items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4 disabled:opacity-40"
                   >
                     <RefreshCw className="size-5" />
                     Try again
@@ -661,7 +692,8 @@ function Reflection() {
                             key={reply.value}
                             type="button"
                             onClick={() => void send(reply.label, reply.value)}
-                            className="inline-flex h-[38px] items-center whitespace-nowrap rounded-pill border border-transparent bg-panel px-4 text-chip text-ink transition-colors hover:bg-blush lg:h-[46px] lg:border-hairline lg:bg-white lg:px-6 lg:text-button-sm lg:hover:border-action/40 lg:hover:bg-white"
+                            disabled={consentState !== 'accepted'}
+                            className="inline-flex h-[38px] items-center whitespace-nowrap rounded-pill border border-transparent bg-panel px-4 text-chip text-ink transition-colors hover:bg-blush disabled:cursor-not-allowed disabled:opacity-40 lg:h-[46px] lg:border-hairline lg:bg-white lg:px-6 lg:text-button-sm lg:hover:border-action/40 lg:hover:bg-white"
                           >
                             {reply.label}
                           </button>
@@ -675,7 +707,8 @@ function Reflection() {
                             key={reply.value}
                             type="button"
                             onClick={() => void send(reply.label, reply.value)}
-                            className="inline-flex h-[38px] items-center whitespace-nowrap rounded-pill border-[1.5px] border-accent/40 bg-peach/50 px-4 text-chip text-peach-ink transition-colors hover:bg-peach lg:h-[46px] lg:border-accent lg:bg-white lg:px-6 lg:text-button-sm lg:hover:bg-peach/50"
+                            disabled={consentState !== 'accepted'}
+                            className="inline-flex h-[38px] items-center whitespace-nowrap rounded-pill border-[1.5px] border-accent/40 bg-peach/50 px-4 text-chip text-peach-ink transition-colors hover:bg-peach disabled:cursor-not-allowed disabled:opacity-40 lg:h-[46px] lg:border-accent lg:bg-white lg:px-6 lg:text-button-sm lg:hover:bg-peach/50"
                           >
                             {reply.label}
                           </button>
@@ -699,7 +732,7 @@ function Reflection() {
                   to="/support"
                   className="mt-3 inline-flex text-button-sm text-action transition-colors hover:text-brand-4"
                 >
-                  Talk to a person on WhatsApp
+                  Talk to a person
                 </Link>
               </div>
             )}
@@ -715,7 +748,7 @@ function Reflection() {
                 <button
                   type="button"
                   onClick={() => void handleContinue()}
-                  disabled={closing}
+                  disabled={closing || consentState !== 'accepted'}
                   className="inline-flex h-[46px] items-center justify-center whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:h-[52px] lg:px-10 lg:text-button"
                 >
                   {closing ? 'Finishing…' : 'Continue'}
@@ -724,7 +757,7 @@ function Reflection() {
                   to="/support"
                   className="text-button-sm text-action transition-colors hover:text-brand-4"
                 >
-                  Or talk to a person on WhatsApp
+                  Or talk to a person
                 </Link>
               </div>
             )}
@@ -766,8 +799,9 @@ function Reflection() {
                 <button
                   type="button"
                   onClick={() => void finishRecording()}
+                  disabled={consentState !== 'accepted'}
                   aria-label="Stop and transcribe"
-                  className="grid size-9 shrink-0 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4 lg:size-10"
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4 disabled:opacity-40 lg:size-10"
                 >
                   <Square className="size-4 fill-current" />
                 </button>
@@ -804,7 +838,7 @@ function Reflection() {
                   <button
                     type="button"
                     onClick={() => void startRecording()}
-                    disabled={thinking || voiceState === 'transcribing'}
+                    disabled={thinking || voiceState === 'transcribing' || consentState !== 'accepted'}
                     aria-label="Record a voice note"
                     title="Record a voice note"
                     className="absolute right-[50px] top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-panel text-action transition-colors hover:bg-blush disabled:opacity-40 lg:right-[60px] lg:size-10"
@@ -818,7 +852,7 @@ function Reflection() {
                 )}
                 <button
                   type="submit"
-                  disabled={!input.trim() || thinking || voiceState === 'transcribing'}
+                  disabled={!input.trim() || thinking || voiceState === 'transcribing' || consentState !== 'accepted'}
                   aria-label="Send"
                   className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4 disabled:opacity-40 lg:right-2.5 lg:size-10"
                 >

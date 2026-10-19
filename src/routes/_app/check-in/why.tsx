@@ -60,7 +60,7 @@ function WhyCheckIn() {
   }
 
   const handleNext = async () => {
-    if (busy) return
+    if (busy || consent.state !== 'accepted') return
     const draft = readMoodDraft()
     const mood = draft ? MOODS.find((item) => item.id === draft.moodId) : undefined
     if (!draft || !mood) {
@@ -189,10 +189,12 @@ function WhyCheckIn() {
         <button
           type="button"
           onClick={handleNext}
-          disabled={busy}
+          disabled={busy || consent.state !== 'accepted'}
           className="order-1 inline-flex h-[52px] w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:order-2 lg:h-[60px] lg:w-auto lg:px-16 lg:text-button"
         >
-          {busy ? (
+          {consent.state === 'loading' ? (
+            <><Spinner /> Checking agreement…</>
+          ) : busy ? (
             <>
               <Spinner />
               Setting up your reflection…

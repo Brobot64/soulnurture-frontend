@@ -163,11 +163,8 @@ export async function firstPassword(
 }
 
 export async function signOut(): Promise<void> {
-  try {
-    await apiFetch('/api/auth/sign-out', { method: 'POST' })
-  } finally {
-    setState({ user: null, status: 'ready' })
-  }
+  await apiFetch('/api/auth/sign-out', { method: 'POST' })
+  setState({ user: null, status: 'ready' })
 }
 
 export async function resendVerification(email: string): Promise<void> {

@@ -64,8 +64,8 @@ export function Landing() {
           </p>
         </div>
         <div className="order-1 flex justify-center lg:order-2">
-          <div className="lg:grid lg:size-[560px] lg:place-items-center lg:rounded-hero lg:bg-panel">
-            <HeroIllustration className="w-[267px] max-w-[78vw] lg:w-[400px] lg:max-w-none" />
+          <div className="lg:grid lg:aspect-square lg:w-full lg:max-w-[560px] lg:place-items-center lg:rounded-hero lg:bg-panel">
+            <HeroIllustration className="w-[267px] max-w-[78vw] lg:w-3/4 lg:max-w-[400px]" />
           </div>
         </div>
       </section>

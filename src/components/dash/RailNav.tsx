@@ -8,7 +8,9 @@ import {
   LayoutDashboard,
   LineChart,
   School,
+  ScrollText,
   Settings,
+  ShieldCheck,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -22,11 +24,13 @@ type RailPath =
   | '/admin/schools'
   | '/admin/users'
   | '/admin/pilot'
+  | '/admin/access-log'
   | '/school'
   | '/school/users'
   | '/school/settings'
   | '/school/inbox'
   | '/school/requests'
+  | '/school/indicators'
 
 interface RailItem {
   to: RailPath
@@ -41,6 +45,7 @@ function itemsForRole(role?: string | null): RailItem[] {
       { to: '/admin/schools', label: 'Schools', icon: School },
       { to: '/admin/users', label: 'Users', icon: Users },
       { to: '/admin/pilot', label: 'Pilot analytics', icon: LineChart },
+      { to: '/admin/access-log', label: 'Access activity', icon: ScrollText },
     ]
   }
   if (role === 'SCHOOL_ADMIN') {
@@ -54,6 +59,9 @@ function itemsForRole(role?: string | null): RailItem[] {
     return [
       { to: '/school/inbox', label: 'Inbox', icon: Inbox },
       { to: '/school/requests', label: 'Support requests', icon: HeartHandshake },
+      ...(role === 'COUNSELLOR' || role === 'PSYCHOLOGIST'
+        ? [{ to: '/school/indicators' as const, label: 'Support indicators', icon: ShieldCheck }]
+        : []),
     ]
   }
   return []
@@ -78,9 +86,9 @@ export function RailNav() {
   return (
     <nav
       aria-label="Dashboard"
-      className="flex w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto bg-brand-2 py-5"
+      className="flex w-full shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-brand-4 bg-brand-2 px-3 py-3 pb-[max(12px,env(safe-area-inset-bottom))] lg:w-[72px] lg:flex-col lg:justify-start lg:overflow-y-auto lg:border-t-0 lg:px-0 lg:py-5"
     >
-      <img src={logoUrl} alt="Soul Nurture AI" className="mb-3 size-10 shrink-0" />
+      <img src={logoUrl} alt="Soul Nurture AI" className="mb-3 hidden size-10 shrink-0 lg:block" />
       {items.map((item) => {
         const isActive = active?.to === item.to
         const Icon = item.icon
@@ -89,11 +97,12 @@ export function RailNav() {
             key={item.to}
             to={item.to}
             aria-label={item.label}
+            aria-current={isActive ? 'page' : undefined}
             title={item.label}
-            className={`relative flex size-11 shrink-0 items-center justify-center rounded-2xl transition-colors ${
+            className={`relative flex size-11 shrink-0 items-center justify-center rounded-2xl transition-colors focus-visible:outline-white ${
               isActive
-                ? 'bg-brand-4 text-brand-11'
-                : 'text-brand-4/70 hover:bg-white/70 hover:text-brand-4'
+                ? 'bg-brand-4 text-white ring-1 ring-brand-8/40'
+                : 'text-brand-10 hover:bg-brand-4 hover:text-white'
             }`}
           >
             <Icon aria-hidden="true" className="size-5" />

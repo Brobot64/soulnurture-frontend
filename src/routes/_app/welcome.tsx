@@ -60,12 +60,12 @@ function Welcome() {
             >
               Start check-in
             </Link>
-            <button
-              type="button"
+            <Link
+              to="/resources"
               className="inline-flex h-[52px] items-center justify-center whitespace-nowrap rounded-pill bg-surface px-8 text-button-sm text-ink transition-colors hover:bg-neutral-10 sm:px-10 lg:h-[60px] lg:px-12 lg:text-button"
             >
               Maybe later
-            </button>
+            </Link>
           </div>
           {status === 'ready' && !user && (
             <p className="mt-6 text-center text-copy-sm text-body lg:text-left">
@@ -83,8 +83,8 @@ function Welcome() {
           </p>
         </div>
         <div className="order-1 flex justify-center lg:order-2">
-          <div className="lg:grid lg:size-[560px] lg:place-items-center lg:rounded-hero lg:bg-panel">
-            <HeroIllustration className="w-[267px] max-w-[78vw] lg:w-[400px] lg:max-w-none" />
+          <div className="lg:grid lg:aspect-square lg:w-full lg:max-w-[560px] lg:place-items-center lg:rounded-hero lg:bg-panel">
+            <HeroIllustration className="w-[267px] max-w-[78vw] lg:w-3/4 lg:max-w-[400px]" />
           </div>
         </div>
       </div>
