@@ -48,9 +48,9 @@ function DashLayout() {
   if (suspended) return <SuspendedPage />
 
   return (
-    <div className="flex h-dvh">
+    <div className="flex h-dvh flex-col-reverse lg:flex-row">
       <RailNav />
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-page">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-page">
         <Outlet />
       </div>
     </div>

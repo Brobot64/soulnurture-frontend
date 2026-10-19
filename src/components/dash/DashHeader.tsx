@@ -1,10 +1,10 @@
 // Dashboard header: title block, optional search + actions, bell, account menu.
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { LogOut } from 'lucide-react'
 
-import { AvatarInitials, SearchInput } from '#/components/dash/ui'
+import { AvatarInitials, Button, Dialog, SearchInput } from '#/components/dash/ui'
 import { NotificationBell } from '#/components/dash/NotificationBell'
 import { roleLabel, signOut, useSession } from '#/lib/auth'
 import { clearSchoolSuspended } from '#/lib/dash'
@@ -47,16 +47,29 @@ export function DashHeader({ title, subtitle, search, actions }: DashHeaderProps
 function AccountMenu() {
   const navigate = useNavigate()
   const { user } = useSession()
+  const [signOutOpen, setSignOutOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState(false)
 
   if (!user) return null
 
   const handleSignOut = async () => {
-    await signOut()
-    clearSchoolSuspended()
-    void navigate({ to: '/signin' })
+    if (signingOut) return
+    setSigningOut(true)
+    setSignOutError(false)
+    try {
+      await signOut()
+      clearSchoolSuspended()
+      void navigate({ to: '/signin' })
+    } catch {
+      setSignOutError(true)
+    } finally {
+      setSigningOut(false)
+    }
   }
 
   return (
+    <>
     <details className="group relative">
       <summary
         aria-label="Account menu"
@@ -70,7 +83,7 @@ function AccountMenu() {
         <p className="mt-1 text-caption text-muted">{roleLabel(user.role)}</p>
         <button
           type="button"
-          onClick={handleSignOut}
+          onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setSignOutOpen(true) }}
           className="mt-3 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-copy-sm text-heading transition-colors hover:bg-panel"
         >
           <LogOut aria-hidden="true" className="size-4" />
@@ -78,5 +91,10 @@ function AccountMenu() {
         </button>
       </div>
     </details>
+    <Dialog open={signOutOpen} onClose={() => { if (!signingOut) setSignOutOpen(false) }} title="Sign out of Soul Nurture AI?" footer={<><Button variant="ghost" disabled={signingOut} onClick={() => setSignOutOpen(false)}>Stay signed in</Button><Button disabled={signingOut} onClick={() => void handleSignOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</Button></>}>
+      <p className="text-copy-sm text-body">You can sign in again with your school account whenever you need to.</p>
+      {signOutError && <p role="alert" className="mt-3 text-copy-sm text-destructive">Could not sign out. Check your connection and try again.</p>}
+    </Dialog>
+    </>
   )
 }

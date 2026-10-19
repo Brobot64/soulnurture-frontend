@@ -13,7 +13,11 @@ import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as DashRouteRouteImport } from './routes/_dash/route'
 import { Route as FirstPasswordRouteImport } from './routes/first-password'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppAccessUnavailableRouteImport } from './routes/_app/access-unavailable'
+import { Route as AppConsentRouteImport } from './routes/_app/consent'
+import { Route as AppForgotPasswordRouteImport } from './routes/_app/forgot-password'
 import { Route as AppPrivacyRouteImport } from './routes/_app/privacy'
+import { Route as AppResetPasswordRouteImport } from './routes/_app/reset-password'
 import { Route as AppSigninRouteImport } from './routes/_app/signin'
 import { Route as AppVerifyRouteImport } from './routes/_app/verify'
 import { Route as AppWelcomeRouteImport } from './routes/_app/welcome'
@@ -21,18 +25,26 @@ import { Route as AppCheckInIndexRouteImport } from './routes/_app/check-in/inde
 import { Route as AppCheckInWhyRouteImport } from './routes/_app/check-in/why'
 import { Route as AppCompleteCheckInIdRouteImport } from './routes/_app/complete/$checkInId'
 import { Route as AppReflectionConversationIdRouteImport } from './routes/_app/reflection/$conversationId'
+import { Route as AppResourcesIndexRouteImport } from './routes/_app/resources.index'
+import { Route as AppResourcesResourceIdRouteImport } from './routes/_app/resources.$resourceId'
 import { Route as AppSupportIndexRouteImport } from './routes/_app/support.index'
 import { Route as AppSupportThreadIdRouteImport } from './routes/_app/support.$threadId'
+import { Route as AppSupportStatusGuideRouteImport } from './routes/_app/support.status-guide'
 import { Route as DashAdminIndexRouteImport } from './routes/_dash/admin/index'
+import { Route as DashAdminAccessLogRouteImport } from './routes/_dash/admin/access-log'
 import { Route as DashAdminPilotRouteImport } from './routes/_dash/admin/pilot'
 import { Route as DashAdminUsersRouteImport } from './routes/_dash/admin/users'
 import { Route as DashSchoolIndexRouteImport } from './routes/_dash/school/index'
 import { Route as DashSchoolSettingsRouteImport } from './routes/_dash/school/settings'
 import { Route as DashSchoolUsersRouteImport } from './routes/_dash/school/users'
+import { Route as AppSupportRequestsIndexRouteImport } from './routes/_app/support.requests.index'
+import { Route as AppSupportRequestsRequestIdRouteImport } from './routes/_app/support.requests.$requestId'
 import { Route as DashAdminSchoolsIndexRouteImport } from './routes/_dash/admin/schools.index'
 import { Route as DashAdminSchoolsIdRouteImport } from './routes/_dash/admin/schools.$id'
 import { Route as DashSchoolInboxIndexRouteImport } from './routes/_dash/school/inbox.index'
 import { Route as DashSchoolInboxThreadIdRouteImport } from './routes/_dash/school/inbox.$threadId'
+import { Route as DashSchoolIndicatorsIndexRouteImport } from './routes/_dash/school/indicators.index'
+import { Route as DashSchoolIndicatorsGuideRouteImport } from './routes/_dash/school/indicators.guide'
 import { Route as DashSchoolRequestsIndexRouteImport } from './routes/_dash/school/requests.index'
 import { Route as DashSchoolRequestsConversationIdRouteImport } from './routes/_dash/school/requests.$conversationId'
 
@@ -54,9 +66,29 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppAccessUnavailableRoute = AppAccessUnavailableRouteImport.update({
+  id: '/access-unavailable',
+  path: '/access-unavailable',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppConsentRoute = AppConsentRouteImport.update({
+  id: '/consent',
+  path: '/consent',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppForgotPasswordRoute = AppForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppPrivacyRoute = AppPrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppResetPasswordRoute = AppResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppSigninRoute = AppSigninRouteImport.update({
@@ -95,6 +127,16 @@ const AppReflectionConversationIdRoute =
     path: '/reflection/$conversationId',
     getParentRoute: () => AppRouteRoute,
   } as any)
+const AppResourcesIndexRoute = AppResourcesIndexRouteImport.update({
+  id: '/resources/',
+  path: '/resources/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppResourcesResourceIdRoute = AppResourcesResourceIdRouteImport.update({
+  id: '/resources/$resourceId',
+  path: '/resources/$resourceId',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppSupportIndexRoute = AppSupportIndexRouteImport.update({
   id: '/support/',
   path: '/support/',
@@ -105,9 +147,19 @@ const AppSupportThreadIdRoute = AppSupportThreadIdRouteImport.update({
   path: '/support/$threadId',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppSupportStatusGuideRoute = AppSupportStatusGuideRouteImport.update({
+  id: '/support/status-guide',
+  path: '/support/status-guide',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const DashAdminIndexRoute = DashAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
+  getParentRoute: () => DashRouteRoute,
+} as any)
+const DashAdminAccessLogRoute = DashAdminAccessLogRouteImport.update({
+  id: '/admin/access-log',
+  path: '/admin/access-log',
   getParentRoute: () => DashRouteRoute,
 } as any)
 const DashAdminPilotRoute = DashAdminPilotRouteImport.update({
@@ -135,6 +187,17 @@ const DashSchoolUsersRoute = DashSchoolUsersRouteImport.update({
   path: '/school/users',
   getParentRoute: () => DashRouteRoute,
 } as any)
+const AppSupportRequestsIndexRoute = AppSupportRequestsIndexRouteImport.update({
+  id: '/support/requests/',
+  path: '/support/requests/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSupportRequestsRequestIdRoute =
+  AppSupportRequestsRequestIdRouteImport.update({
+    id: '/support/requests/$requestId',
+    path: '/support/requests/$requestId',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const DashAdminSchoolsIndexRoute = DashAdminSchoolsIndexRouteImport.update({
   id: '/admin/schools/',
   path: '/admin/schools/',
@@ -155,6 +218,18 @@ const DashSchoolInboxThreadIdRoute = DashSchoolInboxThreadIdRouteImport.update({
   path: '/school/inbox/$threadId',
   getParentRoute: () => DashRouteRoute,
 } as any)
+const DashSchoolIndicatorsIndexRoute =
+  DashSchoolIndicatorsIndexRouteImport.update({
+    id: '/school/indicators/',
+    path: '/school/indicators/',
+    getParentRoute: () => DashRouteRoute,
+  } as any)
+const DashSchoolIndicatorsGuideRoute =
+  DashSchoolIndicatorsGuideRouteImport.update({
+    id: '/school/indicators/guide',
+    path: '/school/indicators/guide',
+    getParentRoute: () => DashRouteRoute,
+  } as any)
 const DashSchoolRequestsIndexRoute = DashSchoolRequestsIndexRouteImport.update({
   id: '/school/requests/',
   path: '/school/requests/',
@@ -170,53 +245,77 @@ const DashSchoolRequestsConversationIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/first-password': typeof FirstPasswordRoute
+  '/access-unavailable': typeof AppAccessUnavailableRoute
+  '/consent': typeof AppConsentRoute
+  '/forgot-password': typeof AppForgotPasswordRoute
   '/privacy': typeof AppPrivacyRoute
+  '/reset-password': typeof AppResetPasswordRoute
   '/signin': typeof AppSigninRoute
   '/verify': typeof AppVerifyRoute
   '/welcome': typeof AppWelcomeRoute
   '/check-in/why': typeof AppCheckInWhyRoute
   '/complete/$checkInId': typeof AppCompleteCheckInIdRoute
   '/reflection/$conversationId': typeof AppReflectionConversationIdRoute
+  '/resources/$resourceId': typeof AppResourcesResourceIdRoute
   '/support/$threadId': typeof AppSupportThreadIdRoute
+  '/support/status-guide': typeof AppSupportStatusGuideRoute
+  '/admin/access-log': typeof DashAdminAccessLogRoute
   '/admin/pilot': typeof DashAdminPilotRoute
   '/admin/users': typeof DashAdminUsersRoute
   '/school/settings': typeof DashSchoolSettingsRoute
   '/school/users': typeof DashSchoolUsersRoute
   '/check-in/': typeof AppCheckInIndexRoute
+  '/resources/': typeof AppResourcesIndexRoute
   '/support/': typeof AppSupportIndexRoute
   '/admin/': typeof DashAdminIndexRoute
   '/school/': typeof DashSchoolIndexRoute
+  '/support/requests/$requestId': typeof AppSupportRequestsRequestIdRoute
   '/admin/schools/$id': typeof DashAdminSchoolsIdRoute
   '/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
+  '/school/indicators/guide': typeof DashSchoolIndicatorsGuideRoute
   '/school/requests/$conversationId': typeof DashSchoolRequestsConversationIdRoute
+  '/support/requests/': typeof AppSupportRequestsIndexRoute
   '/admin/schools/': typeof DashAdminSchoolsIndexRoute
   '/school/inbox/': typeof DashSchoolInboxIndexRoute
+  '/school/indicators/': typeof DashSchoolIndicatorsIndexRoute
   '/school/requests/': typeof DashSchoolRequestsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/first-password': typeof FirstPasswordRoute
+  '/access-unavailable': typeof AppAccessUnavailableRoute
+  '/consent': typeof AppConsentRoute
+  '/forgot-password': typeof AppForgotPasswordRoute
   '/privacy': typeof AppPrivacyRoute
+  '/reset-password': typeof AppResetPasswordRoute
   '/signin': typeof AppSigninRoute
   '/verify': typeof AppVerifyRoute
   '/welcome': typeof AppWelcomeRoute
   '/check-in/why': typeof AppCheckInWhyRoute
   '/complete/$checkInId': typeof AppCompleteCheckInIdRoute
   '/reflection/$conversationId': typeof AppReflectionConversationIdRoute
+  '/resources/$resourceId': typeof AppResourcesResourceIdRoute
   '/support/$threadId': typeof AppSupportThreadIdRoute
+  '/support/status-guide': typeof AppSupportStatusGuideRoute
+  '/admin/access-log': typeof DashAdminAccessLogRoute
   '/admin/pilot': typeof DashAdminPilotRoute
   '/admin/users': typeof DashAdminUsersRoute
   '/school/settings': typeof DashSchoolSettingsRoute
   '/school/users': typeof DashSchoolUsersRoute
   '/check-in': typeof AppCheckInIndexRoute
+  '/resources': typeof AppResourcesIndexRoute
   '/support': typeof AppSupportIndexRoute
   '/admin': typeof DashAdminIndexRoute
   '/school': typeof DashSchoolIndexRoute
+  '/support/requests/$requestId': typeof AppSupportRequestsRequestIdRoute
   '/admin/schools/$id': typeof DashAdminSchoolsIdRoute
   '/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
+  '/school/indicators/guide': typeof DashSchoolIndicatorsGuideRoute
   '/school/requests/$conversationId': typeof DashSchoolRequestsConversationIdRoute
+  '/support/requests': typeof AppSupportRequestsIndexRoute
   '/admin/schools': typeof DashAdminSchoolsIndexRoute
   '/school/inbox': typeof DashSchoolInboxIndexRoute
+  '/school/indicators': typeof DashSchoolIndicatorsIndexRoute
   '/school/requests': typeof DashSchoolRequestsIndexRoute
 }
 export interface FileRoutesById {
@@ -224,7 +323,11 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteRouteWithChildren
   '/_dash': typeof DashRouteRouteWithChildren
   '/first-password': typeof FirstPasswordRoute
+  '/_app/access-unavailable': typeof AppAccessUnavailableRoute
+  '/_app/consent': typeof AppConsentRoute
+  '/_app/forgot-password': typeof AppForgotPasswordRoute
   '/_app/privacy': typeof AppPrivacyRoute
+  '/_app/reset-password': typeof AppResetPasswordRoute
   '/_app/signin': typeof AppSigninRoute
   '/_app/verify': typeof AppVerifyRoute
   '/_app/welcome': typeof AppWelcomeRoute
@@ -232,20 +335,28 @@ export interface FileRoutesById {
   '/_app/check-in/why': typeof AppCheckInWhyRoute
   '/_app/complete/$checkInId': typeof AppCompleteCheckInIdRoute
   '/_app/reflection/$conversationId': typeof AppReflectionConversationIdRoute
+  '/_app/resources/$resourceId': typeof AppResourcesResourceIdRoute
   '/_app/support/$threadId': typeof AppSupportThreadIdRoute
+  '/_app/support/status-guide': typeof AppSupportStatusGuideRoute
+  '/_dash/admin/access-log': typeof DashAdminAccessLogRoute
   '/_dash/admin/pilot': typeof DashAdminPilotRoute
   '/_dash/admin/users': typeof DashAdminUsersRoute
   '/_dash/school/settings': typeof DashSchoolSettingsRoute
   '/_dash/school/users': typeof DashSchoolUsersRoute
   '/_app/check-in/': typeof AppCheckInIndexRoute
+  '/_app/resources/': typeof AppResourcesIndexRoute
   '/_app/support/': typeof AppSupportIndexRoute
   '/_dash/admin/': typeof DashAdminIndexRoute
   '/_dash/school/': typeof DashSchoolIndexRoute
+  '/_app/support/requests/$requestId': typeof AppSupportRequestsRequestIdRoute
   '/_dash/admin/schools/$id': typeof DashAdminSchoolsIdRoute
   '/_dash/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
+  '/_dash/school/indicators/guide': typeof DashSchoolIndicatorsGuideRoute
   '/_dash/school/requests/$conversationId': typeof DashSchoolRequestsConversationIdRoute
+  '/_app/support/requests/': typeof AppSupportRequestsIndexRoute
   '/_dash/admin/schools/': typeof DashAdminSchoolsIndexRoute
   '/_dash/school/inbox/': typeof DashSchoolInboxIndexRoute
+  '/_dash/school/indicators/': typeof DashSchoolIndicatorsIndexRoute
   '/_dash/school/requests/': typeof DashSchoolRequestsIndexRoute
 }
 export interface FileRouteTypes {
@@ -253,60 +364,88 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/first-password'
+    | '/access-unavailable'
+    | '/consent'
+    | '/forgot-password'
     | '/privacy'
+    | '/reset-password'
     | '/signin'
     | '/verify'
     | '/welcome'
     | '/check-in/why'
     | '/complete/$checkInId'
     | '/reflection/$conversationId'
+    | '/resources/$resourceId'
     | '/support/$threadId'
+    | '/support/status-guide'
+    | '/admin/access-log'
     | '/admin/pilot'
     | '/admin/users'
     | '/school/settings'
     | '/school/users'
     | '/check-in/'
+    | '/resources/'
     | '/support/'
     | '/admin/'
     | '/school/'
+    | '/support/requests/$requestId'
     | '/admin/schools/$id'
     | '/school/inbox/$threadId'
+    | '/school/indicators/guide'
     | '/school/requests/$conversationId'
+    | '/support/requests/'
     | '/admin/schools/'
     | '/school/inbox/'
+    | '/school/indicators/'
     | '/school/requests/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/first-password'
+    | '/access-unavailable'
+    | '/consent'
+    | '/forgot-password'
     | '/privacy'
+    | '/reset-password'
     | '/signin'
     | '/verify'
     | '/welcome'
     | '/check-in/why'
     | '/complete/$checkInId'
     | '/reflection/$conversationId'
+    | '/resources/$resourceId'
     | '/support/$threadId'
+    | '/support/status-guide'
+    | '/admin/access-log'
     | '/admin/pilot'
     | '/admin/users'
     | '/school/settings'
     | '/school/users'
     | '/check-in'
+    | '/resources'
     | '/support'
     | '/admin'
     | '/school'
+    | '/support/requests/$requestId'
     | '/admin/schools/$id'
     | '/school/inbox/$threadId'
+    | '/school/indicators/guide'
     | '/school/requests/$conversationId'
+    | '/support/requests'
     | '/admin/schools'
     | '/school/inbox'
+    | '/school/indicators'
     | '/school/requests'
   id:
     | '__root__'
     | '/_app'
     | '/_dash'
     | '/first-password'
+    | '/_app/access-unavailable'
+    | '/_app/consent'
+    | '/_app/forgot-password'
     | '/_app/privacy'
+    | '/_app/reset-password'
     | '/_app/signin'
     | '/_app/verify'
     | '/_app/welcome'
@@ -314,20 +453,28 @@ export interface FileRouteTypes {
     | '/_app/check-in/why'
     | '/_app/complete/$checkInId'
     | '/_app/reflection/$conversationId'
+    | '/_app/resources/$resourceId'
     | '/_app/support/$threadId'
+    | '/_app/support/status-guide'
+    | '/_dash/admin/access-log'
     | '/_dash/admin/pilot'
     | '/_dash/admin/users'
     | '/_dash/school/settings'
     | '/_dash/school/users'
     | '/_app/check-in/'
+    | '/_app/resources/'
     | '/_app/support/'
     | '/_dash/admin/'
     | '/_dash/school/'
+    | '/_app/support/requests/$requestId'
     | '/_dash/admin/schools/$id'
     | '/_dash/school/inbox/$threadId'
+    | '/_dash/school/indicators/guide'
     | '/_dash/school/requests/$conversationId'
+    | '/_app/support/requests/'
     | '/_dash/admin/schools/'
     | '/_dash/school/inbox/'
+    | '/_dash/school/indicators/'
     | '/_dash/school/requests/'
   fileRoutesById: FileRoutesById
 }
@@ -367,11 +514,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/access-unavailable': {
+      id: '/_app/access-unavailable'
+      path: '/access-unavailable'
+      fullPath: '/access-unavailable'
+      preLoaderRoute: typeof AppAccessUnavailableRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/consent': {
+      id: '/_app/consent'
+      path: '/consent'
+      fullPath: '/consent'
+      preLoaderRoute: typeof AppConsentRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/forgot-password': {
+      id: '/_app/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof AppForgotPasswordRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/privacy': {
       id: '/_app/privacy'
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof AppPrivacyRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/reset-password': {
+      id: '/_app/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof AppResetPasswordRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/signin': {
@@ -423,6 +598,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReflectionConversationIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/resources/': {
+      id: '/_app/resources/'
+      path: '/resources'
+      fullPath: '/resources/'
+      preLoaderRoute: typeof AppResourcesIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/resources/$resourceId': {
+      id: '/_app/resources/$resourceId'
+      path: '/resources/$resourceId'
+      fullPath: '/resources/$resourceId'
+      preLoaderRoute: typeof AppResourcesResourceIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/support/': {
       id: '/_app/support/'
       path: '/support'
@@ -437,11 +626,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSupportThreadIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/support/status-guide': {
+      id: '/_app/support/status-guide'
+      path: '/support/status-guide'
+      fullPath: '/support/status-guide'
+      preLoaderRoute: typeof AppSupportStatusGuideRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_dash/admin/': {
       id: '/_dash/admin/'
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof DashAdminIndexRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
+    '/_dash/admin/access-log': {
+      id: '/_dash/admin/access-log'
+      path: '/admin/access-log'
+      fullPath: '/admin/access-log'
+      preLoaderRoute: typeof DashAdminAccessLogRouteImport
       parentRoute: typeof DashRouteRoute
     }
     '/_dash/admin/pilot': {
@@ -479,6 +682,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashSchoolUsersRouteImport
       parentRoute: typeof DashRouteRoute
     }
+    '/_app/support/requests/': {
+      id: '/_app/support/requests/'
+      path: '/support/requests'
+      fullPath: '/support/requests/'
+      preLoaderRoute: typeof AppSupportRequestsIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/support/requests/$requestId': {
+      id: '/_app/support/requests/$requestId'
+      path: '/support/requests/$requestId'
+      fullPath: '/support/requests/$requestId'
+      preLoaderRoute: typeof AppSupportRequestsRequestIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_dash/admin/schools/': {
       id: '/_dash/admin/schools/'
       path: '/admin/schools'
@@ -507,6 +724,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashSchoolInboxThreadIdRouteImport
       parentRoute: typeof DashRouteRoute
     }
+    '/_dash/school/indicators/': {
+      id: '/_dash/school/indicators/'
+      path: '/school/indicators'
+      fullPath: '/school/indicators/'
+      preLoaderRoute: typeof DashSchoolIndicatorsIndexRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
+    '/_dash/school/indicators/guide': {
+      id: '/_dash/school/indicators/guide'
+      path: '/school/indicators/guide'
+      fullPath: '/school/indicators/guide'
+      preLoaderRoute: typeof DashSchoolIndicatorsGuideRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
     '/_dash/school/requests/': {
       id: '/_dash/school/requests/'
       path: '/school/requests'
@@ -525,7 +756,11 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteRouteChildren {
+  AppAccessUnavailableRoute: typeof AppAccessUnavailableRoute
+  AppConsentRoute: typeof AppConsentRoute
+  AppForgotPasswordRoute: typeof AppForgotPasswordRoute
   AppPrivacyRoute: typeof AppPrivacyRoute
+  AppResetPasswordRoute: typeof AppResetPasswordRoute
   AppSigninRoute: typeof AppSigninRoute
   AppVerifyRoute: typeof AppVerifyRoute
   AppWelcomeRoute: typeof AppWelcomeRoute
@@ -533,13 +768,22 @@ interface AppRouteRouteChildren {
   AppCheckInWhyRoute: typeof AppCheckInWhyRoute
   AppCompleteCheckInIdRoute: typeof AppCompleteCheckInIdRoute
   AppReflectionConversationIdRoute: typeof AppReflectionConversationIdRoute
+  AppResourcesResourceIdRoute: typeof AppResourcesResourceIdRoute
   AppSupportThreadIdRoute: typeof AppSupportThreadIdRoute
+  AppSupportStatusGuideRoute: typeof AppSupportStatusGuideRoute
   AppCheckInIndexRoute: typeof AppCheckInIndexRoute
+  AppResourcesIndexRoute: typeof AppResourcesIndexRoute
   AppSupportIndexRoute: typeof AppSupportIndexRoute
+  AppSupportRequestsRequestIdRoute: typeof AppSupportRequestsRequestIdRoute
+  AppSupportRequestsIndexRoute: typeof AppSupportRequestsIndexRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppAccessUnavailableRoute: AppAccessUnavailableRoute,
+  AppConsentRoute: AppConsentRoute,
+  AppForgotPasswordRoute: AppForgotPasswordRoute,
   AppPrivacyRoute: AppPrivacyRoute,
+  AppResetPasswordRoute: AppResetPasswordRoute,
   AppSigninRoute: AppSigninRoute,
   AppVerifyRoute: AppVerifyRoute,
   AppWelcomeRoute: AppWelcomeRoute,
@@ -547,9 +791,14 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppCheckInWhyRoute: AppCheckInWhyRoute,
   AppCompleteCheckInIdRoute: AppCompleteCheckInIdRoute,
   AppReflectionConversationIdRoute: AppReflectionConversationIdRoute,
+  AppResourcesResourceIdRoute: AppResourcesResourceIdRoute,
   AppSupportThreadIdRoute: AppSupportThreadIdRoute,
+  AppSupportStatusGuideRoute: AppSupportStatusGuideRoute,
   AppCheckInIndexRoute: AppCheckInIndexRoute,
+  AppResourcesIndexRoute: AppResourcesIndexRoute,
   AppSupportIndexRoute: AppSupportIndexRoute,
+  AppSupportRequestsRequestIdRoute: AppSupportRequestsRequestIdRoute,
+  AppSupportRequestsIndexRoute: AppSupportRequestsIndexRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
@@ -557,6 +806,7 @@ const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
 )
 
 interface DashRouteRouteChildren {
+  DashAdminAccessLogRoute: typeof DashAdminAccessLogRoute
   DashAdminPilotRoute: typeof DashAdminPilotRoute
   DashAdminUsersRoute: typeof DashAdminUsersRoute
   DashSchoolSettingsRoute: typeof DashSchoolSettingsRoute
@@ -565,13 +815,16 @@ interface DashRouteRouteChildren {
   DashSchoolIndexRoute: typeof DashSchoolIndexRoute
   DashAdminSchoolsIdRoute: typeof DashAdminSchoolsIdRoute
   DashSchoolInboxThreadIdRoute: typeof DashSchoolInboxThreadIdRoute
+  DashSchoolIndicatorsGuideRoute: typeof DashSchoolIndicatorsGuideRoute
   DashSchoolRequestsConversationIdRoute: typeof DashSchoolRequestsConversationIdRoute
   DashAdminSchoolsIndexRoute: typeof DashAdminSchoolsIndexRoute
   DashSchoolInboxIndexRoute: typeof DashSchoolInboxIndexRoute
+  DashSchoolIndicatorsIndexRoute: typeof DashSchoolIndicatorsIndexRoute
   DashSchoolRequestsIndexRoute: typeof DashSchoolRequestsIndexRoute
 }
 
 const DashRouteRouteChildren: DashRouteRouteChildren = {
+  DashAdminAccessLogRoute: DashAdminAccessLogRoute,
   DashAdminPilotRoute: DashAdminPilotRoute,
   DashAdminUsersRoute: DashAdminUsersRoute,
   DashSchoolSettingsRoute: DashSchoolSettingsRoute,
@@ -580,9 +833,11 @@ const DashRouteRouteChildren: DashRouteRouteChildren = {
   DashSchoolIndexRoute: DashSchoolIndexRoute,
   DashAdminSchoolsIdRoute: DashAdminSchoolsIdRoute,
   DashSchoolInboxThreadIdRoute: DashSchoolInboxThreadIdRoute,
+  DashSchoolIndicatorsGuideRoute: DashSchoolIndicatorsGuideRoute,
   DashSchoolRequestsConversationIdRoute: DashSchoolRequestsConversationIdRoute,
   DashAdminSchoolsIndexRoute: DashAdminSchoolsIndexRoute,
   DashSchoolInboxIndexRoute: DashSchoolInboxIndexRoute,
+  DashSchoolIndicatorsIndexRoute: DashSchoolIndicatorsIndexRoute,
   DashSchoolRequestsIndexRoute: DashSchoolRequestsIndexRoute,
 }
 

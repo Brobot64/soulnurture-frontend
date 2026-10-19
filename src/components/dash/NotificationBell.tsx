@@ -126,7 +126,7 @@ export function NotificationBell() {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40"
           />
-          <div className="absolute right-0 top-full z-50 mt-2 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-panel border border-hairline bg-white shadow-xl">
+          <div className="fixed left-4 right-4 top-20 z-50 max-h-[calc(100dvh-7rem)] overflow-hidden rounded-panel border border-hairline bg-white shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[360px] sm:max-w-[calc(100vw-2rem)]">
             <div className="flex items-center justify-between border-b border-hairline px-5 py-3.5">
               <span className="text-card text-heading">Notifications</span>
               <button

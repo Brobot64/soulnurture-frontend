@@ -14,10 +14,10 @@ function AppLayout() {
   return (
     <div className="flex h-dvh flex-col">
       <AppHeader />
-      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col overflow-y-auto outline-none">
         <Outlet />
+        <AppFooter />
       </main>
-      <AppFooter />
     </div>
   )
 }

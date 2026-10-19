@@ -173,6 +173,16 @@
     background-color: var(--color-page);
   }
 
+  :where(a, button, input, textarea, select, summary):focus-visible {
+    outline: 2px solid var(--color-action);
+    outline-offset: 4px;
+  }
+
+  ::selection {
+    background: var(--color-mint);
+    color: var(--color-heading);
+  }
+
   /* Tailwind preflight leaves buttons with the default arrow cursor — restore the pointer. */
   a[href],
   button:not(:disabled),

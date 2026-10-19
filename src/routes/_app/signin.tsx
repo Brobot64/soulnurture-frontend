@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useRef, useState, type FormEvent } from 'react'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import { AuthField, AuthShell } from '#/components/AuthShell'
 import { Spinner, StatusBadge } from '#/components/StatusBadge'
@@ -7,13 +7,14 @@ import { ApiError } from '#/lib/api'
 import { homeForRole, signIn } from '#/lib/auth'
 
 export const Route = createFileRoute('/_app/signin')({
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+  validateSearch: (search: Record<string, unknown>): { redirect?: string; reset?: boolean } => {
     const redirect = search.redirect
     return {
       redirect:
         typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
           ? redirect
           : undefined,
+      reset: search.reset === true || search.reset === 'true' ? true : undefined,
     }
   },
   head: () => ({
@@ -31,15 +32,17 @@ export const Route = createFileRoute('/_app/signin')({
 
 function SignIn() {
   const navigate = useNavigate()
-  const { redirect } = Route.useSearch()
+  const { redirect, reset } = Route.useSearch()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const submitting = useRef(false)
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (busy) return
+    if (submitting.current) return
+    submitting.current = true
     setError(null)
     setBusy(true)
     const trimmedEmail = email.trim()
@@ -49,18 +52,26 @@ function SignIn() {
         redirect && redirect !== '/signin' && !user?.mustChangePassword
           ? redirect
           : homeForRole(user)
-      navigate({ to: target as '/welcome', replace: true })
+      void navigate({ to: target as '/welcome', replace: true })
     } catch (caught) {
       const apiError = caught instanceof ApiError ? caught : null
-      if (apiError?.code === 'EMAIL_NOT_VERIFIED' || apiError?.status === 403) {
-        navigate({ to: '/verify', search: { email: trimmedEmail }, replace: true })
+      if (apiError?.code === 'EMAIL_NOT_VERIFIED') {
+        void navigate({ to: '/verify', search: { email: trimmedEmail }, replace: true })
+        return
+      }
+      if (
+        apiError?.code === 'SCHOOL_SUSPENDED' ||
+        apiError?.code === 'ACCOUNT_DEACTIVATED'
+      ) {
+        void navigate({ to: '/access-unavailable', search: {}, replace: true })
         return
       }
       if (apiError?.status === 401) {
         setError('Email or password is incorrect.')
       } else {
-        setError(apiError?.message ?? 'Something went wrong. Please try again.')
+        setError('We couldn’t sign you in right now. Please try again.')
       }
+      submitting.current = false
       setBusy(false)
     }
   }
@@ -68,14 +79,19 @@ function SignIn() {
   return (
     <AuthShell
       title="Welcome back"
-      subtitle="Sign in to pick up where you left off."
+      subtitle="Students and professionals: sign in with your account email and password."
       footer={
         <p className="mt-7 text-copy text-body">
-          New here? Accounts are set up by your school — ask your school office.
+          New here? Accounts are set up by your school or organisation — ask your administrator.
         </p>
       }
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <form onSubmit={handleSubmit} aria-busy={busy} className="flex flex-col gap-5">
+        {reset && !error && (
+          <StatusBadge tone="success">
+            Your password has been reset. Sign in with your new password.
+          </StatusBadge>
+        )}
         {error && <StatusBadge tone="error">{error}</StatusBadge>}
 
         <AuthField
@@ -97,6 +113,13 @@ function SignIn() {
           autoComplete="current-password"
           required
         />
+        <Link
+          to="/forgot-password"
+          search={{}}
+          className="-mt-3 inline-flex min-h-11 items-center self-end text-copy-sm font-medium text-action transition-colors hover:text-brand-4"
+        >
+          Forgot password?
+        </Link>
 
         <button
           type="submit"

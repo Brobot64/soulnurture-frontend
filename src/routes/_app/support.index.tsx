@@ -1,70 +1,45 @@
-// Student support door: ask to talk and the school's counsellors pick it up in
-// chat. The WhatsApp handoff stays as a quieter second option.
-
-import { useEffect, useState, type FormEvent } from 'react'
+// Secure school chat creation remains separate from read-only support request records.
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { ChevronLeft, MessageCircle, RefreshCw, SendHorizontal } from 'lucide-react'
+import { ArrowLeft, ArrowRight, HeartHandshake, LockKeyhole, MessageCircle, RefreshCw, SendHorizontal, ShieldCheck, TriangleAlert } from 'lucide-react'
 
 import { ChatStatusTag } from '#/components/chat/ThreadView'
-import { ErrorNote } from '#/components/dash/ui'
 import { Flash, useFlash } from '#/components/Flash'
-import { Reveal } from '#/components/Reveal'
-import { TextsReveal } from '#/components/TextsReveal'
-import { ThinkLine } from '#/components/ThinkLine'
 import { ApiError } from '#/lib/api'
-import { roleLabel, useSession } from '#/lib/auth'
-import {
-  createChatThread,
-  fetchChatThreads,
-  useChatUnread,
-  type ChatThreadListItem,
-} from '#/lib/chat'
+import { createChatThread, fetchChatThreads, useChatUnread, type ChatThreadListItem } from '#/lib/chat'
 import { timeAgo, useApiQuery } from '#/lib/dash'
 import { onRealtimeEvent } from '#/lib/socket'
-import {
-  TYPE_LABELS,
-  fetchSupportPeople,
-  handoffMessage,
-  initialsOf,
-  pickRandomPerson,
-  whatsappHandoffLink,
-  type SupportPerson,
-} from '#/lib/support'
+import { initialsOf, SUPPORT_EMERGENCY_NOTICE, SUPPORT_RESPONSE_NOTICE, useStudentSupportAccess, whatsappHandoffLink } from '#/lib/support'
+import { supportTimestamp } from '#/lib/support-requests'
 
 export const Route = createFileRoute('/_app/support/')({
   head: () => ({
     meta: [
-      { title: 'Talk to a real person · Soul Nurture AI' },
-      {
-        name: 'description',
-        content:
-          'Ask to talk and someone at your school — a counsellor or psychologist — will pick up your request. You chat right here.',
-      },
+      { title: 'Talk to a school counsellor · Soul Nurture AI' },
+      { name: 'description', content: 'Ask to talk with a school professional in a secure conversation. Response times vary. This is not an emergency service.' },
     ],
   }),
   component: Support,
 })
 
-const LOADING_STATES = ['Looking for your conversations', 'Checking for a counsellor'] as const
-
 function Support() {
+  const student = useStudentSupportAccess('/support')
+  if (!student) {
+    return <p role="status" className="mx-auto w-full max-w-[1160px] px-6 py-12 text-copy text-body">Checking your access to student support…</p>
+  }
+  return <StudentSupport key={student.id} />
+}
+
+function StudentSupport() {
   const navigate = useNavigate()
   const { message, hiding } = useFlash()
-  const { user, status: authStatus } = useSession()
   const threads = useApiQuery(fetchChatThreads)
   const unread = useChatUnread()
   const [draft, setDraft] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-
+  const submissionLock = useRef(false)
   const { reload } = threads
-
-  useEffect(() => {
-    if (authStatus !== 'ready') return
-    if (!user) {
-      void navigate({ to: '/signin', search: { redirect: '/support' }, replace: true })
-    }
-  }, [authStatus, user, navigate])
 
   useEffect(() => {
     if (threads.error?.status === 401) {
@@ -74,354 +49,201 @@ function Support() {
 
   useEffect(() => {
     const unsubscribes = [
-      onRealtimeEvent('chat.thread.claimed', () => reload()),
-      onRealtimeEvent('chat.message.new', () => reload()),
-      onRealtimeEvent('chat.thread.closed', () => reload()),
+      onRealtimeEvent('chat.thread.claimed', reload),
+      onRealtimeEvent('chat.message.new', reload),
+      onRealtimeEvent('chat.thread.closed', reload),
     ]
     return () => unsubscribes.forEach((off) => off())
   }, [reload])
 
   const handleAsk = async (event: FormEvent) => {
     event.preventDefault()
-    if (submitting) return
+    if (submissionLock.current || threads.loading || threads.error) return
+    submissionLock.current = true
     setSubmitting(true)
     setSubmitError(null)
     try {
       const note = draft.trim()
       const thread = await createChatThread(note ? { note } : {})
-      void navigate({
-        to: '/support/$threadId',
-        params: { threadId: thread.id },
-      })
+      // Only a successful, real chat thread can open the conversation.
+      await navigate({ to: '/support/$threadId', params: { threadId: thread.id } })
     } catch (caught) {
+      submissionLock.current = false
       setSubmitting(false)
-      setSubmitError(
-        caught instanceof ApiError ? caught.message : 'Could not send your request.',
-      )
+      setSubmitError(caught instanceof ApiError ? caught.message : 'Could not send your request. Please try again.')
       reload()
     }
   }
 
-  const isStudent = user?.role === 'STUDENT'
   const list = threads.data ?? []
   const pending = list.find((thread) => thread.status === 'PENDING') ?? null
   const conversations = list.filter((thread) => thread.id !== pending?.id)
+  const accessDenied = threads.error?.status === 401 || threads.error?.status === 403
 
   return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col px-6 py-8 lg:px-8 lg:py-14">
-      <button
-        type="button"
-        onClick={() => window.history.back()}
-        aria-label="Go back"
-        className="grid size-12 w-fit place-items-center rounded-full bg-surface text-ink transition-colors hover:bg-neutral-10 lg:size-11"
-      >
-        <ChevronLeft className="size-5" />
-      </button>
+    <div className="mx-auto w-full max-w-[1160px] flex-1 px-5 py-8 sm:px-8 lg:py-12">
+      <nav aria-label="Support navigation" className="flex flex-wrap items-center justify-between gap-4">
+        <Link to="/welcome" className="inline-flex min-h-11 items-center gap-2 text-button-sm text-action hover:underline">
+          <ArrowLeft aria-hidden="true" className="size-4" /> Back to home
+        </Link>
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <Link to="/support/requests" className="inline-flex min-h-11 items-center text-button-sm text-action hover:underline">My support requests</Link>
+          <Link to="/support/status-guide" className="inline-flex min-h-11 items-center text-button-sm text-action hover:underline">Status guide</Link>
+        </div>
+      </nav>
 
-      <TextsReveal>
-        <h1 className="t-stagger-line t-stagger-line--1 mt-8 text-title text-heading lg:text-hero-sm">
-          Talk to a real person
-        </h1>
-        <p className="t-stagger-line t-stagger-line--2 mt-3 text-copy text-body lg:text-lede">
-          Ask to talk and someone at your school — a counsellor or psychologist — will pick up
-          your request. You'll chat right here, and you can end the conversation whenever you
-          like.
-        </p>
-      </TextsReveal>
+      <div className="mt-7 grid items-start gap-8 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)] lg:gap-10">
+        <div className="min-w-0">
+          <span className="inline-flex items-center gap-2 rounded-pill bg-panel px-3 py-1 text-caption text-brand-4">
+            <HeartHandshake aria-hidden="true" className="size-4" /> Here for you
+          </span>
+          <h1 className="mt-4 text-title text-heading lg:text-title-lg">Talk to a school counsellor</h1>
+          <p className="mt-4 text-copy text-body">You can ask to talk to a counsellor or psychologist at your school. Share as much or as little as you like.</p>
+          <p className="mt-3 text-copy-sm text-body">{SUPPORT_RESPONSE_NOTICE}</p>
 
-      <div className="mt-10 flex flex-col gap-6">
-        {!user ? (
-          <div className="rounded-panel border border-hairline bg-white p-8">
-            <p className="text-copy text-body">
-              <ThinkLine states={LOADING_STATES} />
-            </p>
+          <div className="mt-7" aria-busy={threads.loading || submitting}>
+            {threads.loading && !threads.data ? (
+              <p role="status" className="rounded-panel border border-hairline p-6 text-copy text-body">Loading your conversations…</p>
+            ) : threads.error && (!threads.data || accessDenied) ? (
+              <section className="rounded-panel border border-hairline bg-white p-6 lg:p-8">
+                <h2 className="text-section text-heading">Conversations unavailable</h2>
+                <p role="alert" className="mt-2 text-copy-sm text-body">We couldn't load your conversations. Check your connection or sign in again, then retry.</p>
+                <button type="button" onClick={reload} disabled={threads.loading} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-pill bg-action px-6 text-button-sm text-white hover:bg-brand-4 disabled:opacity-60">
+                  <RefreshCw aria-hidden="true" className="size-4" /> Try again
+                </button>
+              </section>
+            ) : pending ? (
+              <section className="rounded-panel border border-hairline bg-white p-6 lg:p-8">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-caption text-muted">Chat status</span>
+                  <ChatStatusTag status={pending.status} />
+                </div>
+                <h2 className="mt-4 text-section text-heading">Your request to talk has been sent</h2>
+                <p className="mt-3 text-copy text-body">{SUPPORT_RESPONSE_NOTICE}</p>
+                <p className="mt-3 text-caption text-muted">Sent <time dateTime={pending.createdAt}>{supportTimestamp(pending.createdAt)}</time></p>
+                <Link to="/support/$threadId" params={{ threadId: pending.id }} className="mt-6 inline-flex min-h-[52px] items-center justify-center gap-2 rounded-pill bg-action px-6 text-button text-white hover:bg-brand-4">
+                  Open conversation <ArrowRight aria-hidden="true" className="size-4" />
+                  {(unread.byThread[pending.id] ?? 0) > 0 && <span className="text-caption">({unread.byThread[pending.id]} unread)</span>}
+                </Link>
+                <p className="mt-3 text-caption text-muted">You can cancel your request or end the chat from your conversation.</p>
+              </section>
+            ) : (
+              <section className="rounded-panel border border-hairline bg-white p-6 lg:p-8">
+                <h2 className="text-section text-heading">Send a request</h2>
+                <p className="mt-2 text-copy-sm text-body">This opens a secure conversation with your school's support team.</p>
+                <form className="mt-6" onSubmit={(event) => void handleAsk(event)}>
+                  <label htmlFor="ask-note" className="text-card text-heading">Is there anything you'd like them to know? <span className="font-normal">(optional)</span></label>
+                  <textarea id="ask-note" rows={5} maxLength={500} value={draft} disabled={submitting} onChange={(event) => setDraft(event.target.value)} aria-describedby="ask-note-help ask-note-count" placeholder="For example: I've been finding school really hard lately." className="mt-3 w-full resize-y rounded-card border border-hairline bg-page px-4 py-3 text-copy text-ink placeholder:text-muted focus:border-brand-4 disabled:opacity-60" />
+                  <p id="ask-note-count" className="mt-1 text-right text-caption text-muted">{draft.length}/500 characters</p>
+                  <div id="ask-note-help" className="mt-4 flex gap-3 rounded-card border border-hairline bg-panel p-4 text-copy-sm text-body">
+                    <LockKeyhole aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-action" />
+                    <p>Your note is shared with authorised school professionals through this conversation. You don't need to explain everything now.</p>
+                  </div>
+                  {submitError && <p role="alert" className="mt-4 text-copy-sm text-destructive">{submitError}</p>}
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <button type="submit" disabled={submitting || threads.loading || !!threads.error} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-pill bg-action px-6 text-button text-white hover:bg-brand-4 disabled:opacity-60">
+                      <SendHorizontal aria-hidden="true" className="size-4" /> {submitting ? 'Sending…' : 'Send request'}
+                    </button>
+                    <Link to="/welcome" className="inline-flex min-h-[52px] items-center justify-center rounded-pill bg-surface px-6 text-button text-brand-4 hover:bg-neutral-10">Not now</Link>
+                  </div>
+                  {submitting && <p role="status" className="mt-3 text-copy-sm text-body">Sending your request to talk…</p>}
+                </form>
+              </section>
+            )}
           </div>
-        ) : !isStudent ? (
-          <section className="rounded-panel border border-hairline bg-white p-8">
-            <p className="text-copy text-ink">
-              You're signed in as {roleLabel(user.role)} — this door is how students ask to talk.
-            </p>
-            <Link
-              to={user.role === 'PLATFORM_ADMIN' ? '/admin' : user.role === 'SCHOOL_ADMIN' ? '/school' : '/school/inbox'}
-              className="mt-6 inline-flex h-[52px] items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4"
-            >
-              Open your dashboard
-            </Link>
-          </section>
-        ) : threads.loading && !threads.data ? (
-          <div className="rounded-panel border border-hairline bg-white p-8">
-            <p className="text-copy text-body">
-              <ThinkLine states={LOADING_STATES} />
-            </p>
-          </div>
-        ) : threads.error && !threads.data ? (
-          <div className="rounded-panel border border-hairline bg-white p-8">
-            <p className="text-copy text-ink">We couldn't load your conversations right now.</p>
-            <p className="mt-2 text-copy-sm text-muted">
-              Check your connection and try again in a moment.
-            </p>
-            <button
-              type="button"
-              onClick={reload}
-              className="mt-6 inline-flex h-[52px] items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4"
-            >
-              <RefreshCw className="size-5" />
-              Try again
-            </button>
-          </div>
-        ) : pending ? (
-          <section className="rounded-panel border border-hairline bg-white p-6 lg:p-8">
-            <div className="flex items-center gap-3">
-              <ChatStatusTag status="PENDING" />
-              <span className="text-caption text-muted">{timeAgo(pending.updatedAt)}</span>
+
+          {threads.error && threads.data && !accessDenied && (
+            <div className="mt-4 rounded-card border border-hairline p-4">
+              <p role="alert" className="text-copy-sm text-body">We couldn't refresh your conversations. These are the last loaded details.</p>
+              <button type="button" onClick={reload} disabled={threads.loading} className="mt-2 min-h-11 text-button-sm text-action underline disabled:opacity-60">Try again</button>
             </div>
-            <h2 className="mt-3 text-section text-heading">Your request is with the counsellors</h2>
-            <p className="mt-2 text-copy text-body">
-              Someone at your school will pick it up soon. You'll be able to write back and forth
-              right here once they do.
-            </p>
-            <Link
-              to="/support/$threadId"
-              params={{ threadId: pending.id }}
-              className="mt-6 inline-flex h-[52px] items-center justify-center gap-2.5 whitespace-nowrap rounded-pill border border-hairline bg-white px-8 text-button text-ink transition-colors hover:bg-panel"
-            >
-              Open your conversation
-            </Link>
-          </section>
-        ) : (
-          <section className="rounded-panel border border-hairline bg-white p-6 lg:p-8">
-            <form onSubmit={(event) => void handleAsk(event)}>
-              <label htmlFor="ask-note" className="text-copy text-ink">
-                Would you like to tell them anything first? (optional)
-              </label>
-              <textarea
-                id="ask-note"
-                rows={4}
-                maxLength={500}
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder="e.g. I've been finding it hard to sleep and I'd like to talk."
-                className="mt-3 w-full rounded-card border border-hairline bg-panel px-4 py-3 text-copy text-ink outline-none transition-colors placeholder:text-muted focus:border-brand-4"
-              />
-              {submitError && <ErrorNote className="mt-4">{submitError}</ErrorNote>}
-              <button
-                type="submit"
-                disabled={submitting}
-                className="mt-5 inline-flex h-[52px] w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4 disabled:opacity-60"
-              >
-                <SendHorizontal className="size-5" />
-                {submitting ? 'Sending…' : 'Ask to talk'}
-              </button>
-              <p className="mt-3 text-caption text-muted">
-                A counsellor or psychologist at your school will see this request.
-              </p>
-            </form>
-          </section>
-        )}
+          )}
 
-        {isStudent && conversations.length > 0 && (
-          <section className="rounded-panel border border-hairline bg-white p-6 lg:p-8">
-            <h2 className="text-meta uppercase tracking-wider text-muted">Your conversations</h2>
-            <ul className="mt-4 flex flex-col divide-y divide-hairline">
-              {conversations.map((thread) => (
-                <ConversationRow
-                  key={thread.id}
-                  thread={thread}
-                  unread={unread.byThread[thread.id] ?? 0}
-                />
+          {threads.data && !accessDenied && (
+            <section id="conversations" className="mt-6 scroll-mt-6 rounded-panel border border-hairline p-6 lg:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-section text-heading">Chat history</h2>
+                <button type="button" onClick={reload} disabled={threads.loading} className="inline-flex min-h-11 items-center gap-2 text-button-sm text-action hover:underline disabled:opacity-60">
+                  <RefreshCw aria-hidden="true" className="size-4" /> {threads.loading ? 'Refreshing…' : 'Refresh'}
+                </button>
+              </div>
+              <p className="mt-2 text-copy-sm text-body">These are your conversations, separate from <Link to="/support/requests" className="text-action underline">support request records</Link>. An active chat does not mean a request has been reviewed.</p>
+              {conversations.length > 0 ? (
+                <ul className="mt-4 divide-y divide-hairline">
+                  {conversations.map((thread) => <ConversationRow key={thread.id} thread={thread} unread={unread.byThread[thread.id] ?? 0} />)}
+                </ul>
+              ) : <p className="mt-4 text-copy-sm text-muted">{pending ? 'Your pending conversation is shown above. No other conversations yet.' : 'No conversations yet. When you send a request to talk, your chat will be available here.'}</p>}
+            </section>
+          )}
+        </div>
+
+        <aside aria-label="About school support" className="space-y-4">
+          <section className="rounded-card border border-hairline p-5">
+            <div className="flex items-center gap-3"><ShieldCheck aria-hidden="true" className="size-5 shrink-0 text-action" /><h2 className="text-card text-heading">Who can see it?</h2></div>
+            <p className="mt-3 text-copy-sm text-body">Authorised school professionals can read your request and the messages you share in your conversation. Other students cannot see them.</p>
+            <Link to="/privacy" className="mt-3 inline-flex min-h-11 items-center text-button-sm text-action hover:underline">Read about privacy <ArrowRight aria-hidden="true" className="ml-2 size-4" /></Link>
+          </section>
+          <section className="rounded-card border border-hairline p-5">
+            <h2 className="text-card text-heading">How it works</h2>
+            <ol className="mt-4 space-y-5">
+              {[
+                ['You send a request', 'Add a note if you want to. A secure chat is created for your school support team.'],
+                ['A professional can review it', SUPPORT_RESPONSE_NOTICE],
+                ['Continue in your conversation', 'When a professional joins, you can talk here. You can cancel or end your chat at any time.'],
+              ].map(([title, detail], index) => (
+                <li key={title} className="flex gap-3">
+                  <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-full bg-peach text-caption text-peach-ink">{index + 1}</span>
+                  <div><h3 className="text-button-sm text-heading">{title}</h3><p className="mt-1 text-copy-sm text-body">{detail}</p></div>
+                </li>
               ))}
-            </ul>
+            </ol>
           </section>
-        )}
-
-        {isStudent && <WhatsAppCard userName={user.name} />}
+          <section className="rounded-card border border-hairline p-5">
+            <div className="flex items-center gap-3"><HeartHandshake aria-hidden="true" className="size-5 shrink-0 text-action" /><h2 className="text-card text-heading">A person, not the AI</h2></div>
+            <p className="mt-3 text-copy-sm text-body">This request is for a school professional, not an AI response. A professional decides how to offer support.</p>
+          </section>
+          <section className="rounded-card border border-apricot-10 bg-peach p-5">
+            <div className="flex items-center gap-3 text-peach-ink"><TriangleAlert aria-hidden="true" className="size-5 shrink-0" /><h2 className="text-card">Not for emergencies</h2></div>
+            <p className="mt-3 text-copy-sm text-peach-ink">{SUPPORT_EMERGENCY_NOTICE}</p>
+          </section>
+          <WhatsAppCard />
+        </aside>
       </div>
-
-      <p className="mt-10 text-caption text-muted">
-        Only what you write in this chat is shared with your counsellor. If you are in danger,
-        tell a trusted adult right away.
-      </p>
-
       <Flash message={message} hiding={hiding} />
     </div>
   )
 }
 
-function ConversationRow({
-  thread,
-  unread,
-}: {
-  thread: ChatThreadListItem
-  unread: number
-}) {
+function ConversationRow({ thread, unread }: { thread: ChatThreadListItem; unread: number }) {
   const name = thread.professional?.user.name ?? 'Waiting for a counsellor'
   const latest = thread.messages?.[0]
-  const preview = latest
-    ? `${latest.role === 'STUDENT' ? 'You: ' : ''}${latest.content}`
-    : 'No messages yet'
+  const preview = latest ? `${latest.role === 'STUDENT' ? 'You: ' : ''}${latest.content}` : 'No messages yet'
 
   return (
     <li>
-      <Link
-        to="/support/$threadId"
-        params={{ threadId: thread.id }}
-        className="flex items-center gap-4 py-3 first:pt-0 last:pb-0"
-      >
-        <span
-          aria-hidden="true"
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-blush text-[15px] font-bold text-brand-4"
-        >
-          {initialsOf(name)}
-        </span>
+      <Link to="/support/$threadId" params={{ threadId: thread.id }} className="flex items-center gap-3 rounded-lg py-4 hover:bg-panel sm:gap-4">
+        <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-blush text-[15px] font-bold text-brand-4">{initialsOf(name)}</span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2.5">
-            <p className="truncate text-copy text-ink">{name}</p>
-            <ChatStatusTag status={thread.status} />
-          </div>
-          <p className="mt-0.5 truncate text-copy-sm text-muted">{preview}</p>
+          <div className="flex flex-wrap items-center gap-2"><p className="truncate text-copy text-ink">{name}</p><ChatStatusTag status={thread.status} /></div>
+          <p className="mt-1 truncate text-copy-sm text-muted">{preview}</p>
+          <time dateTime={thread.updatedAt} title={supportTimestamp(thread.updatedAt)} className="mt-1 block text-caption text-muted">{timeAgo(thread.updatedAt)}</time>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="text-caption text-muted">{timeAgo(thread.updatedAt)}</span>
-          {unread > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold leading-none text-white">
-              {unread > 99 ? '99+' : unread}
-            </span>
-          )}
-        </div>
+        {unread > 0 && <span aria-label={`${unread} unread messages`} className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-caption text-white">{unread > 99 ? '99+' : unread}</span>}
       </Link>
     </li>
   )
 }
 
-function WhatsAppCard({ userName }: { userName?: string }) {
-  const [open, setOpen] = useState(false)
-  const [people, setPeople] = useState<SupportPerson[] | null>(null)
-  const [person, setPerson] = useState<SupportPerson | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  const load = () => {
-    fetchSupportPeople()
-      .then((list) => {
-        setPeople(list)
-        setPerson((current) => current ?? pickRandomPerson(list))
-      })
-      .catch((caught) => {
-        if (caught instanceof ApiError && caught.status === 401) return
-        setFailed(true)
-      })
-  }
-
-  const shuffle = () => {
-    if (!people || people.length < 2 || !person) return
-    setPerson(pickRandomPerson(people, person.id))
-  }
+function WhatsAppCard() {
+  const href = whatsappHandoffLink()
+  if (!href) return null
 
   return (
-    <details
-      className="rounded-panel border border-hairline bg-white p-6 lg:p-8"
-      onToggle={(event) => {
-        const expanded = event.currentTarget.open
-        setOpen(expanded)
-        if (expanded && !people && !failed) load()
-      }}
-    >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-2.5 text-button-sm text-action">
-          <MessageCircle className="size-5" />
-          Prefer WhatsApp?
-        </span>
-        <span className="text-caption text-muted">{open ? 'Hide' : "See who's around"}</span>
-      </summary>
-
-      {open && failed && (
-        <div className="mt-5">
-          <p className="text-copy-sm text-muted">We couldn't load the list of people right now.</p>
-          <button
-            type="button"
-            onClick={() => {
-              setFailed(false)
-              load()
-            }}
-            className="mt-4 inline-flex h-11 items-center justify-center gap-2.5 whitespace-nowrap rounded-pill border border-hairline bg-white px-6 text-button-sm text-ink transition-colors hover:bg-panel"
-          >
-            <RefreshCw className="size-4" />
-            Try again
-          </button>
-        </div>
-      )}
-
-      {open && !failed && !person && (
-        <p className="mt-5 text-copy-sm text-muted">
-          <ThinkLine states={['Finding someone who is around', 'Matching you with someone kind']} />
-        </p>
-      )}
-
-      {open && !failed && people && people.length === 0 && (
-        <p className="mt-5 text-copy-sm text-muted">
-          No one is listed right now — please try again later, or tell a teacher or another adult
-          you trust today.
-        </p>
-      )}
-
-      {open && !failed && person && (
-        <Reveal key={person.id}>
-          <div className="mt-5 flex items-center gap-4">
-            <Avatar person={person} />
-            <div className="min-w-0">
-              <span className="inline-flex h-8 items-center rounded-pill bg-panel px-3.5 text-chip text-brand-4">
-                {TYPE_LABELS[person.type]}
-              </span>
-              <h3 className="mt-2 truncate text-copy text-ink">{person.name}</h3>
-              {person.title && <p className="mt-0.5 text-copy-sm text-muted">{person.title}</p>}
-            </div>
-          </div>
-          <div className="mt-5 rounded-card bg-panel p-5">
-            <p className="text-copy-sm text-muted">Your message — change it if you like</p>
-            <p className="mt-2 text-copy-sm text-ink">{handoffMessage(person, userName)}</p>
-          </div>
-          <a
-            href={whatsappHandoffLink(person, userName)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-5 inline-flex h-[52px] w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4"
-          >
-            <MessageCircle className="size-5" />
-            Open WhatsApp
-          </a>
-          {people && people.length > 1 && (
-            <button
-              type="button"
-              onClick={shuffle}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2.5 text-button-sm text-action transition-colors hover:text-brand-4"
-            >
-              <RefreshCw className="size-4" />
-              Show me someone else
-            </button>
-          )}
-        </Reveal>
-      )}
-    </details>
-  )
-}
-
-function Avatar({ person }: { person: SupportPerson }) {
-  const [broken, setBroken] = useState(false)
-  if (person.imageUrl && !broken) {
-    return (
-      <img
-        src={person.imageUrl}
-        alt=""
-        onError={() => setBroken(true)}
-        className="size-14 shrink-0 rounded-full object-cover"
-      />
-    )
-  }
-  return (
-    <span
-      aria-hidden="true"
-      className="grid size-14 shrink-0 place-items-center rounded-full bg-blush text-[20px] font-bold text-brand-4"
-    >
-      {initialsOf(person.name)}
-    </span>
+    <section className="rounded-card border border-hairline p-5">
+      <div className="flex items-center gap-3"><MessageCircle aria-hidden="true" className="size-5 shrink-0 text-action" /><h2 className="text-card text-heading">Prefer WhatsApp?</h2></div>
+      <p className="mt-3 text-copy-sm text-body">Use the configured school contact on WhatsApp. This does not assign you to a professional or confirm anyone is available.</p>
+      <p className="mt-3 text-caption text-muted">WhatsApp opens outside Soul Nurture AI. Your phone number and anything you send there are shared through WhatsApp, not this secure chat.</p>
+      <a href={href} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-pill border border-hairline px-5 text-button-sm text-action hover:bg-panel">Open WhatsApp <span className="sr-only">(opens in a new tab)</span><ArrowRight aria-hidden="true" className="size-4" /></a>
+    </section>
   )
 }
