@@ -35,6 +35,13 @@ export interface ChatUnreadPush {
   byThread: Record<string, number>
 }
 
+/** An AI placeholder was rewritten in place: the reply landed or failed. */
+export interface ConversationMessageUpdatedPush {
+  conversationId: string
+  messageId: string
+  asyncState: 'COMPLETE' | 'FAILED'
+}
+
 export interface NotificationPush {
   id: string
   type: string
@@ -53,6 +60,7 @@ export interface RealtimeEventMap {
   'chat.message.new': { threadId: string; message: ChatMessagePush }
   'chat.thread.closed': ChatThreadClosedPush
   'chat.unread.updated': ChatUnreadPush
+  'conversation.message.updated': ConversationMessageUpdatedPush
   'notification.new': NotificationPush
   'notification.unread.updated': NotificationUnreadPush
 }

@@ -385,3 +385,90 @@
   --think-base: var(--color-muted);
   --think-highlight: var(--color-heading);
 }
+
+/* ── Processing dot — AI is composing (ProcessingDot.tsx) ──────────────── */
+
+.t-proc {
+  --t-proc-dur: 1.6s;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 10px;
+  height: 10px;
+}
+.t-proc-core,
+.t-proc-ring {
+  grid-area: 1 / 1;
+  border-radius: 9999px;
+}
+.t-proc-core {
+  width: 10px;
+  height: 10px;
+  background: var(--color-accent);
+}
+.t-proc-ring {
+  display: none;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--color-accent);
+}
+
+/* breathe: the dot swells and fades in place */
+.t-proc[data-variant='breathe'] .t-proc-core {
+  animation: t-proc-breathe var(--t-proc-dur) ease-in-out infinite;
+}
+@keyframes t-proc-breathe {
+  0%, 100% { transform: scale(0.6); opacity: 0.55; }
+  50%      { transform: scale(1.1); opacity: 1; }
+}
+
+/* ripple: a ring expands out of the dot */
+.t-proc[data-variant='ripple'] .t-proc-ring {
+  display: block;
+  animation: t-proc-ripple var(--t-proc-dur) ease-out infinite;
+}
+@keyframes t-proc-ripple {
+  0%   { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* orbit: a dashed ring turns around the dot */
+.t-proc[data-variant='orbit'] .t-proc-ring {
+  display: block;
+  inset: -3px;
+  width: 16px;
+  height: 16px;
+  border-style: dashed;
+  animation: t-proc-orbit calc(var(--t-proc-dur) * 2.4) linear infinite;
+}
+@keyframes t-proc-orbit {
+  to { transform: rotate(360deg); }
+}
+
+/* morph: the dot rotates through soft, uneven shapes */
+.t-proc[data-variant='morph'] .t-proc-core {
+  animation: t-proc-morph var(--t-proc-dur) ease-in-out infinite;
+}
+@keyframes t-proc-morph {
+  0%   { border-radius: 50%; transform: rotate(0deg); }
+  33%  { border-radius: 30% 70% 60% 40% / 50% 40% 60% 50%; transform: rotate(120deg); }
+  66%  { border-radius: 60% 40% 30% 70% / 40% 60% 40% 60%; transform: rotate(240deg); }
+  100% { border-radius: 50%; transform: rotate(360deg); }
+}
+
+/* hop: the dot bounces with a little squash on landing */
+.t-proc[data-variant='hop'] .t-proc-core {
+  animation: t-proc-hop var(--t-proc-dur) cubic-bezier(0.3, 0, 0.5, 1) infinite;
+}
+@keyframes t-proc-hop {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  20%      { transform: translateY(0) scale(1.15, 0.85); }
+  50%      { transform: translateY(-5px) scale(0.9, 1.1); }
+  80%      { transform: translateY(0) scale(1.1, 0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-proc .t-proc-core,
+  .t-proc .t-proc-ring { animation: none !important; }
+  .t-proc .t-proc-ring { display: none !important; }
+}

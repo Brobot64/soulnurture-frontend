@@ -9,10 +9,12 @@ import { ProgressRow } from '#/components/ProgressRow'
 import { Reveal } from '#/components/Reveal'
 import { StatusBadge } from '#/components/StatusBadge'
 import { StreamText } from '#/components/StreamText'
+import { ProcessingDot } from '#/components/ProcessingDot'
 import { ThinkLine } from '#/components/ThinkLine'
 import { ApiError } from '#/lib/api'
 import { useSession } from '#/lib/auth'
 import { isConsentRequired } from '#/lib/consent'
+import { onRealtimeEvent } from '#/lib/socket'
 import {
   QUICK_REPLIES,
   clearPendingOpening,
@@ -235,6 +237,27 @@ function Reflection() {
     const el = scrollRef.current
     el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, thinking])
+
+  // Push path for the async AI reply: the server announces the rewritten
+  // placeholder, so the poll can stop at once instead of waiting for its next
+  // tick. Gated on an active poll so it only reacts to a reply we are waiting on.
+  useEffect(() => {
+    return onRealtimeEvent('conversation.message.updated', (push) => {
+      if (push.conversationId !== conversationId || pollTimerRef.current === null) return
+      void (async () => {
+        try {
+          const conversation = await fetchConversation(conversationId)
+          if (!conversation || pollTimerRef.current === null) return
+          window.clearInterval(pollTimerRef.current)
+          pollTimerRef.current = null
+          setMessages(conversation.messages)
+          setConversationStatus(conversation.status)
+        } catch {
+          // transient network error — the poll keeps retrying until its deadline
+        }
+      })()
+    })
+  }, [conversationId])
 
   useEffect(() => {
     setVoiceReady(isVoiceSupported())
@@ -663,7 +686,7 @@ function Reflection() {
                     className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-blush lg:size-9"
                     aria-hidden="true"
                   >
-                    <span className="size-2.5 rounded-full bg-accent" />
+                    <ProcessingDot />
                   </span>
                   <p className="min-w-0 flex-1 pt-1 text-copy sm:text-lede">
                     <ThinkLine states={THINK_STATES} />
