@@ -104,28 +104,28 @@ function WhyCheckIn() {
 
   if (authStatus !== 'ready' || !user) {
     return (
-      <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:px-8 lg:py-14">
+      <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:max-w-[1440px] lg:px-12 lg:py-10 xl:px-[120px]">
         <ProgressRow step={1} backTo="/check-in" />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:px-8 lg:py-14">
+    <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:max-w-[1440px] lg:px-12 lg:py-10 xl:px-[120px]">
       <ProgressRow step={1} backTo="/check-in" />
 
-      <div className="mt-10 lg:mt-14">
+      <div className="mt-10 lg:mt-7">
         <TextsReveal>
-          <h1 className="t-stagger-line t-stagger-line--1 text-title text-heading lg:text-hero-sm">
+          <h1 className="t-stagger-line t-stagger-line--1 text-title text-heading lg:text-title-lg">
             Why do you think you feel that way?
           </h1>
-          <p className="t-stagger-line t-stagger-line--2 mt-3 text-copy text-body lg:text-lede">
+          <p className="t-stagger-line t-stagger-line--2 mt-3 text-copy text-body lg:mt-6 lg:text-lede">
             Choose any that fit.
           </p>
         </TextsReveal>
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-3 lg:mt-12 lg:gap-4">
+      <div className="mt-8 flex flex-wrap gap-3 lg:mt-6">
         {TRIGGERS.map((trigger) => {
           const active = selected.includes(trigger)
           return (
@@ -135,7 +135,7 @@ function WhyCheckIn() {
               role="checkbox"
               aria-checked={active}
               onClick={() => toggle(trigger)}
-              className={`t-check inline-flex h-[58px] items-center whitespace-nowrap rounded-pill border px-6 text-button lg:h-[52px] lg:px-7 lg:text-button-sm ${
+              className={`t-check inline-flex h-[58px] items-center whitespace-nowrap rounded-pill border px-6 text-button lg:h-10 lg:px-4 lg:text-chip ${
                 active
                   ? 'border-action bg-action text-white'
                   : 'border-hairline bg-white text-ink hover:border-action/40'
@@ -170,7 +170,7 @@ function WhyCheckIn() {
         maxLength={2000}
         placeholder="Add a few words if you want to (optional)"
         aria-label="Add a few words if you want to (optional)"
-        className="mt-8 min-h-[130px] w-full resize-none rounded-3xl border border-hairline bg-white px-6 py-5 text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action lg:mt-10"
+        className="mt-8 min-h-[130px] w-full resize-none rounded-3xl border border-hairline bg-white px-6 py-5 text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action lg:mt-6 lg:min-h-[120px] lg:bg-page lg:p-4"
       />
 
       {error && (
@@ -179,7 +179,7 @@ function WhyCheckIn() {
         </div>
       )}
 
-      <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mt-8 flex flex-col gap-4 lg:mt-6 lg:flex-row lg:items-center lg:justify-between">
         <Link
           to="/support"
           className="order-2 text-center text-button-sm text-action transition-colors hover:text-brand-4 lg:order-1 lg:inline-flex lg:h-[52px] lg:items-center lg:rounded-pill lg:bg-surface lg:px-8 lg:text-brand-4 lg:hover:bg-neutral-10 lg:hover:text-brand-4"
@@ -190,7 +190,7 @@ function WhyCheckIn() {
           type="button"
           onClick={handleNext}
           disabled={busy || consent.state !== 'accepted'}
-          className="order-1 inline-flex h-[52px] w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:order-2 lg:h-[60px] lg:w-auto lg:px-16 lg:text-button"
+          className="order-1 inline-flex h-[52px] w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:order-2 lg:h-14 lg:w-auto lg:px-6 lg:text-button"
         >
           {consent.state === 'loading' ? (
             <><Spinner /> Checking agreement…</>

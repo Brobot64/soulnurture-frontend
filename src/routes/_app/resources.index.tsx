@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { Bookmark, ChevronLeft, RefreshCw, Search, Shapes } from 'lucide-react'
+import { Bookmark, ChevronLeft, RefreshCw, Search } from 'lucide-react'
 
 import { Button, EmptyState, ErrorNote } from '#/components/dash/ui'
 import { ResourceCard, ResourceSupport, ResourceToolboxNotice } from '#/components/ResourceCard'
@@ -58,41 +58,41 @@ function StudentResources() {
   const hasFilters = !!(filters.category || filters.type || filters.search)
 
   return (
-    <div className="mx-auto flex w-full max-w-[1160px] flex-1 flex-col px-5 py-8 sm:px-6 lg:px-8 lg:py-12">
-      <Link to="/welcome" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4">
+    <div className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-5 py-8 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:content-start lg:gap-x-12 lg:px-12 lg:py-12 xl:px-[120px]">
+      <Link to="/welcome" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4 lg:col-span-2">
         <ChevronLeft aria-hidden="true" className="size-4" /> Back home
       </Link>
 
-      <header className="mt-6 grid items-center gap-6 lg:grid-cols-[1fr_320px] lg:gap-12">
-        <div>
-          <p className="inline-flex items-center gap-2 rounded-pill bg-panel px-3 py-1.5 text-chip text-action">
-            <Shapes aria-hidden="true" className="size-4" /> Wellbeing resources
-          </p>
-          <h1 className="mt-4 max-w-[620px] text-title text-heading lg:text-hero-sm">Support for your everyday</h1>
+      <header className="mt-6 grid items-start gap-6 lg:contents">
+        <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:mt-6">
+          <h1 className="max-w-[620px] text-title text-heading lg:text-hero-sm">Wellbeing resources</h1>
           <p className="mt-4 max-w-[600px] text-copy text-body lg:text-lede">
             Explore what is on your mind, at your own pace. Keep resources you want to return to in your toolbox.
           </p>
         </div>
-        <Link
-          to="/resources"
-          search={{ savedOnly: true }}
-          className="group flex items-start gap-4 rounded-panel border border-action/15 bg-panel p-6 transition-colors hover:border-action/40"
-        >
-          <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-card bg-white text-action">
-            <Bookmark className="size-6" strokeWidth={1.7} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[20px] font-semibold leading-7 text-heading">Your toolbox</span>
-            <span className="mt-1 block text-copy-sm text-body">A place for what helps you.</span>
-            <span className="mt-4 inline-flex items-center gap-2 text-chip font-semibold text-action group-hover:underline underline-offset-4">
-              {toolbox.error ? 'View saved resources' : toolbox.count === null ? 'Loading saved resources…' : `${toolbox.count} saved ${toolbox.count === 1 ? 'resource' : 'resources'}`}
-              <span aria-hidden="true">→</span>
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-start-2 lg:row-span-3 lg:mt-6">
+          <ResourceSupport />
+          <Link
+            to="/resources"
+            search={{ savedOnly: true }}
+            className="group flex items-start gap-4 rounded-panel border border-action/15 bg-panel p-6 transition-colors hover:border-action/40"
+          >
+            <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-card bg-white text-action">
+              <Bookmark className="size-6" strokeWidth={1.7} />
             </span>
-          </span>
-        </Link>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[20px] font-semibold leading-7 text-heading">Your toolbox</span>
+              <span className="mt-1 block text-copy-sm text-body">A place for what helps you.</span>
+              <span className="mt-4 inline-flex items-center gap-2 text-chip font-semibold text-action group-hover:underline underline-offset-4">
+                {toolbox.error ? 'View saved resources' : toolbox.count === null ? 'Loading saved resources…' : `${toolbox.count} saved ${toolbox.count === 1 ? 'resource' : 'resources'}`}
+                <span aria-hidden="true">→</span>
+              </span>
+            </span>
+          </Link>
+        </div>
       </header>
 
-      <section aria-labelledby="resource-topics-heading" className="mt-10 rounded-panel border border-hairline bg-white p-5 sm:p-6 lg:mt-12">
+      <section aria-labelledby="resource-topics-heading" className="mt-10 min-w-0 rounded-panel border border-hairline bg-white p-5 sm:p-6 lg:col-start-1 lg:row-start-3 lg:mt-8">
         <h2 id="resource-topics-heading" className="text-card text-heading">What is on your mind?</h2>
         <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filter by topic">
           <button
@@ -117,7 +117,7 @@ function StudentResources() {
         </div>
       </section>
 
-      <section aria-labelledby="resource-list-heading" className="mt-10">
+      <section aria-labelledby="resource-list-heading" className="mt-10 min-w-0 lg:col-start-1 lg:row-start-4">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <h2 id="resource-list-heading" className="text-section text-heading">
             {filters.category ? RESOURCE_CATEGORIES[filters.category] : filters.savedOnly ? 'Your toolbox' : 'Explore resources'}
@@ -180,8 +180,6 @@ function StudentResources() {
         <div className="mt-5"><ResourceToolboxNotice toolbox={toolbox} /></div>
         <ResourceResults key={JSON.stringify(filters)} filters={filters} toolbox={toolbox} />
       </section>
-
-      <div className="mt-12"><ResourceSupport /></div>
     </div>
   )
 }
@@ -208,7 +206,7 @@ function ResourceResults({ filters, toolbox }: { filters: ResourceSearch; toolbo
         {query.loading ? 'Refreshing resources…' : `${items.length} ${items.length === 1 ? 'resource' : 'resources'}${filters.savedOnly ? ' in your toolbox' : ''}${filtered ? ' matching your filters' : ''}`}
       </p>
       {items.length ? (
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
           {items.map((resource) => <ResourceCard key={resource.id} resource={resource} toolbox={toolbox} search={filters} />)}
         </div>
       ) : (

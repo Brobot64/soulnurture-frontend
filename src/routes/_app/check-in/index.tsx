@@ -84,22 +84,22 @@ function MoodCheckIn() {
 
   if (authStatus !== 'ready' || !user) {
     return (
-      <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:px-8 lg:py-14">
+      <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:max-w-[1440px] lg:px-12 lg:py-10 xl:px-[120px]">
         <ProgressRow step={1} backTo="/welcome" />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:px-8 lg:py-14">
+    <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:max-w-[1440px] lg:px-12 lg:py-10 xl:px-[120px]">
       <ProgressRow step={1} backTo="/welcome" />
 
-      <div className="mt-10 lg:mt-14">
+      <div className="mt-10 lg:mt-7">
         <TextsReveal>
-          <h1 className="t-stagger-line t-stagger-line--1 text-title text-heading lg:text-hero-sm">
+          <h1 className="t-stagger-line t-stagger-line--1 text-title text-heading lg:text-title-lg">
             How are you feeling right now?
           </h1>
-          <p className="t-stagger-line t-stagger-line--2 mt-3 text-copy text-body lg:text-lede">
+          <p className="t-stagger-line t-stagger-line--2 mt-3 text-copy text-body lg:mt-6 lg:text-lede">
             Tap the face that feels closest. You can change it any time.
           </p>
         </TextsReveal>
@@ -108,7 +108,7 @@ function MoodCheckIn() {
       <div
         role="radiogroup"
         aria-label="How are you feeling right now?"
-        className="mt-8 grid grid-cols-4 gap-3 lg:mt-12 lg:grid-cols-8 lg:gap-4"
+        className="mt-8 grid grid-cols-4 gap-3 lg:mt-6 lg:grid-cols-8 lg:gap-4 xl:flex xl:justify-between"
       >
         {MOODS.map((mood) => {
           const active = selected === mood.id
@@ -119,7 +119,7 @@ function MoodCheckIn() {
               role="radio"
               aria-checked={active}
               onClick={() => setSelected(mood.id)}
-              className={`t-check relative flex aspect-[4/5] flex-col items-center justify-center gap-1.5 rounded-2xl border-2 ${mood.tone} ${
+              className={`t-check relative flex aspect-[4/5] flex-col items-center justify-center gap-1.5 rounded-2xl border-2 lg:aspect-auto lg:h-[168px] lg:rounded-xl xl:w-[104px] xl:shrink-0 ${mood.tone} ${
                 active ? 'border-action' : 'border-black/[0.04] hover:border-action/25'
               }`}
             >
@@ -137,7 +137,7 @@ function MoodCheckIn() {
                   strokeLinejoin="round"
                 />
               </svg>
-              <span className="text-[30px] leading-none lg:text-[40px]">{mood.emoji}</span>
+              <span className="text-[30px] leading-none lg:text-[48px]">{mood.emoji}</span>
               <span className="text-bubble font-bold text-ink lg:text-card">{mood.label}</span>
             </button>
           )
@@ -150,10 +150,10 @@ function MoodCheckIn() {
         maxLength={2000}
         placeholder="Describe how you feel (optional)"
         aria-label="Describe how you feel (optional)"
-        className="mt-8 min-h-[130px] w-full resize-none rounded-3xl border border-hairline bg-white px-6 py-5 text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action lg:mt-10"
+        className="mt-8 min-h-[130px] w-full resize-none rounded-3xl border border-hairline bg-white px-6 py-5 text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action lg:mt-6 lg:min-h-[120px] lg:bg-page lg:p-4"
       />
 
-      <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mt-8 flex flex-col gap-4 lg:mt-6 lg:flex-row lg:items-center lg:justify-between">
         <Link
           to="/support"
           className="order-2 text-center text-button-sm text-action transition-colors hover:text-brand-4 lg:order-1 lg:text-button"
@@ -163,7 +163,7 @@ function MoodCheckIn() {
         <button
           type="button"
           onClick={handleContinue}
-          className="order-1 inline-flex h-[52px] w-full items-center justify-center whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 lg:order-2 lg:h-[60px] lg:w-auto lg:px-16 lg:text-button"
+          className="order-1 inline-flex h-[52px] w-full items-center justify-center whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 lg:order-2 lg:h-14 lg:w-auto lg:px-6 lg:text-button"
         >
           Continue
         </button>

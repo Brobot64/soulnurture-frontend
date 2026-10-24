@@ -83,6 +83,8 @@ function FirstPassword() {
   return (
     <div className="flex min-h-dvh flex-col bg-page">
       <AuthShell
+        illustrated
+        standalone
         title="Choose a new password"
         subtitle="You signed in with a temporary password. Pick one only you know — you'll use it from now on."
       >
@@ -113,7 +115,7 @@ function FirstPassword() {
           <button
             type="submit"
             disabled={busy}
-            className="mt-1 inline-flex h-[52px] items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:h-[56px]"
+            className="mt-1 inline-flex h-[52px] w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:h-[56px] lg:w-fit lg:self-start"
           >
             {busy ? (
               <>

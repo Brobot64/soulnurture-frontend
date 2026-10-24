@@ -79,7 +79,7 @@ function CheckInComplete() {
 
   if (authStatus !== 'ready' || !user) {
     return (
-      <div className="mx-auto flex w-full max-w-[1000px] flex-1 flex-col px-6 py-10 lg:px-8 lg:py-14">
+      <div className="mx-auto flex w-full max-w-[1000px] flex-1 flex-col px-6 py-10 lg:max-w-[1440px] lg:px-12 xl:px-[120px]">
         <ProgressRow step={3} />
       </div>
     )
@@ -87,7 +87,7 @@ function CheckInComplete() {
 
   if (loading || failed) {
     return (
-      <div className="mx-auto flex w-full max-w-[1000px] flex-1 flex-col px-6 py-10 lg:px-8 lg:py-14">
+      <div className="mx-auto flex w-full max-w-[1000px] flex-1 flex-col px-6 py-10 lg:max-w-[1440px] lg:px-12 xl:px-[120px]">
         <ProgressRow step={3} />
         <div className="mt-10 rounded-panel border border-hairline bg-white p-8 lg:mt-14">
           {loading ? (
@@ -116,13 +116,13 @@ function CheckInComplete() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1000px] flex-1 flex-col px-6 py-10 lg:px-8 lg:py-14">
+    <div className="mx-auto flex w-full max-w-[1000px] flex-1 flex-col px-6 py-10 lg:max-w-[1440px] lg:px-12 xl:px-[120px]">
       <ProgressRow step={3} />
 
-      <div className="mt-10 grid gap-12 lg:mt-14 lg:grid-cols-2 lg:gap-20">
-        <div>
+      <div className="mt-10 grid flex-1 gap-12 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] xl:grid-cols-[440px_minmax(0,1fr)] xl:gap-20">
+        <div className="min-w-0">
           <span
-            className="t-success-check size-[72px] place-items-center rounded-full bg-mint ring-8 ring-mint/25"
+            className="t-success-check size-[72px] place-items-center rounded-full bg-mint ring-8 ring-mint/25 lg:mx-auto"
             style={{ display: 'grid' }}
             data-state={checked ? 'in' : 'out'}
             aria-hidden="true"
@@ -153,13 +153,13 @@ function CheckInComplete() {
           {checkIn && <MoodFeedback checkInId={checkIn.id} />}
         </div>
 
-        <div>
+        <div className="flex min-w-0 flex-col items-start">
           <h2 className="text-section text-heading">What would help next?</h2>
-          <div className="mt-7 flex flex-col gap-5">
+          <div className="mt-7 flex w-full flex-col gap-5 lg:mb-10 lg:mt-4 lg:gap-4">
             <Link
               to="/resources"
               search={{}}
-              className="flex w-full items-center gap-5 rounded-panel border border-hairline bg-white p-6 text-left transition-colors hover:border-action/30"
+              className="flex w-full items-center gap-5 rounded-panel border border-hairline bg-white p-6 text-left transition-colors hover:border-action/30 lg:gap-3.5 lg:bg-page lg:p-4"
             >
               <span className="grid size-[52px] shrink-0 place-items-center rounded-full bg-brand-4 text-white">
                 <Shapes className="size-6" />
@@ -177,7 +177,7 @@ function CheckInComplete() {
 
             <Link
               to="/support"
-              className="flex w-full items-center gap-5 rounded-panel border border-blush bg-peach p-6 text-left transition-colors hover:bg-blush/60"
+              className="flex w-full items-center gap-5 rounded-panel border border-accent bg-peach p-6 text-left transition-colors hover:bg-blush/60 lg:gap-3.5 lg:p-4"
             >
               <span className="grid size-[52px] shrink-0 place-items-center rounded-full bg-counsellor text-white">
                 <UserRound className="size-6" />
@@ -197,7 +197,7 @@ function CheckInComplete() {
           <button
             type="button"
             onClick={() => navigate({ to: '/welcome' })}
-            className="mt-10 inline-flex h-[52px] items-center justify-center whitespace-nowrap rounded-pill bg-surface px-10 text-button text-ink transition-colors hover:bg-neutral-10 lg:mt-16"
+            className="mt-10 inline-flex h-[52px] shrink-0 items-center justify-center whitespace-nowrap rounded-pill bg-surface px-10 text-button text-ink transition-colors hover:bg-neutral-10 lg:mt-auto lg:h-14 lg:px-6"
           >
             I'm done for now
           </button>

@@ -1,7 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { LockKeyhole } from 'lucide-react'
-
-import { AuthShell } from '#/components/AuthShell'
+import { LockKeyhole, TriangleAlert } from 'lucide-react'
 
 export const Route = createFileRoute('/_app/access-unavailable')({
   head: () => ({
@@ -15,25 +13,22 @@ export const Route = createFileRoute('/_app/access-unavailable')({
 
 function AccessUnavailable() {
   return (
-    <AuthShell
-      title="Access unavailable"
-      subtitle="You can’t sign in right now. Your school administrator can help with the next step."
-    >
+    <div className="mx-auto flex w-full flex-1 shrink-0 flex-col items-center justify-center px-6 py-10 lg:py-16">
       <section
         aria-labelledby="access-locked-title"
-        className="flex flex-col items-center gap-5 rounded-panel border border-hairline bg-white px-6 py-8 text-center"
+        className="flex w-full max-w-[560px] flex-col items-center gap-5 rounded-panel border border-hairline bg-page px-6 py-8 text-center sm:p-10"
       >
         <span
           aria-hidden="true"
-          className="grid size-20 place-items-center rounded-full bg-panel text-action"
+          className="grid size-16 place-items-center rounded-full bg-panel text-action"
         >
-          <LockKeyhole className="size-9" />
+          <LockKeyhole className="size-7" />
         </span>
         <div>
-          <h2 id="access-locked-title" className="text-section text-heading">
-            Contact your school
-          </h2>
-          <p className="mt-3 text-copy text-body">
+          <h1 id="access-locked-title" className="text-title-sm text-heading sm:text-title">
+            Access unavailable
+          </h1>
+          <p className="mt-4 text-copy text-body">
             Access may be paused for your school or account. Contact your school office or
             administrator to find out what to do next.
           </p>
@@ -45,14 +40,17 @@ function AccessUnavailable() {
         <Link
           to="/"
           search={{}}
-          className="inline-flex min-h-[52px] w-full items-center justify-center rounded-pill bg-action px-6 py-3 text-button text-white transition-colors hover:bg-brand-4 lg:min-h-[56px]"
+          className="inline-flex min-h-[52px] w-full items-center justify-center rounded-pill bg-action px-6 py-3 text-button-sm text-white transition-colors hover:bg-brand-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-action sm:w-auto"
         >
           Back to home
         </Link>
+        <p className="flex w-full items-start gap-3 rounded-card border border-blush bg-peach p-4 text-left text-copy-sm text-peach-ink">
+          <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+          <span>
+            If you or someone else is in immediate danger, contact local emergency services now.
+          </span>
+        </p>
       </section>
-      <p className="mt-5 text-copy text-body">
-        If you or someone else is in immediate danger, contact local emergency services now.
-      </p>
-    </AuthShell>
+    </div>
   )
 }

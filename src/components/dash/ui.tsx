@@ -424,21 +424,79 @@ export function Dialog({
   title,
   children,
   footer,
+  icon: Icon,
 }: {
   open: boolean
   onClose: () => void
   title: string
   children: ReactNode
   footer?: ReactNode
+  icon?: LucideIcon
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const onCloseRef = useRef(onClose)
+  const headingId = useId()
+
   useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+    onCloseRef.current = onClose
+  }, [onClose])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!open || !dialog) return
+    const opener = document.activeElement
+    const focusSafeControl = () => {
+      ;(closeButtonRef.current ?? dialog).focus({ preventScroll: true })
     }
+    const getFocusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(
+      'a[href], area[href], button, input, select, textarea, [tabindex], [contenteditable]',
+    )).filter((element) => {
+      if (
+        (element.tabIndex < 0 && !(element.isContentEditable && !element.hasAttribute('tabindex'))) ||
+        element.matches(':disabled, input[type="hidden"]') ||
+        element.closest('[hidden], [inert], [aria-hidden="true"], [aria-disabled="true"]')
+      ) return false
+      let current: HTMLElement | null = element
+      while (current && current !== dialog) {
+        const style = window.getComputedStyle(current)
+        if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false
+        current = current.parentElement
+      }
+      return true
+    })
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current()
+      if (event.key !== 'Tab') return
+      const focusable = getFocusable()
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (!first || !last) {
+        event.preventDefault()
+        dialog.focus({ preventScroll: true })
+        return
+      }
+      const active = document.activeElement
+      if (
+        !focusable.includes(active as HTMLElement) ||
+        (event.shiftKey ? active === first : active === last)
+      ) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first).focus({ preventScroll: true })
+      }
+    }
+    const onFocusIn = (event: FocusEvent) => {
+      if (!dialog.contains(event.target as Node)) focusSafeControl()
+    }
+    focusSafeControl()
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+    document.addEventListener('focusin', onFocusIn)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('focusin', onFocusIn)
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true })
+    }
+  }, [open])
 
   if (!open) return null
 
@@ -447,27 +505,35 @@ export function Dialog({
       <div
         aria-hidden="true"
         onClick={onClose}
-        className="absolute inset-0 bg-scrim/40"
+        className="absolute inset-0 bg-surface/70 backdrop-blur-sm"
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
-        className="relative w-full max-w-lg rounded-panel bg-white p-6 shadow-xl"
+        aria-labelledby={headingId}
+        tabIndex={-1}
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-panel bg-white p-6 shadow-xl"
       >
-        <div className="flex items-start justify-between gap-4">
-          <h2 className="text-section text-heading">{title}</h2>
+        <div className={Icon ? 'text-center' : 'flex items-start justify-between gap-4'}>
+          {Icon && (
+            <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-full bg-panel text-action">
+              <Icon aria-hidden="true" className="size-7" />
+            </div>
+          )}
+          <h2 id={headingId} className="text-section text-heading">{title}</h2>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-panel"
+            className={`flex size-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action focus-visible:ring-offset-2 ${Icon ? 'absolute right-4 top-4' : ''}`}
           >
             <X aria-hidden="true" className="size-5" />
           </button>
         </div>
-        <div className="mt-4">{children}</div>
-        {footer && <div className="mt-6 flex justify-end gap-3">{footer}</div>}
+        <div className={`mt-4 ${Icon ? 'text-center' : ''}`}>{children}</div>
+        {footer && <div className={`mt-6 flex gap-3 ${Icon ? 'justify-center' : 'justify-end'}`}>{footer}</div>}
       </div>
     </div>
   )
