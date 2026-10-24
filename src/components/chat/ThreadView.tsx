@@ -2,7 +2,8 @@
 // student request page both mount this. REST for mutations, socket for live
 // arrivals (deduped by message id), read receipts fired on load + on arrival.
 
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { MessagesSquare, SendHorizontal } from 'lucide-react'
 
 import {
@@ -82,6 +83,8 @@ export function ThreadView({
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
+  const composerId = useId()
+  const composerHintId = `${composerId}-hint`
 
   const myRole: ChatMessageRole = viewer === 'staff' ? 'PROFESSIONAL' : 'STUDENT'
 
@@ -249,7 +252,7 @@ export function ThreadView({
         ? [thread.professional.title, thread.professional.department]
             .filter(Boolean)
             .join(' · ')
-        : 'Someone from your school will pick this up.'
+        : 'Response times depend on staff availability.'
 
   return (
     <div className="flex flex-col gap-4">
@@ -316,38 +319,61 @@ export function ThreadView({
       {sendError && <ErrorNote>{sendError}</ErrorNote>}
 
       {thread.status === 'ACTIVE' ? (
-        <Card className="sticky bottom-4 z-10 flex items-end gap-3 p-4">
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault()
-                handleSend()
-              }
-            }}
-            rows={2}
-            placeholder={viewer === 'staff' ? 'Write a reply…' : 'Write a message…'}
-            className="min-h-11 flex-1 resize-none rounded-card border border-hairline bg-white px-4 py-3 text-copy-sm text-heading outline-none transition-colors placeholder:text-muted focus:border-brand-4"
-          />
-          <Button
-            type="submit"
-            disabled={!draft.trim() || sending}
-            onClick={handleSend}
-            className="px-5"
-          >
-            <SendHorizontal aria-hidden="true" className="size-4" />
-            {sending ? 'Sending…' : 'Send'}
-          </Button>
-        </Card>
-      ) : thread.status === 'PENDING' ? (
-        <Card className="flex items-center gap-3 p-5">
-          <MessagesSquare aria-hidden="true" className="size-5 shrink-0 text-muted" />
-          <p className="text-copy-sm text-muted">
-            Waiting for a counsellor to pick up your request — you&rsquo;ll be able to
-            write here as soon as they do.
+        <Card className="sticky bottom-4 z-10 flex flex-col gap-2 p-4">
+          <label htmlFor={composerId} className="text-chip font-medium text-heading">
+            {viewer === 'staff' ? 'Write a reply' : 'Write a message'}
+          </label>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <textarea
+              id={composerId}
+              aria-describedby={composerHintId}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault()
+                  handleSend()
+                }
+              }}
+              rows={2}
+              placeholder={viewer === 'staff' ? 'Write a reply…' : 'Write a message…'}
+              className="min-h-11 min-w-0 flex-1 resize-none rounded-card border border-hairline bg-white px-4 py-3 text-copy-sm text-heading outline-none transition-colors placeholder:text-muted focus:border-brand-4"
+            />
+            <Button
+              type="submit"
+              disabled={!draft.trim() || sending}
+              onClick={handleSend}
+              className="shrink-0 self-end px-5"
+            >
+              <SendHorizontal aria-hidden="true" className="size-4" />
+              {sending ? 'Sending…' : 'Send'}
+            </Button>
+          </div>
+          <p id={composerHintId} className="text-caption text-muted">
+            Enter to send. Shift + Enter for a new line.
           </p>
         </Card>
+      ) : thread.status === 'PENDING' ? (
+        <>
+          <Card className="flex items-center gap-3 p-5">
+            <MessagesSquare aria-hidden="true" className="size-5 shrink-0 text-muted" />
+            <p className="text-copy-sm text-muted">
+              Waiting for a counsellor to pick up your request — you&rsquo;ll be able to
+              write here as soon as they do.
+            </p>
+          </Card>
+          {viewer === 'student' && (
+            <Card className="flex flex-col gap-3 p-5">
+              <h2 className="text-card text-heading">While you wait</h2>
+              <Link to="/resources" className="inline-flex min-h-11 w-fit items-center rounded-pill text-button-sm text-action hover:underline underline-offset-4">
+                Wellbeing resources
+              </Link>
+              <p className="text-copy-sm text-body">
+                Soul Nurture AI is not an emergency service. If you are in danger, tell a trusted adult right away.
+              </p>
+            </Card>
+          )}
+        </>
       ) : (
         <Card className="flex items-center gap-3 p-5">
           <MessagesSquare aria-hidden="true" className="size-5 shrink-0 text-muted" />

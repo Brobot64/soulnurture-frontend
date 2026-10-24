@@ -27,6 +27,7 @@ export type ReviewStatus =
   | 'CANCELLED'
 
 export interface SupportQueueStudent {
+  id: string
   firstName: string
   lastName: string | null
   displayName: string | null
@@ -41,11 +42,15 @@ export interface SupportQueueItem {
   requestedAt: string
   timing: SupportTiming
   note: string | null
+  initialMessage: string | null
+  initialMessageAt: string | null
   reviewNote: string | null
   requestStatus: string
   queueStatus: QueueStatus
   prompt: SupportPrompt
   followUpId: string | null
+  followUpStatus: 'PENDING' | 'SCHEDULED' | null
+  canManageFollowUp: boolean
   followUpDueAt: string | null
   followUpCompletedAt: string | null
   conversationId: string | null
@@ -116,8 +121,26 @@ export async function reviewSupportRequest(
   )
 }
 
+export function bookFollowUp(body: {
+  studentId: string
+  supportRequestId: string
+  dueAt: string
+}): Promise<unknown> {
+  return apiFetch('/api/v1/follow-ups', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, status: 'SCHEDULED' }),
+  })
+}
+
+export function scheduleFollowUp(id: string, dueAt: string): Promise<unknown> {
+  return apiFetch(`/api/v1/follow-ups/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'SCHEDULED', dueAt }),
+  })
+}
+
 export async function completeFollowUp(id: string): Promise<unknown> {
-  return apiFetch(`/api/v1/follow-ups/${id}`, {
+  return apiFetch(`/api/v1/follow-ups/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ status: 'COMPLETED' }),
   })

@@ -4,6 +4,8 @@ import { useEffect } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
   HeartHandshake,
+  CircleSlash,
+  Flag,
   Inbox,
   LayoutDashboard,
   LineChart,
@@ -18,6 +20,7 @@ import {
 import logoUrl from '#/assets/soul-nurture-logo.png'
 import { isChatStaff, useSession } from '#/lib/auth'
 import { refreshChatPool, useChatPoolCount, watchChatUnread } from '#/lib/chat'
+import { REVIEWER_ROLES } from '#/lib/ai-response-reports'
 
 type RailPath =
   | '/admin'
@@ -31,6 +34,8 @@ type RailPath =
   | '/school/inbox'
   | '/school/requests'
   | '/school/indicators'
+  | '/school/reports'
+  | '/school/ai-boundaries'
 
 interface RailItem {
   to: RailPath
@@ -57,10 +62,15 @@ function itemsForRole(role?: string | null): RailItem[] {
   }
   if (isChatStaff(role)) {
     return [
+      { to: '/school', label: 'Overview', icon: LayoutDashboard },
       { to: '/school/inbox', label: 'Inbox', icon: Inbox },
       { to: '/school/requests', label: 'Support requests', icon: HeartHandshake },
-      ...(role === 'COUNSELLOR' || role === 'PSYCHOLOGIST'
-        ? [{ to: '/school/indicators' as const, label: 'Support indicators', icon: ShieldCheck }]
+      ...(REVIEWER_ROLES.some((reviewer) => reviewer === role)
+        ? [
+            { to: '/school/indicators' as const, label: 'Support indicators', icon: ShieldCheck },
+            { to: '/school/reports' as const, label: 'AI reply reports', icon: Flag },
+            { to: '/school/ai-boundaries' as const, label: 'Where the AI stops', icon: CircleSlash },
+          ]
         : []),
     ]
   }
