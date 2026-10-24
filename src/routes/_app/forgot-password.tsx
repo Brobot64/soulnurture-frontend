@@ -52,6 +52,7 @@ function ForgotPassword() {
 
   return (
     <AuthShell
+      illustrated
       title={requested ? 'Check your inbox' : 'Forgot your password?'}
       subtitle={
         requested
@@ -104,7 +105,7 @@ function ForgotPassword() {
             <button
               type="submit"
               disabled={busy}
-              className="mt-1 inline-flex min-h-[52px] items-center justify-center gap-2.5 rounded-pill bg-action px-6 py-3 text-button text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:min-h-[56px]"
+              className="mt-1 inline-flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-pill bg-action px-6 py-3 text-button text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:min-h-[56px] lg:w-fit lg:self-start"
             >
               {busy ? (
                 <>

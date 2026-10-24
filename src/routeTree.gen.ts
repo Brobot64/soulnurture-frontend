@@ -41,10 +41,13 @@ import { Route as AppSupportRequestsIndexRouteImport } from './routes/_app/suppo
 import { Route as AppSupportRequestsRequestIdRouteImport } from './routes/_app/support.requests.$requestId'
 import { Route as DashAdminSchoolsIndexRouteImport } from './routes/_dash/admin/schools.index'
 import { Route as DashAdminSchoolsIdRouteImport } from './routes/_dash/admin/schools.$id'
+import { Route as DashSchoolAiBoundariesIndexRouteImport } from './routes/_dash/school/ai-boundaries.index'
 import { Route as DashSchoolInboxIndexRouteImport } from './routes/_dash/school/inbox.index'
 import { Route as DashSchoolInboxThreadIdRouteImport } from './routes/_dash/school/inbox.$threadId'
 import { Route as DashSchoolIndicatorsIndexRouteImport } from './routes/_dash/school/indicators.index'
 import { Route as DashSchoolIndicatorsGuideRouteImport } from './routes/_dash/school/indicators.guide'
+import { Route as DashSchoolReportsIndexRouteImport } from './routes/_dash/school/reports.index'
+import { Route as DashSchoolReportsReportIdRouteImport } from './routes/_dash/school/reports.$reportId'
 import { Route as DashSchoolRequestsIndexRouteImport } from './routes/_dash/school/requests.index'
 import { Route as DashSchoolRequestsConversationIdRouteImport } from './routes/_dash/school/requests.$conversationId'
 
@@ -208,6 +211,12 @@ const DashAdminSchoolsIdRoute = DashAdminSchoolsIdRouteImport.update({
   path: '/admin/schools/$id',
   getParentRoute: () => DashRouteRoute,
 } as any)
+const DashSchoolAiBoundariesIndexRoute =
+  DashSchoolAiBoundariesIndexRouteImport.update({
+    id: '/school/ai-boundaries/',
+    path: '/school/ai-boundaries/',
+    getParentRoute: () => DashRouteRoute,
+  } as any)
 const DashSchoolInboxIndexRoute = DashSchoolInboxIndexRouteImport.update({
   id: '/school/inbox/',
   path: '/school/inbox/',
@@ -228,6 +237,17 @@ const DashSchoolIndicatorsGuideRoute =
   DashSchoolIndicatorsGuideRouteImport.update({
     id: '/school/indicators/guide',
     path: '/school/indicators/guide',
+    getParentRoute: () => DashRouteRoute,
+  } as any)
+const DashSchoolReportsIndexRoute = DashSchoolReportsIndexRouteImport.update({
+  id: '/school/reports/',
+  path: '/school/reports/',
+  getParentRoute: () => DashRouteRoute,
+} as any)
+const DashSchoolReportsReportIdRoute =
+  DashSchoolReportsReportIdRouteImport.update({
+    id: '/school/reports/$reportId',
+    path: '/school/reports/$reportId',
     getParentRoute: () => DashRouteRoute,
   } as any)
 const DashSchoolRequestsIndexRoute = DashSchoolRequestsIndexRouteImport.update({
@@ -273,11 +293,14 @@ export interface FileRoutesByFullPath {
   '/admin/schools/$id': typeof DashAdminSchoolsIdRoute
   '/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
   '/school/indicators/guide': typeof DashSchoolIndicatorsGuideRoute
+  '/school/reports/$reportId': typeof DashSchoolReportsReportIdRoute
   '/school/requests/$conversationId': typeof DashSchoolRequestsConversationIdRoute
   '/support/requests/': typeof AppSupportRequestsIndexRoute
   '/admin/schools/': typeof DashAdminSchoolsIndexRoute
+  '/school/ai-boundaries/': typeof DashSchoolAiBoundariesIndexRoute
   '/school/inbox/': typeof DashSchoolInboxIndexRoute
   '/school/indicators/': typeof DashSchoolIndicatorsIndexRoute
+  '/school/reports/': typeof DashSchoolReportsIndexRoute
   '/school/requests/': typeof DashSchoolRequestsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -311,11 +334,14 @@ export interface FileRoutesByTo {
   '/admin/schools/$id': typeof DashAdminSchoolsIdRoute
   '/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
   '/school/indicators/guide': typeof DashSchoolIndicatorsGuideRoute
+  '/school/reports/$reportId': typeof DashSchoolReportsReportIdRoute
   '/school/requests/$conversationId': typeof DashSchoolRequestsConversationIdRoute
   '/support/requests': typeof AppSupportRequestsIndexRoute
   '/admin/schools': typeof DashAdminSchoolsIndexRoute
+  '/school/ai-boundaries': typeof DashSchoolAiBoundariesIndexRoute
   '/school/inbox': typeof DashSchoolInboxIndexRoute
   '/school/indicators': typeof DashSchoolIndicatorsIndexRoute
+  '/school/reports': typeof DashSchoolReportsIndexRoute
   '/school/requests': typeof DashSchoolRequestsIndexRoute
 }
 export interface FileRoutesById {
@@ -352,11 +378,14 @@ export interface FileRoutesById {
   '/_dash/admin/schools/$id': typeof DashAdminSchoolsIdRoute
   '/_dash/school/inbox/$threadId': typeof DashSchoolInboxThreadIdRoute
   '/_dash/school/indicators/guide': typeof DashSchoolIndicatorsGuideRoute
+  '/_dash/school/reports/$reportId': typeof DashSchoolReportsReportIdRoute
   '/_dash/school/requests/$conversationId': typeof DashSchoolRequestsConversationIdRoute
   '/_app/support/requests/': typeof AppSupportRequestsIndexRoute
   '/_dash/admin/schools/': typeof DashAdminSchoolsIndexRoute
+  '/_dash/school/ai-boundaries/': typeof DashSchoolAiBoundariesIndexRoute
   '/_dash/school/inbox/': typeof DashSchoolInboxIndexRoute
   '/_dash/school/indicators/': typeof DashSchoolIndicatorsIndexRoute
+  '/_dash/school/reports/': typeof DashSchoolReportsIndexRoute
   '/_dash/school/requests/': typeof DashSchoolRequestsIndexRoute
 }
 export interface FileRouteTypes {
@@ -392,11 +421,14 @@ export interface FileRouteTypes {
     | '/admin/schools/$id'
     | '/school/inbox/$threadId'
     | '/school/indicators/guide'
+    | '/school/reports/$reportId'
     | '/school/requests/$conversationId'
     | '/support/requests/'
     | '/admin/schools/'
+    | '/school/ai-boundaries/'
     | '/school/inbox/'
     | '/school/indicators/'
+    | '/school/reports/'
     | '/school/requests/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -430,11 +462,14 @@ export interface FileRouteTypes {
     | '/admin/schools/$id'
     | '/school/inbox/$threadId'
     | '/school/indicators/guide'
+    | '/school/reports/$reportId'
     | '/school/requests/$conversationId'
     | '/support/requests'
     | '/admin/schools'
+    | '/school/ai-boundaries'
     | '/school/inbox'
     | '/school/indicators'
+    | '/school/reports'
     | '/school/requests'
   id:
     | '__root__'
@@ -470,11 +505,14 @@ export interface FileRouteTypes {
     | '/_dash/admin/schools/$id'
     | '/_dash/school/inbox/$threadId'
     | '/_dash/school/indicators/guide'
+    | '/_dash/school/reports/$reportId'
     | '/_dash/school/requests/$conversationId'
     | '/_app/support/requests/'
     | '/_dash/admin/schools/'
+    | '/_dash/school/ai-boundaries/'
     | '/_dash/school/inbox/'
     | '/_dash/school/indicators/'
+    | '/_dash/school/reports/'
     | '/_dash/school/requests/'
   fileRoutesById: FileRoutesById
 }
@@ -710,6 +748,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashAdminSchoolsIdRouteImport
       parentRoute: typeof DashRouteRoute
     }
+    '/_dash/school/ai-boundaries/': {
+      id: '/_dash/school/ai-boundaries/'
+      path: '/school/ai-boundaries'
+      fullPath: '/school/ai-boundaries/'
+      preLoaderRoute: typeof DashSchoolAiBoundariesIndexRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
     '/_dash/school/inbox/': {
       id: '/_dash/school/inbox/'
       path: '/school/inbox'
@@ -736,6 +781,20 @@ declare module '@tanstack/react-router' {
       path: '/school/indicators/guide'
       fullPath: '/school/indicators/guide'
       preLoaderRoute: typeof DashSchoolIndicatorsGuideRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
+    '/_dash/school/reports/': {
+      id: '/_dash/school/reports/'
+      path: '/school/reports'
+      fullPath: '/school/reports/'
+      preLoaderRoute: typeof DashSchoolReportsIndexRouteImport
+      parentRoute: typeof DashRouteRoute
+    }
+    '/_dash/school/reports/$reportId': {
+      id: '/_dash/school/reports/$reportId'
+      path: '/school/reports/$reportId'
+      fullPath: '/school/reports/$reportId'
+      preLoaderRoute: typeof DashSchoolReportsReportIdRouteImport
       parentRoute: typeof DashRouteRoute
     }
     '/_dash/school/requests/': {
@@ -816,10 +875,13 @@ interface DashRouteRouteChildren {
   DashAdminSchoolsIdRoute: typeof DashAdminSchoolsIdRoute
   DashSchoolInboxThreadIdRoute: typeof DashSchoolInboxThreadIdRoute
   DashSchoolIndicatorsGuideRoute: typeof DashSchoolIndicatorsGuideRoute
+  DashSchoolReportsReportIdRoute: typeof DashSchoolReportsReportIdRoute
   DashSchoolRequestsConversationIdRoute: typeof DashSchoolRequestsConversationIdRoute
   DashAdminSchoolsIndexRoute: typeof DashAdminSchoolsIndexRoute
+  DashSchoolAiBoundariesIndexRoute: typeof DashSchoolAiBoundariesIndexRoute
   DashSchoolInboxIndexRoute: typeof DashSchoolInboxIndexRoute
   DashSchoolIndicatorsIndexRoute: typeof DashSchoolIndicatorsIndexRoute
+  DashSchoolReportsIndexRoute: typeof DashSchoolReportsIndexRoute
   DashSchoolRequestsIndexRoute: typeof DashSchoolRequestsIndexRoute
 }
 
@@ -834,10 +896,13 @@ const DashRouteRouteChildren: DashRouteRouteChildren = {
   DashAdminSchoolsIdRoute: DashAdminSchoolsIdRoute,
   DashSchoolInboxThreadIdRoute: DashSchoolInboxThreadIdRoute,
   DashSchoolIndicatorsGuideRoute: DashSchoolIndicatorsGuideRoute,
+  DashSchoolReportsReportIdRoute: DashSchoolReportsReportIdRoute,
   DashSchoolRequestsConversationIdRoute: DashSchoolRequestsConversationIdRoute,
   DashAdminSchoolsIndexRoute: DashAdminSchoolsIndexRoute,
+  DashSchoolAiBoundariesIndexRoute: DashSchoolAiBoundariesIndexRoute,
   DashSchoolInboxIndexRoute: DashSchoolInboxIndexRoute,
   DashSchoolIndicatorsIndexRoute: DashSchoolIndicatorsIndexRoute,
+  DashSchoolReportsIndexRoute: DashSchoolReportsIndexRoute,
   DashSchoolRequestsIndexRoute: DashSchoolRequestsIndexRoute,
 }
 

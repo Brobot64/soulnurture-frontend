@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 
+import { CounsellorDashboard } from '#/components/dash/CounsellorDashboard'
 import { DashHeader } from '#/components/dash/DashHeader'
 import {
   ActivityPanel,
@@ -25,7 +26,7 @@ import {
   type ActivityFeedKind,
   type AnalyticsDays,
 } from '#/lib/admin'
-import type { SchoolBrief } from '#/lib/auth'
+import { CHAT_STAFF_ROLES, isChatStaff, type SchoolBrief } from '#/lib/auth'
 import { formatNumber, useApiQuery, useRoleGuard } from '#/lib/dash'
 
 export const Route = createFileRoute('/_dash/school/')({
@@ -40,8 +41,17 @@ const DAY_OPTIONS: readonly { value: AnalyticsDays; label: string }[] = [
 ]
 
 function SchoolOverviewPage() {
-  const user = useRoleGuard(['SCHOOL_ADMIN'])
-  if (!user?.school) return null
+  const user = useRoleGuard(['SCHOOL_ADMIN', ...CHAT_STAFF_ROLES])
+  if (!user) return null
+  if (isChatStaff(user.role)) {
+    return (
+      <CounsellorDashboard
+        key={`${user.id}:${user.role}:${user.schoolId ?? user.school?.id ?? 'no-school'}`}
+        user={user}
+      />
+    )
+  }
+  if (!user.school) return null
   return <SchoolOverviewContent school={user.school} />
 }
 

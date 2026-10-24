@@ -179,9 +179,10 @@ function PoolRow({
   const caption = student
     ? [student.classLabel, student.studentCode].filter(Boolean).join(' · ')
     : ''
+  const originalMessage = thread.messages?.find((message) => message.role === 'STUDENT')
 
   return (
-    <div className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
       <AvatarInitials name={name} className="size-10 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-card text-heading">{name}</p>
@@ -189,6 +190,14 @@ function PoolRow({
         <p className="mt-0.5 text-caption text-muted">
           {waitedFor(thread.createdAt)}
         </p>
+        {originalMessage?.content ? (
+          <div className="mt-3 rounded-card bg-panel-2/60 px-3 py-2.5">
+            <p className="text-caption font-medium text-heading">Student’s original message</p>
+            <blockquote className="mt-1 whitespace-pre-wrap break-words text-copy-sm text-body">{originalMessage.content}</blockquote>
+          </div>
+        ) : (
+          <p className="mt-2 text-copy-sm text-muted">No original student message recorded.</p>
+        )}
       </div>
       <Button
         type="button"

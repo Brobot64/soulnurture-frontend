@@ -16,12 +16,16 @@ import {
   ErrorNote,
   Skeleton,
   Tag,
+  TextField,
 } from '#/components/dash/ui'
 import { CHAT_STAFF_ROLES } from '#/lib/auth'
 import { useApiQuery, useRoleGuard } from '#/lib/dash'
 import { ApiError } from '#/lib/api'
+import { supportTimestamp } from '#/lib/support-requests'
 import {
+  bookFollowUp,
   completeFollowUp,
+  scheduleFollowUp,
   fetchSupportQueue,
   QUEUE_STATUS_LABELS,
   REVIEW_STATUS_LABELS,
@@ -82,6 +86,7 @@ function SupportRequestsPage() {
       />
       <main className="flex flex-1 flex-col gap-6 p-6 lg:p-8">
         <QueuePanels
+          key={`${user.id}:${user.schoolId ?? user.school?.id ?? 'no-school'}`}
           chip={chip}
           onChipChange={setChip}
           search={debouncedSearch}
@@ -108,11 +113,13 @@ function QueuePanels({
     [chip, search],
   )
   const [selected, setSelected] = useState<SupportQueueItem | null>(null)
+  const [confirmation, setConfirmation] = useState<string | null>(null)
 
   const counts = queue.data?.counts
 
   return (
     <>
+      {confirmation && <p role="status" className="text-copy-sm text-action">{confirmation}</p>}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile dotClass="bg-accent" label="New requests" value={counts?.new} />
         <StatTile dotClass="bg-action" label="Follow-up required" value={counts?.followUpRequired} />
@@ -140,24 +147,35 @@ function QueuePanels({
         })}
       </div>
 
-      {queue.error && !queue.data ? (
+      {queue.error && (
         <div className="flex flex-col items-start gap-3">
-          <ErrorNote>{queue.error.message}</ErrorNote>
-          <Button type="button" variant="ghost" onClick={queue.reload}>
+          <ErrorNote>
+            {queue.error.message}{queue.data ? ' Showing the last loaded requests.' : ''}
+          </ErrorNote>
+          <Button type="button" variant="ghost" onClick={queue.reload} disabled={queue.loading}>
             Try again
           </Button>
         </div>
-      ) : queue.loading && !queue.data ? (
-        <TableSkeleton />
-      ) : (
-        <RequestsTable items={queue.data?.items ?? []} schoolName={schoolName} onSelect={setSelected} />
       )}
+      {queue.loading && !queue.data ? (
+        <TableSkeleton />
+      ) : queue.data ? (
+        <RequestsTable
+          items={queue.data.items}
+          schoolName={schoolName}
+          onSelect={(item) => {
+            setConfirmation(null)
+            setSelected(item)
+          }}
+        />
+      ) : null}
 
       <ReviewDialog
         item={selected}
         onClose={() => setSelected(null)}
-        onChanged={() => {
+        onChanged={(message) => {
           setSelected(null)
+          setConfirmation(message)
           queue.reload()
         }}
       />
@@ -284,12 +302,14 @@ function ReviewDialog({
 }: {
   item: SupportQueueItem | null
   onClose: () => void
-  onChanged: () => void
+  onChanged: (message: string) => void
 }) {
   const [status, setStatus] = useState<ReviewStatus>('ACCEPTED')
   const [reviewNote, setReviewNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editingSchedule, setEditingSchedule] = useState(false)
+  const [dueAt, setDueAt] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -300,6 +320,8 @@ function ReviewDialog({
         : 'ACCEPTED',
     )
     setReviewNote(item.reviewNote ?? '')
+    setDueAt(item.followUpDueAt ? localDateTime(item.followUpDueAt) : '')
+    setEditingSchedule(false)
     setError(null)
     setSaving(false)
   }, [item])
@@ -309,6 +331,7 @@ function ReviewDialog({
   const studentName = shortName(item.student)
 
   const handleSave = async () => {
+    if (saving) return
     setSaving(true)
     setError(null)
     try {
@@ -316,7 +339,7 @@ function ReviewDialog({
         status,
         reviewNote: reviewNote.trim() || undefined,
       })
-      onChanged()
+      onChanged('Review saved.')
       // Accepting opens the staff↔student chat — land straight in it.
       if (status === 'ACCEPTED' && result.chatThreadId) {
         void navigate({
@@ -331,12 +354,12 @@ function ReviewDialog({
   }
 
   const handleCompleteFollowUp = async () => {
-    if (!item.followUpId) return
+    if (saving || !item.followUpId || !item.canManageFollowUp) return
     setSaving(true)
     setError(null)
     try {
       await completeFollowUp(item.followUpId)
-      onChanged()
+      onChanged('Follow-up completed.')
     } catch (caught) {
       setSaving(false)
       setError(
@@ -345,17 +368,43 @@ function ReviewDialog({
     }
   }
 
+  const handleSchedule = async () => {
+    if (saving || (item.followUpId && !item.canManageFollowUp)) return
+    const date = new Date(dueAt)
+    if (!dueAt || Number.isNaN(date.getTime())) {
+      setError('Choose a date and time for the follow-up.')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      if (item.followUpId) {
+        await scheduleFollowUp(item.followUpId, date.toISOString())
+      } else {
+        await bookFollowUp({
+          studentId: item.student.id,
+          supportRequestId: item.id,
+          dueAt: date.toISOString(),
+        })
+      }
+      onChanged('Follow-up scheduled.')
+    } catch (caught) {
+      setSaving(false)
+      setError(caught instanceof ApiError ? caught.message : 'Could not schedule the follow-up.')
+    }
+  }
+
   return (
     <Dialog
       open
-      onClose={onClose}
+      onClose={() => { if (!saving) onClose() }}
       title={`Review request · ${studentName}`}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button type="button" onClick={() => void handleSave()} disabled={saving}>
+          <Button type="button" onClick={() => void handleSave()} disabled={saving || editingSchedule}>
             {saving ? 'Saving…' : 'Save review'}
           </Button>
         </>
@@ -384,10 +433,27 @@ function ReviewDialog({
           </dd>
         </dl>
 
-        {item.note && (
-          <blockquote className="rounded-card bg-panel-2/60 px-4 py-3 text-copy-sm text-body">
-            “{item.note}”
-          </blockquote>
+        <section className="rounded-card bg-panel-2/60 px-4 py-3">
+          <h3 className="text-chip font-medium text-heading">Student’s original message</h3>
+          {item.initialMessage ? (
+            <>
+              {item.initialMessageAt && (
+                <time dateTime={item.initialMessageAt} className="mt-1 block text-caption text-muted">
+                  {new Date(item.initialMessageAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
+                </time>
+              )}
+              <blockquote className="mt-2 whitespace-pre-wrap break-words text-copy-sm text-body">{item.initialMessage}</blockquote>
+            </>
+          ) : (
+            <p className="mt-2 text-copy-sm text-muted">No original student message was recorded for this request.</p>
+          )}
+        </section>
+
+        {item.note?.trim() && item.note.trim() !== item.initialMessage?.trim() && (
+          <section className="rounded-card border border-hairline px-4 py-3">
+            <h3 className="text-chip font-medium text-heading">Request note</h3>
+            <p className="mt-2 whitespace-pre-wrap break-words text-copy-sm text-body">{item.note}</p>
+          </section>
         )}
 
         {item.conversationId && (
@@ -401,26 +467,61 @@ function ReviewDialog({
           </Link>
         )}
 
-        {item.followUpId && item.queueStatus === 'FOLLOW_UP_REQUIRED' && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-hairline px-4 py-3">
-            <span className="text-copy-sm text-body">
-              Follow-up due{' '}
-              <span className="font-semibold text-heading">
-                {item.followUpDueAt ? requestedLabel(item.followUpDueAt) : 'not scheduled'}
-              </span>
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={saving}
-              onClick={() => void handleCompleteFollowUp()}
-            >
-              Mark follow-up complete
-            </Button>
-          </div>
-        )}
+        <section className="flex flex-col gap-3 rounded-card border border-hairline px-4 py-3" aria-label="Follow-up">
+          <h3 className="text-chip font-medium text-heading">Follow-up</h3>
+          {item.followUpId ? (
+            <>
+              <p className="text-copy-sm text-body">
+                {item.followUpStatus === 'SCHEDULED' ? 'Scheduled' : 'Pending'}
+                {item.followUpDueAt ? <> · <time dateTime={item.followUpDueAt}>{supportTimestamp(item.followUpDueAt)}</time></> : ' · No date set'}
+              </p>
+              {!item.canManageFollowUp && (
+                <p className="text-caption text-muted">Only the professional assigned to this follow-up can change or complete it.</p>
+              )}
+            </>
+          ) : (
+            <p className="text-copy-sm text-body">
+              {item.followUpCompletedAt
+                ? `Previous follow-up completed ${supportTimestamp(item.followUpCompletedAt)}.`
+                : 'No follow-up booked for this request.'}
+            </p>
+          )}
+          {(!item.followUpId || item.canManageFollowUp) && (
+            editingSchedule ? (
+              <form onSubmit={(event) => { event.preventDefault(); void handleSchedule() }} className="flex flex-col gap-3">
+                <TextField
+                  label="Follow-up date and time"
+                  type="datetime-local"
+                  value={dueAt}
+                  onChange={(event) => setDueAt(event.target.value)}
+                  required
+                  disabled={saving}
+                  hint="Times use your device’s time zone."
+                />
+                <p className="text-caption text-muted">
+                  {item.followUpId ? 'This changes your follow-up only.' : 'This follow-up will be assigned to you.'} Review changes are saved separately.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Schedule follow-up'}</Button>
+                  <Button variant="ghost" onClick={() => setEditingSchedule(false)} disabled={saving}>Cancel scheduling</Button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="ghost" onClick={() => { setError(null); setEditingSchedule(true) }} disabled={saving}>
+                  {item.followUpId ? 'Change follow-up date' : 'Book follow-up'}
+                </Button>
+                {item.followUpId && (
+                  <Button variant="ghost" disabled={saving} onClick={() => void handleCompleteFollowUp()}>
+                    Mark follow-up complete
+                  </Button>
+                )}
+              </div>
+            )
+          )}
+        </section>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <fieldset disabled={saving || editingSchedule} className="grid gap-4 sm:grid-cols-2 disabled:opacity-60">
           <label className="flex flex-col gap-1.5">
             <span className="text-chip font-medium text-heading">Review status</span>
             <select
@@ -446,7 +547,7 @@ function ReviewDialog({
               className="min-h-11 resize-none rounded-card border border-hairline bg-white px-4 py-2.5 text-copy-sm text-heading outline-none transition-colors placeholder:text-muted focus:border-brand-4"
             />
           </label>
-        </div>
+        </fieldset>
 
         {error && <ErrorNote>{error}</ErrorNote>}
       </div>
@@ -493,4 +594,10 @@ function requestedLabel(iso: string): string {
 
 function timeOf(date: Date): string {
   return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(date)
+}
+
+function localDateTime(iso: string): string {
+  const date = new Date(iso)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }

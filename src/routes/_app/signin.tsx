@@ -36,14 +36,22 @@ function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [invalidCredentials, setInvalidCredentials] = useState(false)
   const [busy, setBusy] = useState(false)
   const submitting = useRef(false)
+
+  const clearCredentialError = () => {
+    if (!invalidCredentials) return
+    setInvalidCredentials(false)
+    setError(null)
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (submitting.current) return
     submitting.current = true
     setError(null)
+    setInvalidCredentials(false)
     setBusy(true)
     const trimmedEmail = email.trim()
     try {
@@ -67,6 +75,7 @@ function SignIn() {
         return
       }
       if (apiError?.status === 401) {
+        setInvalidCredentials(true)
         setError('Email or password is incorrect.')
       } else {
         setError('We couldn’t sign you in right now. Please try again.')
@@ -78,6 +87,7 @@ function SignIn() {
 
   return (
     <AuthShell
+      illustrated
       title="Welcome back"
       subtitle="Students and professionals: sign in with your account email and password."
       footer={
@@ -92,16 +102,25 @@ function SignIn() {
             Your password has been reset. Sign in with your new password.
           </StatusBadge>
         )}
-        {error && <StatusBadge tone="error">{error}</StatusBadge>}
+        {error && (
+          <div id="sign-in-error">
+            <StatusBadge tone="error">{error}</StatusBadge>
+          </div>
+        )}
 
         <AuthField
           id="email"
           label="Email"
           type="email"
           value={email}
-          onChange={setEmail}
+          onChange={(value) => {
+            setEmail(value)
+            clearCredentialError()
+          }}
           placeholder="you@example.com"
           autoComplete="email"
+          invalid={invalidCredentials}
+          errorId={invalidCredentials ? 'sign-in-error' : undefined}
           required
         />
         <AuthField
@@ -109,8 +128,13 @@ function SignIn() {
           label="Password"
           type="password"
           value={password}
-          onChange={setPassword}
+          onChange={(value) => {
+            setPassword(value)
+            clearCredentialError()
+          }}
           autoComplete="current-password"
+          invalid={invalidCredentials}
+          errorId={invalidCredentials ? 'sign-in-error' : undefined}
           required
         />
         <Link
@@ -124,7 +148,7 @@ function SignIn() {
         <button
           type="submit"
           disabled={busy}
-          className="mt-1 inline-flex h-[52px] items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:h-[56px]"
+          className="mt-1 inline-flex h-[52px] w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-pill bg-action px-8 text-button text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:h-[56px] lg:w-fit lg:self-start"
         >
           {busy ? (
             <>

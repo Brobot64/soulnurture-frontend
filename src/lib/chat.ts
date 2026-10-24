@@ -54,7 +54,7 @@ export interface ChatThreadListItem {
   professionalId?: string | null
   student?: ChatStudentBrief
   professional?: ChatProfessionalBrief | null
-  /** Latest message first (backend take: 1); absent on rows with none. */
+  /** Inbox: first student message. Own threads: latest message. */
   messages?: ChatMessagePreview[]
 }
 

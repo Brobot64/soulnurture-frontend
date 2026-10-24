@@ -6,12 +6,14 @@ import { homeForRole, useSession } from '#/lib/auth'
 export type SupportPersonType =
   | 'COUNSELLOR'
   | 'PSYCHOLOGIST'
+  | 'SUPPORT_STAFF'
   | 'TRUSTED_TEACHER'
   | 'PARENT_GUARDIAN'
 
 export const TYPE_LABELS: Record<SupportPersonType, string> = {
   COUNSELLOR: 'School counsellor',
   PSYCHOLOGIST: 'Psychologist',
+  SUPPORT_STAFF: 'Support staff',
   TRUSTED_TEACHER: 'Trusted teacher',
   PARENT_GUARDIAN: 'Parent or guardian',
 }

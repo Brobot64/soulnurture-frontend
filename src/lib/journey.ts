@@ -69,10 +69,19 @@ export interface Message {
   content: string
   /** Present on user messages sent via a quick-reply tap; null/absent for free text. */
   quickReply?: string | null
-  /** Present on assistant messages — asyncState COMPLETE means the AI reply is final. */
-  aiPayload?: { asyncState?: string } | null
+  /**
+   * Present on assistant messages — asyncState COMPLETE means the AI reply is
+   * final. boundary is the server's own record of why that turn left the AI's
+   * remit; null or absent means it stayed inside it.
+   */
+  aiPayload?: { asyncState?: string; boundary?: AiBoundary | null } | null
   createdAt: string
 }
+
+/** Mirrors the server-owned AiBoundary written into aiPayload. */
+export type AiBoundary =
+  | { kind: 'OUT_OF_SCOPE'; intentId: null }
+  | { kind: 'ACUTE_SAFEGUARD_ROUTE'; intentId: string | null }
 
 export interface Conversation {
   id: string

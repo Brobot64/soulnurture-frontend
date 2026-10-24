@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, BookOpen, Check, ChevronRight, RefreshCw, UserRound } from 'lucide-react'
+import { ArrowRight, BookOpen, Check, ChevronRight, Database, MessageCircle, RefreshCw, ShieldCheck, Sparkles, TriangleAlert, UserRound, UsersRound, type LucideIcon } from 'lucide-react'
 
 import { StatusBadge, Spinner } from '#/components/StatusBadge'
 import { ApiError } from '#/lib/api'
@@ -62,6 +62,18 @@ interface ConsentGateProps {
 
 const primaryButton = 'inline-flex min-h-[52px] items-center justify-center gap-2.5 rounded-pill bg-action px-7 py-3 text-button-sm text-white transition-colors hover:bg-brand-4 disabled:cursor-not-allowed disabled:opacity-40'
 const secondaryButton = 'inline-flex min-h-[52px] items-center justify-center gap-2.5 rounded-pill border border-action/25 bg-page px-7 py-3 text-button-sm text-action transition-colors hover:bg-panel disabled:cursor-not-allowed disabled:opacity-40'
+const sectionIcons: Record<string, LucideIcon> = {
+  'what-it-is': MessageCircle,
+  'what-it-cannot-do': TriangleAlert,
+  'get-human-help': UsersRound,
+  'privacy-in-short': ShieldCheck,
+  'what-it-supports': MessageCircle,
+  'how-it-works': Sparkles,
+  'what-we-collect': Database,
+  'how-we-protect': ShieldCheck,
+  'when-we-escalate': TriangleAlert,
+  'human-support': UsersRound,
+}
 
 /** Shared canonical disclosure reader for the pre-chat dialog and /consent. */
 export function ConsentGate({
@@ -104,7 +116,7 @@ export function ConsentGate({
     Promise.all([fetchDisclosure(), canRecord ? fetchDisclosureStatus() : Promise.resolve(null)])
       .then(([information, status]) => {
         if (cancelled) return
-        if (status && status.version !== information.version) {
+        if (status && status.version !== information.consentVersion) {
           setLoadError('This information changed while it was loading. Please load the latest version.')
           return
         }
@@ -185,7 +197,7 @@ export function ConsentGate({
       // Check before retrying a POST: a lost response may already have been recorded.
       let status = await fetchDisclosureStatus()
       if (!mounted.current) return
-      if (status.version !== disclosure.version) {
+      if (status.version !== disclosure.consentVersion) {
         setLoadError('The information has changed. Load the latest version and read it before agreeing.')
         return
       }
@@ -201,7 +213,7 @@ export function ConsentGate({
         status = await fetchDisclosureStatus()
         if (!mounted.current) return
       }
-      if (status.version !== disclosure.version) {
+      if (status.version !== disclosure.consentVersion) {
         setLoadError('The information has changed. Load the latest version and read it before agreeing.')
       } else if (!status.accepted) {
         setSubmitError('Your agreement is not confirmed yet. Check its status again before continuing.')
@@ -265,7 +277,8 @@ export function ConsentGate({
           {view === 'declined' ? (
             <div className="max-w-[760px]">
               <p className="text-copy text-body">You can come back whenever you’re ready. You can also explore other ways to get support.</p>
-              <div className="mt-7 divide-y divide-hairline rounded-panel border border-hairline bg-white px-5 sm:px-6">
+              <h3 className="mt-7 text-section text-heading">Other ways to get support</h3>
+              <div className="mt-4 divide-y divide-hairline rounded-panel border border-hairline bg-white px-5 sm:px-6">
                 <Link to="/support" className="flex items-center gap-4 py-5 text-action">
                   <span className="grid size-10 shrink-0 place-items-center rounded-full bg-peach text-peach-ink"><UserRound aria-hidden="true" className="size-5" /></span>
                   <span className="flex-1"><span className="block text-card text-heading">Talk to a person</span><span className="mt-1 block text-copy-sm text-body">Explore human support options.</span></span>
@@ -276,6 +289,7 @@ export function ConsentGate({
                   <span className="flex-1"><span className="block text-card text-heading">Wellbeing resources</span><span className="mt-1 block text-copy-sm text-body">Read and explore at your own pace.</span></span>
                   <ChevronRight aria-hidden="true" className="size-5 shrink-0" />
                 </Link>
+                <p className="py-5 text-copy-sm text-peach-ink">Soul Nurture AI is not an emergency service. If you are in danger, tell a trusted adult right away.</p>
               </div>
             </div>
           ) : loadError ? (
@@ -303,8 +317,8 @@ export function ConsentGate({
                 </button>
               </div>
               <div className="flex flex-col items-center justify-center rounded-panel bg-panel px-7 py-9 text-center">
-                <div aria-hidden="true" className="relative mb-7 grid size-40 place-items-center rounded-full bg-surface">
-                  <div className="grid size-28 place-items-center rounded-full bg-brand-9/50"><span className="grid size-20 place-items-center rounded-full bg-action text-white"><Check className="size-10" strokeWidth={1.5} /></span></div>
+                <div aria-hidden="true" className="relative mb-7 grid size-40 place-items-center rounded-full bg-surface lg:size-60">
+                  <div className="grid size-28 place-items-center rounded-full bg-brand-9/50 lg:size-44"><span className="grid size-20 place-items-center rounded-full bg-action text-white lg:size-32"><Check className="size-10 lg:size-16" strokeWidth={1.5} /></span></div>
                   <span className="absolute right-1 top-5 size-5 rounded-full bg-accent" />
                   <span className="absolute bottom-4 left-3 size-3 rounded-full bg-mint" />
                 </div>
@@ -335,16 +349,21 @@ export function ConsentGate({
                       <h3 id={`${id}-${group.id}`} className="text-section text-heading">{group.title}</h3>
                       <p className="mt-2 whitespace-pre-line text-copy-sm text-body">{group.summary}</p>
                       <div className={`mt-4 grid gap-4 sm:grid-cols-2 ${isModal ? '' : 'lg:grid-cols-3'}`}>
-                        {group.sections.map((section) => (
-                          <div key={section.id} className="rounded-card border border-hairline bg-white p-5 sm:p-6">
-                            <h4 className="text-card text-heading">{section.heading}</h4>
-                            <ul className="mt-3 flex flex-col gap-3">
-                              {section.items.map((item, index) => (
-                                <li key={index} className="flex gap-3 text-copy-sm text-body"><span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-6" /><span className="whitespace-pre-line">{item}</span></li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
+                        {group.sections.map((section) => {
+                          const Icon = sectionIcons[section.id] ?? BookOpen
+                          const warning = section.id === 'what-it-cannot-do' || section.id === 'get-human-help'
+                          return (
+                            <div key={section.id} className={`rounded-card border p-5 sm:p-6 ${warning ? 'border-accent bg-peach' : 'border-hairline bg-white'}`}>
+                              <span aria-hidden="true" className={`mb-4 grid size-11 place-items-center rounded-full ${warning ? 'bg-white/70 text-peach-ink' : 'bg-panel text-action'}`}><Icon className="size-5" /></span>
+                              <h4 className="text-card text-heading">{section.heading}</h4>
+                              <ul className="mt-3 flex flex-col gap-3">
+                                {section.items.map((item, index) => (
+                                  <li key={index} className="flex gap-3 text-copy-sm text-body"><span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-6" /><span className="whitespace-pre-line">{item}</span></li>
+                                ))}
+                              </ul>
+                            </div>
+                          )
+                        })}
                       </div>
                     </section>
                   ))}
@@ -376,7 +395,7 @@ export function ConsentGate({
 
         <footer className={isModal ? 'shrink-0 border-t border-hairline bg-page px-5 py-5 sm:px-8' : 'mt-8 border-t border-hairline pt-6'}>
           {submitError && view === 'read' && !loadError && <div className="mb-4"><StatusBadge tone="error">{submitError}</StatusBadge></div>}
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className={`flex flex-col-reverse gap-3 sm:flex-row sm:items-center ${view === 'record' ? 'sm:justify-center' : 'sm:justify-between'}`}>
             {view === 'declined' ? (
               <>
                 <button type="button" onClick={backToInformation} className={secondaryButton}>Read before you start again</button>

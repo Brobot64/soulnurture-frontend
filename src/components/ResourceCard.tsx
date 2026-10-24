@@ -195,7 +195,7 @@ export function ResourceToolboxNotice({ toolbox }: { toolbox: ResourceToolbox })
 
 export function ResourceSupport() {
   return (
-    <aside className="rounded-panel border border-blush bg-peach p-6">
+    <aside className="min-w-0 rounded-panel border border-accent bg-peach p-6">
       <span aria-hidden="true" className="grid size-11 place-items-center rounded-full bg-counsellor text-white">
         <UserRound className="size-5" />
       </span>
@@ -203,8 +203,9 @@ export function ResourceSupport() {
       <p className="mt-2 text-copy-sm text-peach-ink">
         Resources are not a replacement for a real conversation. A school counsellor can help you work through what is on your mind.
       </p>
-      <Link to="/support" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-pill text-button-sm font-semibold text-peach-ink hover:underline underline-offset-4">
-        Talk to a school counsellor <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
+      <Link to="/support" className="mt-4 inline-flex min-h-11 max-w-full items-center justify-center gap-2 whitespace-normal rounded-pill bg-action px-4 py-3 text-center text-button-sm font-semibold text-white transition-colors hover:bg-brand-4">
+        <span className="min-w-0 break-words">Talk to a school counsellor</span>
+        <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
       </Link>
       <p className="mt-4 text-caption text-peach-ink">If you are in immediate danger, contact local emergency services or a trusted adult now.</p>
     </aside>
