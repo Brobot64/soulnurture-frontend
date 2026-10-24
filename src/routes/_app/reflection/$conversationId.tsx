@@ -2,16 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowRight, ChevronDown, ChevronRight, Loader2, Mic, RefreshCw, Square, UserRound, X } from 'lucide-react'
 
+import { BoundaryNotice } from '#/components/BoundaryNotice'
 import { CheckInSummary } from '#/components/CheckInSummary'
 import { ConsentGate, useAiConsent } from '#/components/ConsentGate'
 import { Flash, useFlash } from '#/components/Flash'
 import { ProgressRow } from '#/components/ProgressRow'
+import { ReportResponseButton } from '#/components/ReportResponseButton'
 import { Reveal } from '#/components/Reveal'
 import { StatusBadge } from '#/components/StatusBadge'
 import { StreamText } from '#/components/StreamText'
 import { ProcessingDot } from '#/components/ProcessingDot'
 import { ThinkLine } from '#/components/ThinkLine'
 import { ApiError } from '#/lib/api'
+import { fetchReportReceipts } from '#/lib/ai-response-reports'
 import { useSession } from '#/lib/auth'
 import { isConsentRequired } from '#/lib/consent'
 import { onRealtimeEvent } from '#/lib/socket'
@@ -59,7 +62,7 @@ const VOICE_MAX_SECONDS = 120
 const BASE_TURN_BUDGET = 3
 const EXTENDED_TURN_BUDGET = 5
 
-/** aiPending polling: refetch the conversation on this interval until the assistant reply is COMPLETE. */
+/** Poll while any assistant is PENDING_AI; terminal content always comes from the server. */
 const POLL_INTERVAL_MS = 4000
 const POLL_MAX_MS = 90_000
 
@@ -96,6 +99,24 @@ function Reflection() {
   const [voiceReady, setVoiceReady] = useState(false)
   const [history, setHistory] = useState<CheckInHistoryEntry[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
+  const reportScope = `${user?.id}:${conversationId}`
+  const [receipts, setReceipts] = useState<{ scope: string; ids: Set<string>; failed: boolean } | null>(null)
+
+  useEffect(() => {
+    if (user?.role !== 'STUDENT' || consentState !== 'accepted') return
+    let cancelled = false
+    fetchReportReceipts(conversationId).then(({ items }) => {
+      if (cancelled) return
+      setReceipts((previous) => ({
+        scope: reportScope,
+        ids: new Set([...(previous?.scope === reportScope ? previous.ids : []), ...items.map((item) => item.messageId)]),
+        failed: false,
+      }))
+    }).catch(() => {
+      if (!cancelled) setReceipts((previous) => ({ scope: reportScope, ids: previous?.scope === reportScope ? previous.ids : new Set(), failed: true }))
+    })
+    return () => { cancelled = true }
+  }, [user?.role, conversationId, reportScope, consentState, attempt])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   // Only messages added this session stream word by word; restored ones render settled.
@@ -105,10 +126,15 @@ function Reflection() {
   const consentStateRef = useRef(consentState)
   consentStateRef.current = consentState
   const voiceTimerRef = useRef<number | null>(null)
-  const pollTimerRef = useRef<number | null>(null)
-  const pollDeadlineRef = useRef(0)
-  // True while a send is in flight — the completion poll must not clobber it.
-  const sendingRef = useRef(false)
+  const currentConversationRef = useRef(conversationId)
+  currentConversationRef.current = conversationId
+  const syncRef = useRef<{
+    conversationId: string
+    isCurrent: () => boolean
+    beginSend: () => boolean
+    finishSend: () => void
+    watchPending: (entries: Message[]) => void
+  } | null>(null)
   // True while the composer holds an unsent transcript — marks the next send
   // as a voice turn for the pilot analytics.
   const voiceDraftRef = useRef(false)
@@ -127,12 +153,106 @@ function Reflection() {
     // stashed first message or initiate an AI turn.
     if (consentState !== 'accepted') return
     let cancelled = false
+    let loaded = false
+    let sending = false
+    let sendRevision = 0
+    let refreshing = false
+    let refreshQueued = false
+    let pollTimer: number | null = null
+    let pollDeadline = 0
+    let pendingIds = new Set<string>()
+    const isCurrent = () =>
+      !cancelled &&
+      currentConversationRef.current === conversationId &&
+      consentStateRef.current === 'accepted'
+    const stopPolling = () => {
+      if (pollTimer !== null) window.clearTimeout(pollTimer)
+      pollTimer = null
+    }
+
+    // Coalesce pushes during reads/sends; pre-send reads cannot overwrite optimistic state.
+    const refresh = async () => {
+      if (!isCurrent()) return
+      refreshQueued = true
+      if (!loaded || sending || refreshing) return
+      refreshing = true
+      try {
+        while (refreshQueued && isCurrent() && !sending) {
+          refreshQueued = false
+          const revision = sendRevision
+          try {
+            const conversation = await fetchConversation(conversationId)
+            if (!isCurrent()) return
+            if (revision !== sendRevision || sending) {
+              refreshQueued = true
+              continue
+            }
+            if (conversation) {
+              setMessages(conversation.messages)
+              setConversationStatus(conversation.status)
+            }
+          } catch {
+            // Transient errors leave the bounded poll (or a later push) to retry.
+          }
+        }
+      } finally {
+        refreshing = false
+      }
+    }
+
+    const poll = () => {
+      pollTimer = null
+      if (!isCurrent() || pendingIds.size === 0) return
+      if (Date.now() >= pollDeadline) {
+        flash('The AI is still thinking — its full reply will appear here shortly.')
+        return
+      }
+      if (!sending && !refreshing) void refresh()
+      pollTimer = window.setTimeout(poll, Math.min(POLL_INTERVAL_MS, pollDeadline - Date.now()))
+    }
+    const sync = {
+      conversationId,
+      isCurrent,
+      beginSend: () => {
+        if (!isCurrent() || !loaded || sending) return false
+        sending = true
+        sendRevision += 1
+        if (refreshing) refreshQueued = true
+        setThinking(true)
+        return true
+      },
+      finishSend: () => {
+        sending = false
+        if (!isCurrent()) return
+        setThinking(false)
+        if (refreshQueued) void refresh()
+      },
+      watchPending: (entries: Message[]) => {
+        if (!isCurrent() || !loaded) return
+        const nextIds = entries
+          .filter((entry) => entry.role === 'ASSISTANT' && entry.aiPayload?.asyncState === 'PENDING_AI')
+          .map((entry) => entry.id)
+        // Only newly pending IDs renew the deadline, not renders or other replies finishing.
+        if (nextIds.some((id) => !pendingIds.has(id))) pollDeadline = Date.now() + POLL_MAX_MS
+        pendingIds = new Set(nextIds)
+        if (pendingIds.size === 0) stopPolling()
+        else if (pollTimer === null && Date.now() < pollDeadline) {
+          pollTimer = window.setTimeout(poll, Math.min(POLL_INTERVAL_MS, pollDeadline - Date.now()))
+        }
+      },
+    }
+    syncRef.current = sync
+    // Push remains active after the polling deadline, including FAILED updates.
+    const unsubscribe = onRealtimeEvent('conversation.message.updated', (push) => {
+      if (push.conversationId === conversationId) void refresh()
+    })
     setLoadFailed(false)
     setLoading(true)
+    setThinking(false)
 
     fetchCheckInHistory()
       .then((result) => {
-        if (!cancelled) setHistory(result.items)
+        if (isCurrent()) setHistory(result.items)
       })
       .catch(() => {
         // the history sidebar is optional — the chat works without it
@@ -143,7 +263,7 @@ function Reflection() {
       try {
         conversation = await fetchConversation(conversationId)
       } catch (caught) {
-        if (cancelled) return
+        if (!isCurrent()) return
         if (caught instanceof ApiError && caught.status === 401) {
           navigate({
             to: '/signin',
@@ -156,12 +276,13 @@ function Reflection() {
         setLoadFailed(true)
         return
       }
-      if (cancelled) return
+      if (!isCurrent()) return
       if (!conversation) {
         navigate({ to: '/check-in', replace: true })
         return
       }
 
+      loaded = true
       setCheckInId(conversation.checkInId)
       setConversationStatus(conversation.status)
       setMessages(conversation.messages)
@@ -170,7 +291,7 @@ function Reflection() {
       if (conversation.checkInId) {
         getCheckIn(conversation.checkInId)
           .then((found) => {
-            if (!cancelled) setCheckIn(found)
+            if (isCurrent()) setCheckIn(found)
           })
           .catch(() => {
             // the sidebar summary is optional — the chat works without it
@@ -180,17 +301,20 @@ function Reflection() {
       // The composed "why" travels as the student's first message.
       const pending =
         conversation.messages.length === 0 ? readPendingOpening(conversationId) : null
-      if (!pending || openingInFlight.has(conversationId)) return
+      if (!pending || openingInFlight.has(conversationId)) {
+        if (refreshQueued) void refresh()
+        return
+      }
+      if (!sync.beginSend()) return
 
       openingInFlight.add(conversationId)
       const tempId = newId('msg')
       setMessages([
         { id: tempId, role: 'USER', content: pending, createdAt: new Date().toISOString() },
       ])
-      setThinking(true)
       try {
         const result = await sendMessage(conversationId, { content: pending })
-        if (cancelled) return
+        if (!isCurrent()) return
         clearPendingOpening()
         streamIds.current.add(result.assistantMessage.id)
         setMessages((prev) => [
@@ -198,9 +322,8 @@ function Reflection() {
           result.assistantMessage,
         ])
         if (result.humanCareRecommendation?.show) setRecommendation(result.humanCareRecommendation)
-        if (result.aiPending) startCompletionPoll()
       } catch (caught) {
-        if (cancelled) return
+        if (!isCurrent()) return
         setMessages([])
         if (caught instanceof ApiError && caught.status === 401) {
           navigate({
@@ -223,13 +346,15 @@ function Reflection() {
         )
       } finally {
         openingInFlight.delete(conversationId)
-        if (!cancelled) setThinking(false)
+        sync.finishSend()
       }
     })()
 
     return () => {
       cancelled = true
-      if (pollTimerRef.current !== null) window.clearInterval(pollTimerRef.current)
+      stopPolling()
+      unsubscribe()
+      if (syncRef.current === sync) syncRef.current = null
     }
   }, [authStatus, user, conversationId, navigate, flash, attempt, consentState])
 
@@ -238,26 +363,11 @@ function Reflection() {
     el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, thinking])
 
-  // Push path for the async AI reply: the server announces the rewritten
-  // placeholder, so the poll can stop at once instead of waiting for its next
-  // tick. Gated on an active poll so it only reacts to a reply we are waiting on.
+  // Restored placeholders and new sends use the same state-driven polling path.
   useEffect(() => {
-    return onRealtimeEvent('conversation.message.updated', (push) => {
-      if (push.conversationId !== conversationId || pollTimerRef.current === null) return
-      void (async () => {
-        try {
-          const conversation = await fetchConversation(conversationId)
-          if (!conversation || pollTimerRef.current === null) return
-          window.clearInterval(pollTimerRef.current)
-          pollTimerRef.current = null
-          setMessages(conversation.messages)
-          setConversationStatus(conversation.status)
-        } catch {
-          // transient network error — the poll keeps retrying until its deadline
-        }
-      })()
-    })
-  }, [conversationId])
+    const sync = syncRef.current
+    if (sync?.conversationId === conversationId) sync.watchPending(messages)
+  }, [messages, conversationId, consentState])
 
   useEffect(() => {
     setVoiceReady(isVoiceSupported())
@@ -291,54 +401,11 @@ function Reflection() {
       (totalTurns >= EXTENDED_TURN_BUDGET || freeTextTurns >= turnBudget))
   const last = messages[messages.length - 1]
 
-  const stopPolling = () => {
-    if (pollTimerRef.current !== null) {
-      window.clearInterval(pollTimerRef.current)
-      pollTimerRef.current = null
-    }
-  }
-
-  // A failed AI generation returns a holding reply with aiPending — the worker
-  // regenerates later, so poll until the assistant payload turns COMPLETE.
-  const startCompletionPoll = () => {
-    stopPolling()
-    if (consentStateRef.current !== 'accepted') return
-    pollDeadlineRef.current = Date.now() + POLL_MAX_MS
-    pollTimerRef.current = window.setInterval(() => {
-      if (consentStateRef.current !== 'accepted') {
-        stopPolling()
-        return
-      }
-      if (sendingRef.current) return
-      if (Date.now() > pollDeadlineRef.current) {
-        stopPolling()
-        flash('The AI is still thinking — its full reply will appear here shortly.')
-        return
-      }
-      void (async () => {
-        try {
-          const conversation = await fetchConversation(conversationId)
-          if (!conversation || pollTimerRef.current === null) return
-          const latestAssistant = [...conversation.messages]
-            .reverse()
-            .find((entry) => entry.role === 'ASSISTANT')
-          if (latestAssistant?.aiPayload?.asyncState === 'COMPLETE') {
-            stopPolling()
-            setMessages(conversation.messages)
-            setConversationStatus(conversation.status)
-          }
-        } catch {
-          // transient network error — the next tick retries until the deadline
-        }
-      })()
-    }, POLL_INTERVAL_MS)
-  }
-
   const send = async (raw: string, quickReply?: QuickReplyValue, viaVoice = false) => {
     const content = raw.trim()
     if (!content || thinking || done || consentStateRef.current !== 'accepted') return
-    stopPolling()
-    sendingRef.current = true
+    const sync = syncRef.current
+    if (sync?.conversationId !== conversationId || !sync.beginSend()) return
     setInput('')
     setComposerError(null)
     const tempId = newId('msg')
@@ -352,13 +419,13 @@ function Reflection() {
         createdAt: new Date().toISOString(),
       },
     ])
-    setThinking(true)
     try {
       const result = await sendMessage(conversationId, {
         content,
         ...(quickReply ? { quickReply } : {}),
         ...(viaVoice ? { viaVoice: true } : {}),
       })
+      if (!sync.isCurrent()) return
       voiceDraftRef.current = false
       streamIds.current.add(result.assistantMessage.id)
       setMessages((prev) => [
@@ -366,8 +433,8 @@ function Reflection() {
         result.assistantMessage,
       ])
       if (result.humanCareRecommendation?.show) setRecommendation(result.humanCareRecommendation)
-      if (result.aiPending) startCompletionPoll()
     } catch (caught) {
+      if (!sync.isCurrent()) return
       if (caught instanceof ApiError && caught.status === 401) {
         navigate({
           to: '/signin',
@@ -396,8 +463,7 @@ function Reflection() {
           : 'Your message could not be sent. Please try again.',
       )
     } finally {
-      sendingRef.current = false
-      setThinking(false)
+      sync.finishSend()
     }
   }
 
@@ -574,20 +640,19 @@ function Reflection() {
 
   if (authStatus !== 'ready' || !user) {
     return (
-      <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-4 py-4 lg:px-10 lg:py-8">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-4 py-4 lg:max-w-[1440px] lg:px-12 lg:py-10 xl:px-[120px]">
         <ProgressRow step={2} backTo="/check-in/why" />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-4 py-4 lg:px-10 lg:py-8">
-      <ProgressRow step={2} backTo="/check-in/why" />
-
-      <div className="mt-3 flex min-h-0 flex-1 flex-col lg:mt-8 lg:flex-row lg:gap-12">
-        <div className="flex min-h-0 flex-1 flex-col">
+    <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-4 py-4 lg:max-w-[1440px] lg:px-12 lg:py-10 xl:px-[120px]">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row lg:gap-12">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <ProgressRow step={2} backTo="/check-in/why" />
           {/* Mobile past-reflections accordion — desktop renders the sidebar in the aside. */}
-          <div className="mb-2.5 shrink-0 lg:hidden">
+          <div className="mb-2.5 mt-3 shrink-0 lg:hidden">
             <button
               type="button"
               onClick={() => setHistoryOpen((open) => !open)}
@@ -605,7 +670,7 @@ function Reflection() {
             )}
           </div>
 
-          <p className="mx-auto flex w-fit items-center gap-2 rounded-pill bg-peach px-4 py-1.5 text-caption text-peach-ink lg:gap-2.5 lg:px-5 lg:py-2 lg:text-chip">
+          <p className="mx-auto flex w-fit shrink-0 items-center gap-2 rounded-pill bg-peach px-4 py-1.5 text-caption text-peach-ink lg:mt-5 lg:gap-2.5 lg:px-5 lg:py-2 lg:text-chip">
             <span className="size-1.5 rounded-full bg-accent lg:size-2" aria-hidden="true" />
             AI-guided reflection · not a therapist or doctor
           </p>
@@ -651,6 +716,10 @@ function Reflection() {
                 </p>
               )}
 
+              {!loading && receipts?.scope === reportScope && receipts.failed && (
+                <p role="status" className="text-caption text-muted">Previously submitted reports couldn’t be checked. You can still report a reply; duplicates won’t be saved.</p>
+              )}
+
               {!loading &&
                 messages.map((entry) =>
                   entry.role === 'USER' ? (
@@ -667,15 +736,33 @@ function Reflection() {
                       >
                         <span className="size-2.5 rounded-full bg-accent" />
                       </span>
-                      {streamIds.current.has(entry.id) ? (
-                        <p className="min-w-0 flex-1 text-copy text-ink sm:text-lede">
-                          <StreamText text={entry.content} />
-                        </p>
-                      ) : (
-                        <Reveal className="min-w-0 flex-1">
-                          <p className="text-copy text-ink sm:text-lede">{entry.content}</p>
-                        </Reveal>
-                      )}
+                      <div className="min-w-0 flex-1">
+                        {streamIds.current.has(entry.id) ? (
+                          <p className="text-copy text-ink sm:text-lede">
+                            <StreamText text={entry.content} />
+                          </p>
+                        ) : (
+                          <Reveal>
+                            <p className="text-copy text-ink sm:text-lede">{entry.content}</p>
+                          </Reveal>
+                        )}
+                        {entry.aiPayload?.boundary && (
+                          <BoundaryNotice boundary={entry.aiPayload.boundary} />
+                        )}
+                        {!loadFailed && user?.role === 'STUDENT' && consentState === 'accepted' && entry.role === 'ASSISTANT' && entry.content &&
+                          entry.aiPayload?.asyncState !== 'PENDING_AI' && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(entry.id) && (
+                          <ReportResponseButton
+                            key={`${reportScope}:${entry.id}`}
+                            message={entry}
+                            reported={receipts?.scope === reportScope && receipts.ids.has(entry.id)}
+                            onReported={(alreadyReported) => {
+                              setReceipts((previous) => ({ scope: reportScope, ids: new Set([...(previous?.scope === reportScope ? previous.ids : []), entry.id]), failed: previous?.scope === reportScope && previous.failed }))
+                              flash(alreadyReported ? 'This reply was already reported. Your original report is unchanged.' : 'Report submitted for your school’s counsellors and psychologists.')
+                            }}
+                            onReload={() => setAttempt((current) => current + 1)}
+                          />
+                        )}
+                      </div>
                     </div>
                   ),
                 )}
@@ -700,7 +787,7 @@ function Reflection() {
                 !done &&
                 voiceState === 'idle' &&
                 last?.role === 'ASSISTANT' && (
-                <div className="pl-11 lg:pl-12">
+                <div className="pl-11 lg:pl-0">
                   <p className="text-chip font-medium text-muted lg:text-copy lg:text-ink">
                     Choose a reply
                   </p>
@@ -716,7 +803,7 @@ function Reflection() {
                             type="button"
                             onClick={() => void send(reply.label, reply.value)}
                             disabled={consentState !== 'accepted'}
-                            className="inline-flex h-[38px] items-center whitespace-nowrap rounded-pill border border-transparent bg-panel px-4 text-chip text-ink transition-colors hover:bg-blush disabled:cursor-not-allowed disabled:opacity-40 lg:h-[46px] lg:border-hairline lg:bg-white lg:px-6 lg:text-button-sm lg:hover:border-action/40 lg:hover:bg-white"
+                            className="inline-flex h-[38px] items-center whitespace-nowrap rounded-pill border border-transparent bg-panel px-4 text-chip text-ink transition-colors hover:bg-blush disabled:cursor-not-allowed disabled:opacity-40 lg:h-10 lg:border-hairline lg:bg-page lg:px-4 lg:text-chip lg:hover:border-action/40 lg:hover:bg-white"
                           >
                             {reply.label}
                           </button>
@@ -731,7 +818,7 @@ function Reflection() {
                             type="button"
                             onClick={() => void send(reply.label, reply.value)}
                             disabled={consentState !== 'accepted'}
-                            className="inline-flex h-[38px] items-center whitespace-nowrap rounded-pill border-[1.5px] border-accent/40 bg-peach/50 px-4 text-chip text-peach-ink transition-colors hover:bg-peach disabled:cursor-not-allowed disabled:opacity-40 lg:h-[46px] lg:border-accent lg:bg-white lg:px-6 lg:text-button-sm lg:hover:bg-peach/50"
+                            className="inline-flex h-[38px] items-center whitespace-nowrap rounded-pill border-[1.5px] border-accent/40 bg-peach/50 px-4 text-chip text-peach-ink transition-colors hover:bg-peach disabled:cursor-not-allowed disabled:opacity-40 lg:h-10 lg:border-accent lg:bg-peach lg:px-4 lg:text-chip lg:hover:bg-blush/60"
                           >
                             {reply.label}
                           </button>
@@ -837,26 +924,32 @@ function Reflection() {
                   event.preventDefault()
                   void send(input, undefined, voiceDraftRef.current)
                 }}
-                className="relative"
+                className="relative lg:flex lg:items-center lg:gap-2.5"
               >
-                <input
-                  value={input}
-                  onChange={(event) => {
-                    setInput(event.target.value)
-                    if (!event.target.value.trim()) voiceDraftRef.current = false
-                  }}
-                  maxLength={4000}
-                  disabled={voiceState === 'transcribing'}
-                  placeholder={
-                    voiceState === 'transcribing' ? 'Transcribing your voice note…' : 'Type a reply…'
-                  }
-                  aria-label="Type a reply"
-                  className={`h-[48px] w-full rounded-pill border border-hairline bg-white pl-5 ${
-                    voiceReady ? 'pr-[94px]' : 'pr-[52px]'
-                  } text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action disabled:opacity-60 lg:h-[60px] lg:pl-7 ${
-                    voiceReady ? 'lg:pr-28' : 'lg:pr-16'
-                  }`}
-                />
+                <div className="relative min-w-0 flex-1">
+                  <input
+                    value={input}
+                    onChange={(event) => {
+                      setInput(event.target.value)
+                      if (!event.target.value.trim()) voiceDraftRef.current = false
+                    }}
+                    maxLength={4000}
+                    disabled={voiceState === 'transcribing'}
+                    placeholder={
+                      voiceState === 'transcribing' ? 'Transcribing your voice note…' : 'Type a reply…'
+                    }
+                    aria-label="Type a reply"
+                    className={`h-[48px] w-full rounded-pill border border-hairline bg-white pl-5 ${voiceReady ? 'pr-[94px]' : 'pr-[52px]'} text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 focus:border-action disabled:opacity-60 lg:h-[56px] lg:bg-page lg:pr-16`}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!input.trim() || thinking || voiceState === 'transcribing' || consentState !== 'accepted'}
+                    aria-label="Send"
+                    className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4 disabled:opacity-40 lg:size-10 lg:bg-panel lg:text-action lg:hover:bg-surface"
+                  >
+                    <ArrowRight className="size-4 lg:size-5" />
+                  </button>
+                </div>
                 {voiceReady && (
                   <button
                     type="button"
@@ -864,7 +957,7 @@ function Reflection() {
                     disabled={thinking || voiceState === 'transcribing' || consentState !== 'accepted'}
                     aria-label="Record a voice note"
                     title="Record a voice note"
-                    className="absolute right-[50px] top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-panel text-action transition-colors hover:bg-blush disabled:opacity-40 lg:right-[60px] lg:size-10"
+                    className="absolute right-[50px] top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-panel text-action transition-colors hover:bg-blush disabled:opacity-40 lg:static lg:size-12 lg:shrink-0 lg:translate-y-0 lg:bg-action lg:text-white lg:hover:bg-brand-4"
                   >
                     {voiceState === 'transcribing' ? (
                       <Loader2 className="size-4 animate-spin lg:size-5" />
@@ -873,14 +966,6 @@ function Reflection() {
                     )}
                   </button>
                 )}
-                <button
-                  type="submit"
-                  disabled={!input.trim() || thinking || voiceState === 'transcribing' || consentState !== 'accepted'}
-                  aria-label="Send"
-                  className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-action text-white transition-colors hover:bg-brand-4 disabled:opacity-40 lg:right-2.5 lg:size-10"
-                >
-                  <ArrowRight className="size-4 lg:size-5" />
-                </button>
               </form>
             )}
 
@@ -890,12 +975,12 @@ function Reflection() {
           </div>
         </div>
 
-        <aside className="hidden w-[356px] shrink-0 lg:block">
+        <aside className="hidden w-[320px] shrink-0 lg:block xl:w-[360px]">
           <h2 className="text-section text-heading">Your check-in</h2>
           {checkIn && <CheckInSummary checkIn={checkIn} circle className="mt-8" />}
           <Link
             to="/support"
-            className="mt-12 flex w-full items-center gap-5 rounded-card bg-peach px-6 py-6 text-left transition-colors hover:bg-blush/70"
+            className="mt-10 flex w-full items-center gap-3.5 rounded-card border border-accent bg-peach p-4 text-left transition-colors hover:bg-blush/70"
           >
             <span className="grid size-[52px] shrink-0 place-items-center rounded-full bg-counsellor text-white">
               <UserRound className="size-6" />
