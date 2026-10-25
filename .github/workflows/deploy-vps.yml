@@ -1,0 +1,72 @@
+name: VPS deploy (same-origin app)
+
+# Pushes to main rebuild the self-hosted frontend on the VPS, so
+# https://app.<ip>.sslip.io serves the same commit Vercel serves.
+#
+# There is no build job here on purpose: the build happens ON the box, inside
+# /usr/local/bin/natlas-frontend-deploy (npm ci -> NITRO_PRESET=node_server
+# VITE_API_BASE_URL= npm run build -> restart -> health gate -> rollback).
+# Building on this runner instead would prove nothing about the artifact the box
+# actually serves, and VITE_API_BASE_URL must be empty on the box or every student's
+# phone calls its own localhost (natlas docs/DEPLOYMENT.md §6A).
+#
+# Failure notification is GitHub's own: a non-zero exit from the forced command below
+# fails this job, and Actions "Failures" notifications email the subscriber. Nothing
+# here can send an email, so nothing here can silently stop sending one.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Same discipline as the backend lane: two overlapping deploys would have the second
+  # one abort on the box's flock and report a failure nobody caused.
+  group: frontend-vps-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Rebuild and deploy on the VPS
+    runs-on: ubuntu-latest
+    # A cold npm ci + vite build on the box is minutes, not seconds; the health gate
+    # adds up to 40s, and a rollback rebuilds the last-known-good revision on top.
+    timeout-minutes: 30
+    environment: production
+    steps:
+      # No checkout: the box pulls origin/main itself over anonymous HTTPS (this repo is
+      # public), so this workflow carries no repo credential and needs no deploy key.
+      #
+      # FRONTEND_VPS_SSH_KEY is the private half of a keypair whose public half is
+      # installed on the server as:
+      #   restrict,command="/usr/local/bin/natlas-frontend-deploy" ssh-ed25519 ... github-actions-frontend-vps-deploy
+      # `restrict` + forced command means this key cannot open a shell, forward an agent,
+      # run pty or pass an argument: any command this job sends is REPLACED by
+      # natlas-frontend-deploy server-side (verified by asking it for `cat /etc/shadow`).
+      # Its whole blast radius is "rebuild main on the box and restart natlas-frontend".
+      - name: Trigger natlas-frontend-deploy over SSH
+        env:
+          FRONTEND_VPS_SSH_KEY: ${{ secrets.FRONTEND_VPS_SSH_KEY }}
+        run: |
+          if [ -z "$FRONTEND_VPS_SSH_KEY" ]; then
+            echo "FRONTEND_VPS_SSH_KEY is not set in this repository's Actions secrets." >&2
+            echo "Repo Settings -> Secrets and variables -> Actions -> New repository secret," >&2
+            echo "value = the PRIVATE key ~/.ssh/natlas-frontend-actions from the deploy laptop." >&2
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          # tr -d '\r' guards against Windows CRLF if the secret was pasted from an editor
+          printf '%s\n' "$FRONTEND_VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/natlas-frontend-actions
+          chmod 600 ~/.ssh/natlas-frontend-actions
+          # Pinned from a live connection, not copied from a doc: a one-character typo in
+          # a host key is a deploy that fails looking like a network problem.
+          printf '%s\n' '[169.58.86.169]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGgVDzxvjFFHOE4/HhMtfjhpvjee+FYQLrgAvs7rOSAl' >> ~/.ssh/known_hosts
+          # No command argument: the server's forced command supplies it. The exit code
+          # that reaches this job IS the deploy script's, so a failed build or a failed
+          # health gate (which has already rolled the box back) fails the run.
+          ssh -i ~/.ssh/natlas-frontend-actions -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -p 2222 deploy@169.58.86.169
