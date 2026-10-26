@@ -238,7 +238,7 @@ function RequestsTable({
 
   return (
     <div className="overflow-hidden rounded-panel border border-hairline bg-white">
-      <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem] items-center gap-4 bg-panel px-6 py-3 text-chip font-medium text-body">
+      <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem] items-center gap-4 bg-panel px-6 py-3 text-chip font-medium text-body md:grid">
         <span>Student</span>
         <span>Requested</span>
         <span>Support prompt</span>
@@ -251,42 +251,51 @@ function RequestsTable({
             <button
               type="button"
               onClick={() => onSelect(item)}
-              className="grid w-full grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem] items-center gap-4 px-6 py-4 text-left transition-colors hover:bg-panel-2/50"
+              // One row, two shapes. Below md the five columns cannot each hold
+              // a pill, so the row stacks: identity on top, the meta fields on
+              // a wrapped line under it. At md+ both wrapper spans become
+              // `display: contents`, which hands their children to the grid and
+              // restores the aligned table columns.
+              className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-panel-2/50 md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem] md:gap-4 md:px-6"
             >
-              <span className="flex min-w-0 items-center gap-3">
-                <AvatarInitials name={shortName(item.student)} className="size-10" />
-                <span className="min-w-0">
-                  <span className="block truncate text-card text-heading">
-                    {shortName(item.student)}
+              <span className="flex min-w-0 flex-1 flex-col gap-2 md:contents">
+                <span className="flex min-w-0 items-center gap-3 md:flex-none">
+                  <AvatarInitials name={shortName(item.student)} className="size-10" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-card text-heading">
+                      {shortName(item.student)}
+                    </span>
+                    <span className="block truncate text-caption text-muted">
+                      {[item.student.classLabel, item.student.studentCode]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
                   </span>
-                  <span className="block truncate text-caption text-muted">
-                    {[item.student.classLabel, item.student.studentCode]
-                      .filter(Boolean)
-                      .join(' · ')}
+                </span>
+                <span className="flex flex-wrap items-center gap-2 md:contents">
+                  <span className="text-copy-sm text-body md:min-w-0 md:truncate">
+                    {requestedLabel(item.requestedAt)}
+                  </span>
+                  <span>
+                    {item.prompt === 'REVIEW_SUGGESTED' ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-pill bg-peach px-3 py-1 text-chip font-medium text-peach-ink">
+                        <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" />
+                        Review suggested
+                      </span>
+                    ) : (
+                      <span className="text-copy-sm text-muted">No prompt</span>
+                    )}
+                  </span>
+                  <span>
+                    <span
+                      className={`inline-flex items-center rounded-pill px-3 py-1 text-chip font-medium ${STATUS_PILLS[item.queueStatus]}`}
+                    >
+                      {QUEUE_STATUS_LABELS[item.queueStatus]}
+                    </span>
                   </span>
                 </span>
               </span>
-              <span className="truncate text-copy-sm text-body">
-                {requestedLabel(item.requestedAt)}
-              </span>
-              <span>
-                {item.prompt === 'REVIEW_SUGGESTED' ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-pill bg-peach px-3 py-1 text-chip font-medium text-peach-ink">
-                    <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" />
-                    Review suggested
-                  </span>
-                ) : (
-                  <span className="text-copy-sm text-muted">No prompt</span>
-                )}
-              </span>
-              <span>
-                <span
-                  className={`inline-flex items-center rounded-pill px-3 py-1 text-chip font-medium ${STATUS_PILLS[item.queueStatus]}`}
-                >
-                  {QUEUE_STATUS_LABELS[item.queueStatus]}
-                </span>
-              </span>
-              <ChevronRight aria-hidden="true" className="size-4 text-muted" />
+              <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted" />
             </button>
           </li>
         ))}

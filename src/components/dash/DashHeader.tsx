@@ -77,7 +77,11 @@ function AccountMenu() {
       >
         <AvatarInitials name={user.name} className="size-8" />
       </summary>
-      <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-card border border-hairline bg-white p-4 shadow-xl">
+      {/* The trigger's position is not stable on a phone — the actions row is
+          right-aligned on /admin but wraps to the left on /admin/pilot, and an
+          `absolute right-0 w-64` panel then hung 132px off the left edge. Below
+          sm it is a bottom sheet, like the notification tray. */}
+      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-sheet border border-hairline bg-white p-4 shadow-xl sm:absolute sm:inset-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-64 sm:rounded-card">
         <p className="truncate text-card text-heading">{user.name}</p>
         <p className="truncate text-caption text-muted">{user.email}</p>
         <p className="mt-1 text-caption text-muted">{roleLabel(user.role)}</p>

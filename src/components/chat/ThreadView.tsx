@@ -164,7 +164,18 @@ export function ThreadView({
   }, [threadId, myRole])
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end' })
+    const end = endRef.current
+    if (!end) return
+    // Scroll the container to its true bottom rather than aligning the end
+    // marker with the viewport: the reply card is `sticky bottom-4`, so it
+    // covers the last ~230px of the scrollport and block:'end' left the newest
+    // message hidden behind it on every open and every send.
+    let scroller: HTMLElement | null = end.parentElement
+    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) {
+      scroller = scroller.parentElement
+    }
+    if (scroller) scroller.scrollTo({ top: scroller.scrollHeight })
+    else end.scrollIntoView({ block: 'end' })
   }, [messages.length, loading])
 
   const handleSend = () => {
@@ -256,7 +267,12 @@ export function ThreadView({
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="flex flex-col gap-0 overflow-hidden p-0">
+      {/* p-0! because every child here carries its own padding, and the plain
+          `p-0` lost to Card's base `p-6`: Tailwind emits padding utilities in
+          ascending order, so the later class wins regardless of attribute
+          order. The dead override left a 24px inset that cut the header's
+          bottom border short of the card edges. */}
+      <Card className="flex flex-col gap-0 overflow-hidden p-0!">
         <div className="flex flex-wrap items-center gap-3 border-b border-hairline px-5 py-4">
           <AvatarInitials name={headerTitle} />
           <div className="min-w-0 flex-1">

@@ -793,6 +793,70 @@ async function handler(req, res, next) {
     )
   }
 
+  // Staff review queue (figma PNA-4). One item per queue status so every pill,
+  // filter chip and row shape on /school/requests renders at mobile width.
+  if (path === '/api/v1/support-requests/queue' && req.method === 'GET') {
+    const miva = schools.find((x) => x.id === 'sch-miva')
+    const queueStudents = studentsOf(miva)
+    const QUEUE = [
+      ['NEW', 'REVIEW_SUGGESTED', 'URGENT_UNSAFE', hours(3)],
+      ['NEW', 'NONE', 'TODAY_STUDY_PERIOD', hours(7)],
+      ['REVIEWED', 'REVIEW_SUGGESTED', 'GENTLE_1_2_DAYS', hours(20)],
+      ['FOLLOW_UP_REQUIRED', 'NONE', 'GENTLE_1_2_DAYS', days(2)],
+      ['FOLLOW_UP_COMPLETED', 'REVIEW_SUGGESTED', 'TODAY_STUDY_PERIOD', days(4)],
+    ]
+    const items = QUEUE.map(([queueStatus, prompt, timing, msAgo], i) => {
+      const student = queueStudents[i % queueStudents.length]
+      const profile = student.studentProfile
+      return {
+        id: `sreq-${i}`,
+        requestedAt: iso(msAgo),
+        timing,
+        note: 'I keep worrying about exams and I cannot sleep.',
+        initialMessage: i % 2 === 0 ? 'Can I talk to someone today?' : null,
+        initialMessageAt: i % 2 === 0 ? iso(msAgo) : null,
+        reviewNote: queueStatus === 'NEW' ? null : 'Spoke during break, booked a follow-up.',
+        requestStatus: queueStatus === 'NEW' ? 'PENDING' : 'IN_REVIEW',
+        queueStatus,
+        prompt,
+        followUpId: queueStatus.startsWith('FOLLOW_UP') ? `fu-${i}` : null,
+        followUpStatus: queueStatus === 'FOLLOW_UP_REQUIRED' ? 'SCHEDULED' : queueStatus === 'FOLLOW_UP_COMPLETED' ? 'COMPLETED' : null,
+        canManageFollowUp: queueStatus === 'FOLLOW_UP_REQUIRED',
+        followUpDueAt: queueStatus === 'FOLLOW_UP_REQUIRED' ? iso(days(-1)) : null,
+        followUpCompletedAt: queueStatus === 'FOLLOW_UP_COMPLETED' ? iso(days(1)) : null,
+        conversationId: `conv-${i}`,
+        student: {
+          id: student.id,
+          firstName: profile?.firstName ?? student.name.split(' ')[0],
+          lastName: profile?.lastName ?? null,
+          displayName: null,
+          classLabel: profile?.classLabel ?? null,
+          studentCode: profile?.studentCode ?? null,
+          studentRef: null,
+          email: student.email,
+        },
+        supportPerson: queueStatus === 'NEW' ? null : { id: SESSION_USER.id, name: 'Kiki Amuta', type: 'COUNSELLOR' },
+      }
+    })
+    const counts = {
+      all: items.length,
+      new: items.filter((i) => i.queueStatus === 'NEW').length,
+      reviewed: items.filter((i) => i.queueStatus === 'REVIEWED').length,
+      followUpRequired: items.filter((i) => i.queueStatus === 'FOLLOW_UP_REQUIRED').length,
+      followUpCompleted: items.filter((i) => i.queueStatus === 'FOLLOW_UP_COMPLETED').length,
+    }
+    const status = url.searchParams.get('status')
+    const q = (url.searchParams.get('q') ?? '').trim().toLowerCase()
+    return ok(res, {
+      counts,
+      items: items.filter(
+        (item) =>
+          (!status || item.queueStatus === status) &&
+          (!q || `${item.student.firstName} ${item.student.lastName ?? ''}`.toLowerCase().includes(q)),
+      ),
+    })
+  }
+
   // Platform overview
   if (path === '/api/v1/admin/overview') return ok(res, overviewPayload())
 
@@ -800,6 +864,91 @@ async function handler(req, res, next) {
   if (path === '/api/v1/admin/analytics') {
     const d = Number(url.searchParams.get('days') ?? 14)
     return ok(res, platformAnalytics(d === 30 || d === 90 ? d : 14))
+  }
+
+  // Pilot analytics — the wellbeing tab is the widest table-like layout on
+  // this page, so the themes carry long labels and a suppressed row.
+  if (path === '/api/v1/admin/pilot') {
+    const days = Number(url.searchParams.get('days') ?? 30)
+    const series = Array.from({ length: Math.min(days, 14) }, (_, i) => ({
+      date: new Date(Date.now() - (13 - i) * 86400000).toISOString().slice(0, 10),
+      activeUsers: 20 + i * 3,
+      checkIns: 30 + i * 4,
+    }))
+    return ok(res, {
+      generatedAt: new Date().toISOString(),
+      window: { from: '2026-09-26', to: '2026-10-26', days },
+      school: null,
+      suppression: { threshold: 5, note: 'Themes naming fewer than 5 students are masked.' },
+      overview: {
+        studentsOnboarded: 412,
+        newStudents: 38,
+        activeStudents: 196,
+        checkIns: 1204,
+        aiInteractions: 3310,
+        voiceInteractions: 214,
+        resourcesAccessed: 640,
+        supportRequests: 74,
+        completedReferrals: 21,
+        avgSatisfaction: { available: true, reason: '' },
+      },
+      engagement: {
+        active: 196,
+        dau: 61,
+        wau: 143,
+        mau: 196,
+        new: 38,
+        returning: 158,
+        returnRate: 71,
+        checkInsPerActiveStudent: 6.1,
+        avgSessionsPerStudent: 3.4,
+        avgSessionMinutes: 8.2,
+        textVsVoice: { text: 3096, voice: 214 },
+        series,
+      },
+      featureUsage: [
+        { id: 'checkin', label: 'Daily check-in', uses: 1204, students: 196, suppressed: false, available: true },
+        { id: 'voice', label: 'Voice messages', uses: 214, students: 63, suppressed: false, available: true },
+        { id: 'resources', label: 'Resource library', uses: 640, students: 118, suppressed: false, available: true },
+        { id: 'reflection', label: 'Reflection', uses: 4, students: null, suppressed: true, available: true },
+      ],
+      wellbeingThemes: [
+        { id: 'school-pressure', label: 'School workload and exam pressure', mentions: 412, students: 168, suppressed: false },
+        { id: 'family', label: 'Family expectations at home', mentions: 286, students: 131, suppressed: false },
+        { id: 'friendship', label: 'Friendship and belonging', mentions: 194, students: 97, suppressed: false },
+        { id: 'money', label: 'Money and basic needs', mentions: 88, students: 41, suppressed: false },
+        { id: 'health', label: 'Health and sleep', mentions: 37, students: 19, suppressed: false },
+        { id: 'faith', label: 'Faith and community', mentions: 9, students: null, suppressed: true },
+      ],
+      outcomes: { available: true, reason: '' },
+      resources: {
+        note: 'Saves are per student, not per view.',
+        mostSaved: [
+          { id: 'r1', title: 'Calming your mind before an exam', saves: 84, students: 71, suppressed: false },
+          { id: 'r2', title: 'Talking to a parent about grades', saves: 52, students: 44, suppressed: false },
+        ],
+        byCategory: [
+          { category: 'Exam stress', saves: 140, students: 98, suppressed: false },
+          { category: 'Relationships', saves: 63, students: 51, suppressed: false },
+        ],
+        savesSeries: series.map((p) => ({ date: p.date, saves: p.activeUsers })),
+        activities: { started: 320, completed: 214, completionRate: 67 },
+      },
+      support: {
+        requests: { total: 74, urgent: 6, byStatus: { NEW: 12, REVIEWED: 40, FOLLOW_UP_REQUIRED: 14, FOLLOW_UP_COMPLETED: 8 } },
+        referrals: { created: 26, claimed: 23, closed: 21, avgClaimHours: 5.4 },
+        followUps: { completed: 8, open: 14 },
+        unresolved: 12,
+        series: series.map((p) => ({ date: p.date, requests: Math.round(p.activeUsers / 5), threads: Math.round(p.activeUsers / 3) })),
+      },
+      safeguarding: {
+        flags: { total: 17, bySeverity: { TIER_1: 9, TIER_2: 5, TIER_3: 3 }, byStatus: { OPEN: 4, REVIEWED: 13 } },
+        escalations: 3,
+        urgentRequests: 6,
+        followUpStatus: { open: 4, resolved: 13 },
+        avgResolutionHours: 9.1,
+      },
+    })
   }
 
   // Platform activity

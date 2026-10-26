@@ -155,7 +155,7 @@ export function OnboardStudentDialog({
           }}
           className="flex flex-col gap-4"
         >
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField
               label="First name"
               value={firstName}
@@ -181,7 +181,7 @@ export function OnboardStudentDialog({
             placeholder="student@school.edu.ng"
             error={fieldErrors.email}
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField
               label="Class (optional)"
               value={classLabel}
@@ -329,7 +329,7 @@ export function OnboardProfessionalDialog({
             placeholder="counsellor@school.edu.ng"
             error={fieldErrors.email}
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <SelectField
               label="Role"
               value={role}
@@ -481,7 +481,7 @@ export function EditSchoolUserDialog({
           hint="Leave blank to keep their current number."
         />
         {student && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField
               label="Class"
               value={classLabel}
@@ -498,7 +498,7 @@ export function EditSchoolUserDialog({
           </div>
         )}
         {professional && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField
               label="Title"
               value={title}

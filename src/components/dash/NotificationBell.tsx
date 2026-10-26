@@ -126,7 +126,10 @@ export function NotificationBell() {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40"
           />
-          <div className="fixed left-4 right-4 top-20 z-50 max-h-[calc(100dvh-7rem)] overflow-hidden rounded-panel border border-hairline bg-white shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[360px] sm:max-w-[calc(100vw-2rem)]">
+          {/* A fixed top-20 popover used to land on top of the header, because
+              the header wraps to two rows on a phone and the bell sits far
+              lower than 80px. Below sm it is a bottom sheet instead. */}
+          <div className="fixed inset-x-0 bottom-0 z-50 max-h-[70dvh] overflow-hidden rounded-t-sheet border border-hairline bg-white shadow-xl sm:absolute sm:inset-auto sm:bottom-auto sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100dvh-7rem)] sm:w-[360px] sm:max-w-[calc(100vw-2rem)] sm:rounded-panel">
             <div className="flex items-center justify-between border-b border-hairline px-5 py-3.5">
               <span className="text-card text-heading">Notifications</span>
               <button

@@ -456,25 +456,38 @@ function WellbeingTab({ data }: { data: PilotAnalytics }) {
         Themes students raise in check-ins and reflections. Self-reported themes —
         never clinical diagnoses or labels.
       </p>
-      <div className="flex items-center gap-4 border-b border-hairline pb-2 text-caption text-muted">
+      <div className="hidden items-center gap-4 border-b border-hairline pb-2 text-caption text-muted md:flex">
         <span className="w-40 shrink-0">Theme</span>
         <span className="min-w-0 flex-1">Mentions</span>
         <span className="w-14 text-right">Mentions</span>
         <span className="w-24 text-right">Students</span>
       </div>
       {themes.map((theme) => (
-        <div key={theme.id} className="flex items-center gap-4">
-          <span className="w-40 shrink-0 text-copy-sm text-heading">{theme.label}</span>
-          <ProgressBar
-            value={(theme.mentions / maxMentions) * 100}
-            className="min-w-0 flex-1"
-          />
-          <span className="w-14 text-right text-copy-sm tabular-nums text-heading">
-            {formatNumber(theme.mentions)}
-          </span>
-          <span className="flex w-24 justify-end text-copy-sm text-muted">
-            <StudentsCell students={theme.students} suppressed={theme.suppressed} />
-          </span>
+        // 10rem label + two number columns is 360px, wider than a phone card
+        // (294px), so below md the row stacks and the counts name themselves.
+        <div
+          key={theme.id}
+          className="flex flex-col gap-1.5 md:grid md:grid-cols-[10rem_minmax(0,1fr)_3.5rem_6rem] md:items-center md:gap-4"
+        >
+          <span className="text-copy-sm text-heading">{theme.label}</span>
+          <div className="flex items-center gap-3 md:contents">
+            <ProgressBar
+              value={(theme.mentions / maxMentions) * 100}
+              className="min-w-0 flex-1"
+            />
+            <span className="shrink-0 whitespace-nowrap text-caption text-muted md:hidden">
+              {formatNumber(theme.mentions)} mentions ·{' '}
+              {theme.suppressed
+                ? 'students suppressed'
+                : `${formatNumber(theme.students ?? 0)} students`}
+            </span>
+            <span className="hidden w-14 text-right text-copy-sm tabular-nums text-heading md:block">
+              {formatNumber(theme.mentions)}
+            </span>
+            <span className="hidden flex w-24 justify-end text-copy-sm text-muted md:flex">
+              <StudentsCell students={theme.students} suppressed={theme.suppressed} />
+            </span>
+          </div>
         </div>
       ))}
     </PanelCard>

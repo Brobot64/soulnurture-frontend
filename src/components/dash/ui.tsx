@@ -32,7 +32,10 @@ export function Card({
   children: ReactNode
 }) {
   return (
-    <div className={`rounded-panel border border-hairline bg-white p-6 ${className}`}>
+    // min-w-0: a grid item's default min-width is its content's min-content,
+    // and a wide table nested inside this card used to widen the grid track —
+    // i.e. the whole page — instead of scrolling within the card.
+    <div className={`min-w-0 rounded-panel border border-hairline bg-white p-6 ${className}`}>
       {children}
     </div>
   )
@@ -183,7 +186,10 @@ export function Segmented<T extends string | number>({
 }) {
   return (
     <div
-      className={`inline-flex shrink-0 items-center gap-1 rounded-pill bg-panel p-1 ${className}`}
+      // flex-wrap, not overflow-x-auto: a 4-chip filter row on a phone is
+      // 500px wide, and scrolling it hid the last option behind an edge with
+      // no affordance. Wrapping keeps every choice visible.
+      className={`inline-flex max-w-full shrink-0 flex-wrap items-center gap-1 rounded-pill bg-panel p-1 ${className}`}
     >
       {options.map((option) => {
         const active = option.value === value
@@ -225,7 +231,7 @@ export function TextField({
       <input
         id={id}
         {...rest}
-        className={`h-11 rounded-card border bg-white px-4 text-copy-sm text-heading outline-none transition-colors placeholder:text-muted focus:border-brand-4 ${
+        className={`h-11 w-full rounded-card border bg-white px-4 text-copy-sm text-heading outline-none transition-colors placeholder:text-muted focus:border-brand-4 ${
           error ? 'border-destructive' : 'border-hairline'
         }`}
       />
@@ -259,7 +265,7 @@ export function SelectField({
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 rounded-pill border border-hairline bg-white px-4 text-copy-sm text-heading outline-none transition-colors focus:border-brand-4"
+        className="h-11 w-full rounded-pill border border-hairline bg-white px-4 text-copy-sm text-heading outline-none transition-colors focus:border-brand-4"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
