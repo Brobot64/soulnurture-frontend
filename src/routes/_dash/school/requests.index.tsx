@@ -1,12 +1,14 @@
 // The staff "Support requests" review queue (figma PNA-4, node 146:914):
 // stat tiles, filter chips with live counts, student search, and the review
-// table with prompt + queue-status pills. Rows open a review dialog that
-// drives the existing PATCH /v1/support-requests/:id (status + note) and
-// PATCH /v1/follow-ups/:id (complete a follow-up).
+// table. Each row shows the four facts the backend keeps separate — the stored
+// lifecycle, the NEW/REVIEWED split, the follow-up state and the student's own
+// urgency — instead of collapsing them into one pill. Rows open a review dialog
+// that drives PATCH /v1/support-requests/:id (status, note, and the time and
+// place once a request is scheduled) plus PATCH /v1/follow-ups/:id.
 
 import { useEffect, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ChevronRight, CircleAlert, Inbox } from 'lucide-react'
+import { ChevronRight, CircleAlert, Inbox, TriangleAlert } from 'lucide-react'
 
 import { DashHeader } from '#/components/dash/DashHeader'
 import {
@@ -15,7 +17,6 @@ import {
   Dialog,
   ErrorNote,
   Skeleton,
-  Tag,
   TextField,
 } from '#/components/dash/ui'
 import { CHAT_STAFF_ROLES } from '#/lib/auth'
@@ -27,13 +28,17 @@ import {
   completeFollowUp,
   scheduleFollowUp,
   fetchSupportQueue,
+  FOLLOW_UP_STATE_LABELS,
   QUEUE_STATUS_LABELS,
+  REQUEST_STATUS_LABELS,
   REVIEW_STATUS_LABELS,
   reviewSupportRequest,
   shortName,
   TIMING_LABELS,
-  type QueueStatus,
+  type QueueFilter,
+  type RequestStatus,
   type ReviewStatus,
+  type ReviewSupportRequestBody,
   type SupportQueueItem,
   type SupportQueueResponse,
 } from '#/lib/support-queue'
@@ -43,7 +48,7 @@ export const Route = createFileRoute('/_dash/school/requests/')({
   component: SupportRequestsPage,
 })
 
-const CHIPS: { value: QueueStatus | 'ALL'; label: string; countKey: keyof SupportQueueResponse['counts'] }[] = [
+const CHIPS: { value: QueueFilter | 'ALL'; label: string; countKey: keyof SupportQueueResponse['counts'] }[] = [
   { value: 'ALL', label: 'All', countKey: 'all' },
   { value: 'NEW', label: 'New', countKey: 'new' },
   { value: 'REVIEWED', label: 'Reviewed', countKey: 'reviewed' },
@@ -51,16 +56,21 @@ const CHIPS: { value: QueueStatus | 'ALL'; label: string; countKey: keyof Suppor
   { value: 'FOLLOW_UP_COMPLETED', label: 'Follow-Up Completed', countKey: 'followUpCompleted' },
 ]
 
-const STATUS_PILLS: Record<QueueStatus, string> = {
-  NEW: 'bg-peach text-peach-ink',
-  REVIEWED: 'bg-panel-2 text-body',
-  FOLLOW_UP_REQUIRED: 'bg-blush text-apricot-4',
-  FOLLOW_UP_COMPLETED: 'bg-action text-white',
+/** The stored lifecycle, colour-coded. A completed request must not read like
+ * one that merely started, so the pill is the real status, not the chip. */
+const REQUEST_STATUS_PILLS: Record<RequestStatus, string> = {
+  PENDING: 'bg-peach text-peach-ink',
+  ACCEPTED: 'bg-panel text-brand-4',
+  SCHEDULED: 'bg-panel text-brand-4',
+  IN_PROGRESS: 'bg-surface text-brand-4',
+  COMPLETED: 'bg-action text-white',
+  CANCELLED: 'bg-surface text-body',
+  ESCALATED: 'bg-blush text-apricot-4',
 }
 
 function SupportRequestsPage() {
   const user = useRoleGuard([...CHAT_STAFF_ROLES])
-  const [chip, setChip] = useState<QueueStatus | 'ALL'>('ALL')
+  const [chip, setChip] = useState<QueueFilter | 'ALL'>('ALL')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
@@ -103,8 +113,8 @@ function QueuePanels({
   search,
   schoolName,
 }: {
-  chip: QueueStatus | 'ALL'
-  onChipChange: (next: QueueStatus | 'ALL') => void
+  chip: QueueFilter | 'ALL'
+  onChipChange: (next: QueueFilter | 'ALL') => void
   search: string
   schoolName: string
 }) {
@@ -123,7 +133,7 @@ function QueuePanels({
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile dotClass="bg-accent" label="New requests" value={counts?.new} />
         <StatTile dotClass="bg-action" label="Follow-up required" value={counts?.followUpRequired} />
-        <StatTile dotClass="bg-action" label="Completed this week" value={counts?.followUpCompleted} />
+        <StatTile dotClass="bg-action" label="Completed this week" value={counts?.completedThisWeek} />
       </div>
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
@@ -146,6 +156,13 @@ function QueuePanels({
           )
         })}
       </div>
+
+      {counts && (
+        <p className="text-caption text-muted">
+          Each number is exactly the rows that chip shows. They overlap — a request can be
+          New and still need a follow-up — so they do not add up to All.
+        </p>
+      )}
 
       {queue.error && (
         <div className="flex flex-col items-start gap-3">
@@ -239,10 +256,10 @@ function RequestsTable({
   return (
     <div className="overflow-hidden rounded-panel border border-hairline bg-white">
       <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem] items-center gap-4 bg-panel px-6 py-3 text-chip font-medium text-body md:grid">
-        <span>Student</span>
+        <span>Student · urgency</span>
         <span>Requested</span>
         <span>Support prompt</span>
-        <span>Status</span>
+        <span>Request status</span>
         <span aria-hidden="true" />
       </div>
       <ul className="flex flex-col divide-y divide-hairline">
@@ -270,6 +287,12 @@ function RequestsTable({
                         .filter(Boolean)
                         .join(' · ')}
                     </span>
+                    {item.urgency === 'URGENT' && (
+                      <span className="mt-1 inline-flex items-center gap-1.5 rounded-pill bg-blush px-2.5 py-0.5 text-chip font-medium text-apricot-4">
+                        <TriangleAlert aria-hidden="true" className="size-3 shrink-0" />
+                        Does not feel safe
+                      </span>
+                    )}
                   </span>
                 </span>
                 <span className="flex flex-wrap items-center gap-2 md:contents">
@@ -286,12 +309,17 @@ function RequestsTable({
                       <span className="text-copy-sm text-muted">No prompt</span>
                     )}
                   </span>
-                  <span>
+                  <span className="flex flex-wrap items-center gap-2">
                     <span
-                      className={`inline-flex items-center rounded-pill px-3 py-1 text-chip font-medium ${STATUS_PILLS[item.queueStatus]}`}
+                      className={`inline-flex items-center rounded-pill px-3 py-1 text-chip font-medium ${REQUEST_STATUS_PILLS[item.requestStatus] ?? 'bg-surface text-body'}`}
                     >
-                      {QUEUE_STATUS_LABELS[item.queueStatus]}
+                      {REQUEST_STATUS_LABELS[item.requestStatus] ?? item.requestStatus}
                     </span>
+                    {item.followUpState !== 'NONE' && (
+                      <span className="inline-flex items-center rounded-pill border border-hairline px-3 py-1 text-chip text-body">
+                        {FOLLOW_UP_STATE_LABELS[item.followUpState]}
+                      </span>
+                    )}
                   </span>
                 </span>
               </span>
@@ -304,6 +332,40 @@ function RequestsTable({
   )
 }
 
+/** Everything the review dialog can change, in one snapshot, so “did this
+ * professional actually change anything?” is one comparison. */
+interface ReviewDraft {
+  status: ReviewStatus | ''
+  reviewNote: string
+  scheduledAt: string
+  locationLabel: string
+}
+
+function emptyDraft(): ReviewDraft {
+  return { status: '', reviewNote: '', scheduledAt: '', locationLabel: '' }
+}
+
+/** What the row already says. PENDING and ESCALATED are not choices a
+ * professional makes, so they open as “nothing picked yet”. */
+function draftOf(item: SupportQueueItem): ReviewDraft {
+  const stored = item.requestStatus as string
+  return {
+    status: stored in REVIEW_STATUS_LABELS ? (stored as ReviewStatus) : '',
+    reviewNote: item.reviewNote ?? '',
+    scheduledAt: item.scheduledAt ? localDateTime(item.scheduledAt) : '',
+    locationLabel: item.locationLabel ?? '',
+  }
+}
+
+function isUnchangedDraft(a: ReviewDraft, b: ReviewDraft): boolean {
+  return (
+    a.status === b.status &&
+    a.reviewNote === b.reviewNote &&
+    a.scheduledAt === b.scheduledAt &&
+    a.locationLabel === b.locationLabel
+  )
+}
+
 function ReviewDialog({
   item,
   onClose,
@@ -313,8 +375,8 @@ function ReviewDialog({
   onClose: () => void
   onChanged: (message: string) => void
 }) {
-  const [status, setStatus] = useState<ReviewStatus>('ACCEPTED')
-  const [reviewNote, setReviewNote] = useState('')
+  const [draft, setDraft] = useState<ReviewDraft>(emptyDraft)
+  const [baseline, setBaseline] = useState<ReviewDraft>(emptyDraft)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editingSchedule, setEditingSchedule] = useState(false)
@@ -323,12 +385,9 @@ function ReviewDialog({
 
   useEffect(() => {
     if (!item) return
-    setStatus(
-      item.requestStatus in REVIEW_STATUS_LABELS
-        ? (item.requestStatus as ReviewStatus)
-        : 'ACCEPTED',
-    )
-    setReviewNote(item.reviewNote ?? '')
+    const initial = draftOf(item)
+    setDraft(initial)
+    setBaseline(initial)
     setDueAt(item.followUpDueAt ? localDateTime(item.followUpDueAt) : '')
     setEditingSchedule(false)
     setError(null)
@@ -338,19 +397,33 @@ function ReviewDialog({
   if (!item) return null
 
   const studentName = shortName(item.student)
+  const changed = !isUnchangedDraft(draft, baseline)
+  const arrangementMissing =
+    draft.status === 'SCHEDULED' && (!draft.scheduledAt || !draft.locationLabel.trim())
+  const canSave =
+    draft.status !== '' && changed && !arrangementMissing && !saving && !editingSchedule
+
+  const patchDraft = (patch: Partial<ReviewDraft>) =>
+    setDraft((current) => ({ ...current, ...patch }))
 
   const handleSave = async () => {
-    if (saving) return
+    if (!canSave || saving) return
     setSaving(true)
     setError(null)
     try {
-      const result = await reviewSupportRequest(item.id, {
-        status,
-        reviewNote: reviewNote.trim() || undefined,
-      })
+      const body: ReviewSupportRequestBody = {
+        status: draft.status as ReviewStatus,
+        reviewNote: draft.reviewNote.trim() || undefined,
+      }
+      if (draft.status === 'SCHEDULED') {
+        body.scheduledAt = new Date(draft.scheduledAt).toISOString()
+        body.locationLabel = draft.locationLabel.trim()
+      }
+      const result = await reviewSupportRequest(item.id, body)
+      setBaseline(draft)
       onChanged('Review saved.')
       // Accepting opens the staff↔student chat — land straight in it.
-      if (status === 'ACCEPTED' && result.chatThreadId) {
+      if (draft.status === 'ACCEPTED' && result.chatThreadId) {
         void navigate({
           to: '/school/inbox/$threadId',
           params: { threadId: result.chatThreadId },
@@ -413,7 +486,13 @@ function ReviewDialog({
           <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button type="button" onClick={() => void handleSave()} disabled={saving || editingSchedule}>
+          <Button
+            type="button"
+            onClick={() => void handleSave()}
+            // No change, no write: opening the dialog must never leave an
+            // accidental status progression one click away.
+            disabled={!canSave}
+          >
             {saving ? 'Saving…' : 'Save review'}
           </Button>
         </>
@@ -432,14 +511,35 @@ function ReviewDialog({
           <dd className="truncate text-heading">{item.student.email}</dd>
           <dt className="text-muted">Requested</dt>
           <dd className="text-heading">{requestedLabel(item.requestedAt)}</dd>
-          <dt className="text-muted">Timing</dt>
-          <dd className="text-heading">{TIMING_LABELS[item.timing]}</dd>
           <dt className="text-muted">Support person</dt>
           <dd className="text-heading">{item.supportPerson?.name ?? '—'}</dd>
-          <dt className="text-muted">Queue status</dt>
-          <dd>
-            <Tag tone="neutral">{QUEUE_STATUS_LABELS[item.queueStatus]}</Tag>
+          <dt className="text-muted">Request status</dt>
+          <dd className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center rounded-pill px-3 py-1 text-chip font-medium ${REQUEST_STATUS_PILLS[item.requestStatus] ?? 'bg-surface text-body'}`}
+            >
+              {REQUEST_STATUS_LABELS[item.requestStatus] ?? item.requestStatus}
+            </span>
+            <span className="text-caption text-muted">
+              {QUEUE_STATUS_LABELS[item.queueStatus]}
+            </span>
           </dd>
+          <dt className="text-muted">Urgency</dt>
+          <dd className="flex flex-wrap items-center gap-2 text-heading">
+            {item.urgency === 'URGENT' ? (
+              <span className="inline-flex items-center gap-1.5 rounded-pill bg-blush px-2.5 py-0.5 text-chip font-medium text-apricot-4">
+                <TriangleAlert aria-hidden="true" className="size-3 shrink-0" />
+                The student does not feel safe
+              </span>
+            ) : (
+              'Normal'
+            )}
+            <span className="text-caption text-muted">
+              Asked for {TIMING_LABELS[item.timing].toLowerCase()}
+            </span>
+          </dd>
+          <dt className="text-muted">Follow-up</dt>
+          <dd className="text-heading">{FOLLOW_UP_STATE_LABELS[item.followUpState]}</dd>
         </dl>
 
         <section className="rounded-card bg-panel-2/60 px-4 py-3">
@@ -534,10 +634,17 @@ function ReviewDialog({
           <label className="flex flex-col gap-1.5">
             <span className="text-chip font-medium text-heading">Review status</span>
             <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value as ReviewStatus)}
+              value={draft.status}
+              // Empty is a real state, not a default: nothing is written until a
+              // status is chosen deliberately.
+              onChange={(event) => patchDraft({ status: event.target.value as ReviewStatus | '' })}
               className="h-11 rounded-card border border-hairline bg-white px-4 text-copy-sm text-heading outline-none transition-colors focus:border-brand-4"
             >
+              <option value="">
+                {item.requestStatus in REVIEW_STATUS_LABELS
+                  ? `Current: ${REVIEW_STATUS_LABELS[item.requestStatus as ReviewStatus]}`
+                  : `Current: ${REQUEST_STATUS_LABELS[item.requestStatus] ?? item.requestStatus}`}
+              </option>
               {(Object.keys(REVIEW_STATUS_LABELS) as ReviewStatus[]).map((value) => (
                 <option key={value} value={value}>
                   {REVIEW_STATUS_LABELS[value]}
@@ -548,8 +655,8 @@ function ReviewDialog({
           <label className="flex flex-col gap-1.5">
             <span className="text-chip font-medium text-heading">Review note</span>
             <textarea
-              value={reviewNote}
-              onChange={(event) => setReviewNote(event.target.value)}
+              value={draft.reviewNote}
+              onChange={(event) => patchDraft({ reviewNote: event.target.value })}
               rows={1}
               maxLength={500}
               placeholder="What did you do about this request?"
@@ -557,6 +664,38 @@ function ReviewDialog({
             />
           </label>
         </fieldset>
+
+        {draft.status === 'SCHEDULED' && (
+          <fieldset disabled={saving || editingSchedule} className="grid gap-4 sm:grid-cols-2 disabled:opacity-60">
+            <TextField
+              label="When you will meet"
+              type="datetime-local"
+              value={draft.scheduledAt}
+              onChange={(event) => patchDraft({ scheduledAt: event.target.value })}
+              required
+              hint="Shown to the student in their own time zone."
+            />
+            <TextField
+              label="Where"
+              value={draft.locationLabel}
+              onChange={(event) => patchDraft({ locationLabel: event.target.value })}
+              maxLength={200}
+              required
+              placeholder="e.g. Counselling office, Block C"
+              hint="The student sees this exactly as you write it."
+            />
+          </fieldset>
+        )}
+
+        <p className="text-caption text-muted">
+          {!changed
+            ? 'Nothing has changed yet — Save stays off until you do.'
+            : draft.status === ''
+              ? 'Choose a review status to save.'
+              : arrangementMissing
+                ? 'A scheduled request needs a time and a place — that is what the student will see.'
+                : `Saves as “${REVIEW_STATUS_LABELS[draft.status as ReviewStatus]}”. The student is told the status changed; your note stays private.`}
+        </p>
 
         {error && <ErrorNote>{error}</ErrorNote>}
       </div>
