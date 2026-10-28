@@ -1,8 +1,8 @@
 // Bell with a live unread badge and a popover of the latest notifications.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Bell } from 'lucide-react'
+import { Bell, X } from 'lucide-react'
 
 import { Spinner } from '#/components/StatusBadge'
 import { isChatStaff, refreshSession, useSession } from '#/lib/auth'
@@ -24,6 +24,51 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<NotificationItem[] | null>(null)
   const [busy, setBusy] = useState(false)
+  const [popoverTop, setPopoverTop] = useState(0)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const popoverId = useId()
+
+  const closePopover = () => {
+    setOpen(false)
+    buttonRef.current?.focus({ preventScroll: true })
+  }
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const updatePosition = () => {
+      const button = buttonRef.current
+      if (!button) return
+      const header = button.closest('header')
+      setPopoverTop(Math.max(button.getBoundingClientRect().bottom, header?.getBoundingClientRect().bottom ?? 0) + 8)
+    }
+    updatePosition()
+    const mobile = window.matchMedia('(width < 40rem)')
+    const restoreDesktopFocus = () => {
+      if (!mobile.matches) buttonRef.current?.focus({ preventScroll: true })
+    }
+    if (mobile.matches) closeButtonRef.current?.focus({ preventScroll: true })
+    mobile.addEventListener('change', restoreDesktopFocus)
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      mobile.removeEventListener('change', restoreDesktopFocus)
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        buttonRef.current?.focus({ preventScroll: true })
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open])
 
   useEffect(() => {
     watchNotifications()
@@ -106,9 +151,13 @@ export function NotificationBell() {
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-label="Notifications"
+        aria-expanded={open}
+        aria-controls={popoverId}
+        aria-haspopup="dialog"
         className="relative flex size-11 items-center justify-center rounded-full border border-hairline bg-white text-heading transition-colors hover:bg-panel"
       >
         <Bell aria-hidden="true" className="size-5" />
@@ -123,26 +172,40 @@ export function NotificationBell() {
         <>
           <div
             aria-hidden="true"
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 z-40"
+            onClick={closePopover}
+            className="fixed inset-0 z-40 touch-none bg-scrim/20 sm:bg-transparent"
           />
-          {/* A fixed top-20 popover used to land on top of the header, because
-              the header wraps to two rows on a phone and the bell sits far
-              lower than 80px. Below sm it is a bottom sheet instead. */}
-          <div className="fixed inset-x-0 bottom-0 z-50 max-h-[70dvh] overflow-hidden rounded-t-sheet border border-hairline bg-white shadow-xl sm:absolute sm:inset-auto sm:bottom-auto sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100dvh-7rem)] sm:w-[360px] sm:max-w-[calc(100vw-2rem)] sm:rounded-panel">
-            <div className="flex items-center justify-between border-b border-hairline px-5 py-3.5">
+          <div
+            id={popoverId}
+            role="dialog"
+            aria-label="Notifications"
+            style={{ '--notifications-top': `${popoverTop}px` } as CSSProperties}
+            className="fixed inset-x-3 top-[var(--notifications-top)] z-50 flex max-h-[min(70dvh,calc(100dvh-var(--notifications-top)-1rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-panel border border-hairline bg-white shadow-xl sm:absolute sm:inset-auto sm:bottom-auto sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100dvh-7rem)] sm:w-[360px] sm:max-w-[calc(100vw-2rem)]"
+          >
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline px-4 py-2 sm:px-5 sm:py-3.5">
               <span className="text-card text-heading">Notifications</span>
-              <button
-                type="button"
-                onClick={handleMarkAll}
-                disabled={busy || unread === 0}
-                className="text-chip text-action transition-colors hover:text-brand-4 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Mark all read
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleMarkAll}
+                  disabled={busy || unread === 0}
+                  className="min-h-11 whitespace-nowrap text-chip text-action transition-colors hover:text-brand-4 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0"
+                >
+                  Mark all read
+                </button>
+                <button
+                  ref={closeButtonRef}
+                  type="button"
+                  onClick={closePopover}
+                  aria-label="Close notifications"
+                  className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-panel hover:text-heading sm:hidden"
+                >
+                  <X className="size-5" aria-hidden="true" />
+                </button>
+              </div>
             </div>
 
-            <div className="max-h-[420px] divide-y divide-hairline overflow-y-auto">
+            <div className="min-h-0 max-h-[420px] divide-y divide-hairline overflow-y-auto overscroll-contain">
               {items === null ? (
                 <div className="flex items-center justify-center py-10">
                   <Spinner className="size-5 text-brand-4" />
@@ -169,7 +232,7 @@ export function NotificationBell() {
                       <span className="block text-copy-sm font-medium text-heading">
                         {item.title}
                       </span>
-                      <span className="mt-0.5 line-clamp-2 block text-caption text-muted">
+                      <span className="mt-0.5 line-clamp-2 text-caption text-muted">
                         {item.body}
                       </span>
                       <span className="mt-1 block text-caption text-muted">

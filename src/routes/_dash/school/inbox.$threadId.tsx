@@ -21,10 +21,12 @@ function SchoolInboxThreadPage() {
   return (
     <>
       <DashHeader title="Conversation" />
-      <main className="flex flex-1 flex-col gap-6 p-6 lg:p-8">
+      {/* Same shell contract the student thread page gives ThreadView: the page
+          is a fixed column and the transcript inside it does the scrolling. */}
+      <main className="flex min-h-0 flex-1 flex-col gap-6 p-6 lg:p-8">
         <Link
           to="/school/inbox"
-          className="flex w-fit items-center gap-2 text-copy-sm text-muted transition-colors hover:text-heading"
+          className="flex w-fit shrink-0 items-center gap-2 text-copy-sm text-muted transition-colors hover:text-heading"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           Back to inbox

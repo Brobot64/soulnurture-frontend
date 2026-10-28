@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { PanelRightOpen } from 'lucide-react'
 
 import { Flash, useFlash } from '#/components/Flash'
 import { ConsentGate, useAiConsent } from '#/components/ConsentGate'
+import { PastReflectionsDrawer, PastReflectionsSidebar } from '#/components/PastReflectionsSidebar'
 import { ProgressRow } from '#/components/ProgressRow'
 import { TextsReveal } from '#/components/TextsReveal'
 import { useSession } from '#/lib/auth'
+import { usePastReflectionsRail } from '#/lib/rail'
 import {
   MOODS,
   readMoodDraft,
@@ -40,6 +43,7 @@ function MoodCheckIn() {
   const [historyLoaded, setHistoryLoaded] = useState(false)
   // Pre-chat consent gate — the journey cannot reach the AI without it.
   const consent = useAiConsent(authStatus === 'ready' && !!user)
+  const rail = usePastReflectionsRail()
 
   useEffect(() => {
     if (authStatus !== 'ready') return
@@ -91,8 +95,20 @@ function MoodCheckIn() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col px-6 py-8 lg:max-w-[1440px] lg:px-12 lg:py-10 xl:px-[120px]">
-      <ProgressRow step={1} backTo="/welcome" />
+    <div className="relative flex w-full flex-1 flex-col lg:min-h-0 lg:flex-row">
+      {historyLoaded && <PastReflectionsDrawer entries={history} />}
+      {!rail.open && (
+        <button
+          type="button"
+          onClick={() => rail.toggle(true)}
+          aria-label="Show past reflections"
+          className="absolute right-0 top-14 z-10 hidden size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-panel hover:text-ink lg:grid"
+        >
+          <PanelRightOpen className="size-[18px]" aria-hidden="true" />
+        </button>
+      )}
+      <div className="mx-auto flex w-full min-w-0 flex-1 flex-col px-6 py-8 lg:max-w-[1440px] lg:px-12 lg:py-10 xl:px-[120px]">
+        <ProgressRow step={1} backTo="/welcome" />
 
       <div className="mt-10 lg:mt-7">
         <TextsReveal>
@@ -170,53 +186,10 @@ function MoodCheckIn() {
       </div>
 
       <Flash message={message} hiding={hiding} />
+      </div>
 
-      {historyLoaded && (
-        <section className="mt-12 lg:mt-16" aria-label="Past reflections">
-          <h2 className="text-section text-heading">Past reflections</h2>
-          <div className="mt-4 flex flex-col gap-2.5">
-            {history.length === 0 && (
-              <p className="text-copy-sm text-muted">
-                No past reflections yet — your closed conversations will show up here.
-              </p>
-            )}
-            {history.map((entry) => {
-              const when = new Date(entry.createdAt)
-              const label = Number.isNaN(when.getTime())
-                ? entry.createdAt
-                : when.toLocaleDateString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                  })
-              const body = (
-                <>
-                  <p className="text-chip font-semibold text-ink lg:text-copy">{label}</p>
-                  <p className="mt-1 line-clamp-2 text-copy-sm text-muted lg:line-clamp-3">
-                    {entry.summary?.trim() || 'Summary on its way — check back soon.'}
-                  </p>
-                </>
-              )
-              return entry.conversationId ? (
-                <Link
-                  key={entry.checkInId}
-                  to="/reflection/$conversationId"
-                  params={{ conversationId: entry.conversationId }}
-                  className="rounded-2xl border border-hairline bg-white px-3.5 py-2.5 text-left transition-colors hover:border-action/40 lg:px-4 lg:py-3"
-                >
-                  {body}
-                </Link>
-              ) : (
-                <div
-                  key={entry.checkInId}
-                  className="rounded-2xl border border-hairline bg-white px-3.5 py-2.5 lg:px-4 lg:py-3"
-                >
-                  {body}
-                </div>
-              )
-            })}
-          </div>
-        </section>
+      {historyLoaded && rail.open && (
+        <PastReflectionsSidebar entries={history} onCollapse={() => rail.toggle(false)} />
       )}
 
       {consent.state === 'required' && (

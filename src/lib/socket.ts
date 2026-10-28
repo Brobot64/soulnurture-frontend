@@ -42,6 +42,13 @@ export interface ConversationMessageUpdatedPush {
   asyncState: 'COMPLETE' | 'FAILED'
 }
 
+/** An AI check-in ended — the student completed it, or idle expiry closed it. */
+export interface ConversationClosedPush {
+  conversationId: string
+  checkInId: string | null
+  reason: 'MANUAL' | 'IDLE'
+}
+
 export interface NotificationPush {
   id: string
   type: string
@@ -61,6 +68,7 @@ export interface RealtimeEventMap {
   'chat.thread.closed': ChatThreadClosedPush
   'chat.unread.updated': ChatUnreadPush
   'conversation.message.updated': ConversationMessageUpdatedPush
+  'conversation.closed': ConversationClosedPush
   'notification.new': NotificationPush
   'notification.unread.updated': NotificationUnreadPush
 }

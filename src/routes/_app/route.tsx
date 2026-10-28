@@ -14,6 +14,9 @@ function AppLayout() {
   return (
     <div className="flex h-dvh flex-col">
       <AppHeader />
+      {/* The footer is a sibling of this scroll box, not a child: inside it,
+          the footer was part of the scrolled content and slid off screen.
+          Here the only scrollable region is the band between header and footer. */}
       <main
         id="main-content"
         tabIndex={-1}
@@ -23,8 +26,8 @@ function AppLayout() {
         className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto outline-none"
       >
         <Outlet />
-        <AppFooter />
       </main>
+      <AppFooter />
     </div>
   )
 }
