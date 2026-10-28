@@ -12,3 +12,6 @@ dist-ssr
 .vercel
 __unconfig*
 todos.json
+.probe/shots/
+.probe/*edge-*/
+.probe/*.log
