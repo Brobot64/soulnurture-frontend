@@ -14,10 +14,20 @@ function AppLayout() {
   return (
     <div className="flex h-dvh flex-col">
       <AppHeader />
-      <main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col overflow-y-auto outline-none">
+      {/* The footer is a sibling of this scroll box, not a child: inside it,
+          the footer was part of the scrolled content and slid off screen.
+          Here the only scrollable region is the band between header and footer. */}
+      <main
+        id="main-content"
+        tabIndex={-1}
+        // overflow-x-hidden: overflow-y:auto alone turns this box into a
+        // horizontal scroller too, so one wide descendant slid the entire
+        // student app — header included — sideways.
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto outline-none"
+      >
         <Outlet />
-        <AppFooter />
       </main>
+      <AppFooter />
     </div>
   )
 }

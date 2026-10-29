@@ -149,8 +149,36 @@ function AdminUsersPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-left">
+            <>
+              <ul className="flex flex-col divide-y divide-hairline md:hidden">
+                {items.map((row) => (
+                  // No horizontal padding: the Card already insets its content by
+                  // p-6, and padding here stacked into a 44px gutter that pushed
+                  // the role and verification tags onto separate lines on a phone.
+                  <li key={row.id} className="flex items-start gap-3 py-3.5">
+                    <AvatarInitials name={row.name} className="size-9" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-card text-heading">{row.name}</p>
+                      <p className="truncate text-caption text-muted">{row.email}</p>
+                      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <Tag tone="neutral">{roleLabel(row.role)}</Tag>
+                        {row.emailVerified ? (
+                          <Tag tone="success">Verified</Tag>
+                        ) : (
+                          <Tag tone="info">Unverified</Tag>
+                        )}
+                      </p>
+                      <p className="mt-1 truncate text-caption text-muted">
+                        {row.school ? `${row.school.name} · ${row.school.shortCode}` : 'No school'}
+                        {' · '}
+                        {timeAgo(row.createdAt)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[720px] border-collapse text-left">
                 <thead>
                   <tr className="border-b border-hairline text-meta uppercase tracking-wider text-muted">
                     <th className="py-3 pl-6 pr-4 font-semibold">User</th>
@@ -207,7 +235,8 @@ function AdminUsersPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </Card>
 

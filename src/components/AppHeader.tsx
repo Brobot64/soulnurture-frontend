@@ -76,7 +76,7 @@ export function AppHeader() {
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-pill focus:bg-action focus:px-5 focus:py-3 focus:text-white">
         Skip to content
       </a>
-      <div className="mx-auto flex min-h-18 w-full max-w-[1440px] items-center justify-between gap-3 px-5 py-3 lg:min-h-[106px] lg:gap-6 lg:px-12 xl:px-20">
+      <div className="mx-auto flex min-h-14 w-full max-w-[1440px] items-center justify-between gap-3 px-5 py-2 lg:min-h-[68px] lg:gap-6 lg:px-12 xl:px-20">
         <Link to={home} activeOptions={{ exact: true }} aria-label="Soul Nurture AI home" className="flex shrink-0 items-center gap-2.5">
           <img src={logo} alt="" className="size-9 rounded-full lg:size-10" />
           <span className="hidden text-card font-bold tracking-tight text-heading min-[400px]:inline lg:text-wordmark">Soul Nurture AI</span>

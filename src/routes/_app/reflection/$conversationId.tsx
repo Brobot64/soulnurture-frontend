@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowRight, ChevronDown, ChevronRight, Loader2, Mic, RefreshCw, Square, UserRound, X } from 'lucide-react'
+import { ArrowRight, Check, ChevronRight, Loader2, Mic, RefreshCw, Square, UserRound, X } from 'lucide-react'
 
 import { BoundaryNotice } from '#/components/BoundaryNotice'
 import { CheckInSummary } from '#/components/CheckInSummary'
 import { ConsentGate, useAiConsent } from '#/components/ConsentGate'
 import { Flash, useFlash } from '#/components/Flash'
+import {
+  PastReflectionsDrawer,
+  PastReflectionsList,
+} from '#/components/PastReflectionsSidebar'
 import { ProgressRow } from '#/components/ProgressRow'
 import { ReportResponseButton } from '#/components/ReportResponseButton'
 import { Reveal } from '#/components/Reveal'
@@ -58,10 +62,6 @@ const LOAD_STATES = ['Opening your check-in', 'Finding where you left off'] as c
 /** Voice notes stop automatically at this length. */
 const VOICE_MAX_SECONDS = 120
 
-/** Mirrors the backend guided budget: 3 free-text turns (5 once "Tell you more" was used), hard-capped at 5 total turns — quick-reply taps count toward the cap. */
-const BASE_TURN_BUDGET = 3
-const EXTENDED_TURN_BUDGET = 5
-
 /** Poll while any assistant is PENDING_AI; terminal content always comes from the server. */
 const POLL_INTERVAL_MS = 4000
 const POLL_MAX_MS = 90_000
@@ -86,6 +86,10 @@ function Reflection() {
   const [checkIn, setCheckIn] = useState<CheckIn | null>(null)
   const [checkInId, setCheckInId] = useState<string | null>(null)
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('ACTIVE')
+  /** Why this conversation ended: idle expiry gets its own copy, a close from
+   * another device (or a 409 on send) stays generic. */
+  const [endedByExpiry, setEndedByExpiry] = useState(false)
+  const [confirmComplete, setConfirmComplete] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -98,7 +102,7 @@ function Reflection() {
   const [voiceElapsed, setVoiceElapsed] = useState(0)
   const [voiceReady, setVoiceReady] = useState(false)
   const [history, setHistory] = useState<CheckInHistoryEntry[]>([])
-  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const reportScope = `${user?.id}:${conversationId}`
   const [receipts, setReceipts] = useState<{ scope: string; ids: Set<string>; failed: boolean } | null>(null)
 
@@ -122,6 +126,7 @@ function Reflection() {
   // Only messages added this session stream word by word; restored ones render settled.
   const streamIds = useRef<Set<string>>(new Set())
   const recorderRef = useRef<VoiceRecorder | null>(null)
+  const confirmDialogRef = useRef<HTMLDialogElement>(null)
   // Timers and microphone permission prompts must see the latest consent state.
   const consentStateRef = useRef(consentState)
   consentStateRef.current = consentState
@@ -246,13 +251,27 @@ function Reflection() {
     const unsubscribe = onRealtimeEvent('conversation.message.updated', (push) => {
       if (push.conversationId === conversationId) void refresh()
     })
+    // The server owns when a check-in ends (idle expiry, or a close on another
+    // device), so the end arrives as a push: it is what takes the composer
+    // away mid-session — there is no client-side turn count to do it.
+    const unsubscribeClosed = onRealtimeEvent('conversation.closed', (push) => {
+      if (push.conversationId !== conversationId || !isCurrent()) return
+      setEndedByExpiry(push.reason === 'IDLE')
+      setConversationStatus('CLOSED')
+      if (push.reason === 'IDLE') {
+        flash('Your reflection timed out — your words are saved. Finish with a quick mood check.')
+      }
+    })
     setLoadFailed(false)
     setLoading(true)
     setThinking(false)
 
     fetchCheckInHistory()
       .then((result) => {
-        if (isCurrent()) setHistory(result.items)
+        if (isCurrent()) {
+          setHistory(result.items)
+          setHistoryLoaded(true)
+        }
       })
       .catch(() => {
         // the history sidebar is optional — the chat works without it
@@ -354,6 +373,7 @@ function Reflection() {
       cancelled = true
       stopPolling()
       unsubscribe()
+      unsubscribeClosed()
       if (syncRef.current === sync) syncRef.current = null
     }
   }, [authStatus, user, conversationId, navigate, flash, attempt, consentState])
@@ -362,6 +382,16 @@ function Reflection() {
     const el = scrollRef.current
     el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, thinking])
+
+  // Native <dialog>: showModal() gives the backdrop, focus trap and Esc for
+  // free; the closed element stays mounted, so anything querying the page must
+  // scope around it.
+  useEffect(() => {
+    const dialog = confirmDialogRef.current
+    if (!dialog) return
+    if (confirmComplete) dialog.showModal()
+    else dialog.close()
+  }, [confirmComplete])
 
   // Restored placeholders and new sends use the same state-driven polling path.
   useEffect(() => {
@@ -388,22 +418,15 @@ function Reflection() {
     setVoiceElapsed(0)
   }, [consentState])
 
-  const freeTextTurns = messages.filter(
-    (entry) => entry.role === 'USER' && !entry.quickReply,
-  ).length
-  const totalTurns = messages.filter((entry) => entry.role === 'USER').length
-  const hadTellMore = messages.some((entry) => entry.quickReply === 'TELL_MORE')
-  const turnBudget = hadTellMore ? EXTENDED_TURN_BUDGET : BASE_TURN_BUDGET
+  // A check-in has no turn cap: it runs until the student completes it or the
+  // server's idle expiry closes it. `readOnly` — the conversation's own status
+  // — is therefore the only thing that can take the composer away.
   const readOnly = conversationStatus !== 'ACTIVE'
-  const done =
-    readOnly ||
-    (!thinking &&
-      (totalTurns >= EXTENDED_TURN_BUDGET || freeTextTurns >= turnBudget))
   const last = messages[messages.length - 1]
 
   const send = async (raw: string, quickReply?: QuickReplyValue, viaVoice = false) => {
     const content = raw.trim()
-    if (!content || thinking || done || consentStateRef.current !== 'accepted') return
+    if (!content || thinking || readOnly || consentStateRef.current !== 'accepted') return
     const sync = syncRef.current
     if (sync?.conversationId !== conversationId || !sync.beginSend()) return
     setInput('')
@@ -475,7 +498,7 @@ function Reflection() {
   }
 
   const startRecording = async () => {
-    if (voiceState !== 'idle' || thinking || done || consentStateRef.current !== 'accepted') return
+    if (voiceState !== 'idle' || thinking || readOnly || consentStateRef.current !== 'accepted') return
     setComposerError(null)
     let recorder: VoiceRecorder
     try {
@@ -559,9 +582,11 @@ function Reflection() {
 
   const handleContinue = async () => {
     if (closing || consentStateRef.current !== 'accepted') return
+    setConfirmComplete(false)
     setClosing(true)
     try {
       await closeConversation(conversationId)
+      setConversationStatus('CLOSED')
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 401) {
         navigate({
@@ -585,59 +610,6 @@ function Reflection() {
     }
   }
 
-  // Shared by the mobile accordion and the desktop sidebar — closed
-  // conversations only, each opening read-only in the chat.
-  const historyList = (
-    <div className="flex flex-col gap-2.5">
-      {history.length === 0 && (
-        <p className="text-copy-sm text-muted">
-          No past reflections yet — your closed conversations will show up here.
-        </p>
-      )}
-      {history.map((entry) => {
-        const when = new Date(entry.createdAt)
-        const label = Number.isNaN(when.getTime())
-          ? entry.createdAt
-          : when.toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })
-        const body = (
-          <>
-            <p className="text-chip font-semibold text-ink lg:text-copy">{label}</p>
-            <p className="mt-1 line-clamp-2 text-copy-sm text-muted lg:line-clamp-3">
-              {entry.summary?.trim() || 'Summary on its way — check back soon.'}
-            </p>
-          </>
-        )
-        const targetId = entry.conversationId
-        return targetId ? (
-          <button
-            key={entry.checkInId}
-            type="button"
-            onClick={() =>
-              navigate({
-                to: '/reflection/$conversationId',
-                params: { conversationId: targetId },
-              })
-            }
-            className="rounded-2xl border border-hairline bg-white px-3.5 py-2.5 text-left transition-colors hover:border-action/40 lg:px-4 lg:py-3"
-          >
-            {body}
-          </button>
-        ) : (
-          <div
-            key={entry.checkInId}
-            className="rounded-2xl border border-hairline bg-white px-3.5 py-2.5 lg:px-4 lg:py-3"
-          >
-            {body}
-          </div>
-        )
-      })}
-    </div>
-  )
-
   if (authStatus !== 'ready' || !user) {
     return (
       <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-4 py-4 lg:max-w-[1440px] lg:px-12 lg:py-10 xl:px-[120px]">
@@ -647,35 +619,46 @@ function Reflection() {
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col px-4 py-4 lg:max-w-[1440px] lg:px-12 lg:py-10 xl:px-[120px]">
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row lg:gap-12">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1120px] flex-col overflow-hidden px-4 py-3 lg:max-w-[1440px] lg:px-12 lg:py-4 xl:px-[120px]">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row lg:gap-8">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <ProgressRow step={2} backTo="/check-in/why" />
-          {/* Mobile past-reflections accordion — desktop renders the sidebar in the aside. */}
-          <div className="mb-2.5 mt-3 shrink-0 lg:hidden">
-            <button
-              type="button"
-              onClick={() => setHistoryOpen((open) => !open)}
-              className="inline-flex h-[40px] w-full items-center justify-between rounded-pill border border-hairline bg-white px-4 text-chip text-ink transition-colors hover:border-action/40"
-            >
-              Past reflections
-              <ChevronDown
-                className={`size-4 transition-transform ${historyOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-            {historyOpen && (
-              <div className="mt-2 max-h-[240px] overflow-y-auto rounded-panel border border-hairline bg-white p-2.5">
-                {historyList}
-              </div>
+          <div className="flex shrink-0 items-center gap-3 lg:gap-4">
+            <div className="min-w-0 flex-1">
+              <ProgressRow step={2} backTo="/check-in/why" />
+            </div>
+            {/* The only way to end a check-in on purpose: no cap, no wrap-up
+                  turn, just this and the server's idle expiry. */}
+            {!readOnly && !loading && !loadFailed && (
+              <button
+                type="button"
+                onClick={() => setConfirmComplete(true)}
+                disabled={closing}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-pill border border-hairline bg-white px-3.5 text-chip font-medium text-action transition-colors hover:border-action/40 hover:bg-panel disabled:opacity-50 lg:h-10 lg:px-4"
+              >
+                {closing ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Check className="size-4" aria-hidden="true" />
+                )}
+                Complete
+              </button>
             )}
           </div>
+          {/* Past reflections live in the same right-side drawer the check-in
+              uses — an in-page accordion pushed the chat down on phones. */}
+          {historyLoaded && (
+            <PastReflectionsDrawer
+              activeConversationId={conversationId}
+              entries={history}
+            />
+          )}
 
-          <p className="mx-auto flex w-fit shrink-0 items-center gap-2 rounded-pill bg-peach px-4 py-1.5 text-caption text-peach-ink lg:mt-5 lg:gap-2.5 lg:px-5 lg:py-2 lg:text-chip">
+          <p className="mx-auto flex w-fit shrink-0 items-center gap-2 rounded-pill bg-peach px-4 py-1.5 text-caption text-peach-ink lg:mt-3 lg:gap-2.5 lg:px-5 lg:py-1.5 lg:text-chip">
             <span className="size-1.5 rounded-full bg-accent lg:size-2" aria-hidden="true" />
             AI-guided reflection · not a therapist or doctor
           </p>
 
-          <div ref={scrollRef} role="log" className="mt-3 min-h-0 flex-1 overflow-y-auto lg:mt-6">
+          <div ref={scrollRef} role="log" className="mt-2 min-h-0 flex-1 overflow-y-auto lg:mt-3">
             <div className="flex flex-col gap-5 pb-4 lg:gap-7">
               {loading && (
                 <div className="flex items-start gap-3">
@@ -784,7 +767,7 @@ function Reflection() {
               {!loading &&
                 !loadFailed &&
                 !thinking &&
-                !done &&
+                !readOnly &&
                 voiceState === 'idle' &&
                 last?.role === 'ASSISTANT' && (
                 <div className="pl-11 lg:pl-0">
@@ -831,9 +814,9 @@ function Reflection() {
             </div>
           </div>
 
-          <div className="mt-3 shrink-0 lg:mt-4">
+          <div className="mt-2 shrink-0 lg:mt-3">
             {recommendation?.show && (
-              <div className="mb-4 rounded-panel bg-peach px-5 py-4 lg:px-6 lg:py-5">
+              <div className="mb-3 rounded-panel bg-peach px-5 py-4 lg:px-6 lg:py-4">
                 <p className="text-copy text-peach-ink">
                   {recommendation.message ??
                     'It might help to talk with someone at your school.'}
@@ -853,40 +836,33 @@ function Reflection() {
               </div>
             )}
 
-            {!loading && !loadFailed && done && !readOnly && (
-              <div className="flex flex-col items-center gap-3 py-3 lg:gap-4 lg:py-4">
-                <button
-                  type="button"
-                  onClick={() => void handleContinue()}
-                  disabled={closing || consentState !== 'accepted'}
-                  className="inline-flex h-[46px] items-center justify-center whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 disabled:opacity-50 lg:h-[52px] lg:px-10 lg:text-button"
-                >
-                  {closing ? 'Finishing…' : 'Continue'}
-                </button>
-                <Link
-                  to="/support"
-                  className="text-button-sm text-action transition-colors hover:text-brand-4"
-                >
-                  Or talk to a person
-                </Link>
-              </div>
-            )}
-
             {!loading && !loadFailed && readOnly && (
-              <div className="flex flex-col items-center gap-3 py-3 lg:gap-4 lg:py-4">
+              <div className="flex flex-col items-center gap-2.5 py-1.5 lg:gap-3 lg:py-2">
                 <p className="text-center text-copy text-muted">
-                  This conversation has ended — you can read it back any time.
+                  {endedByExpiry
+                    ? 'This reflection timed out after a quiet few minutes — what you wrote is saved and you can read it back any time.'
+                    : 'This conversation has ended — you can read it back any time.'}
                 </p>
-                <Link
-                  to="/check-in"
-                  className="inline-flex h-[46px] items-center justify-center whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 lg:h-[52px] lg:px-10 lg:text-button"
-                >
-                  Start a new check-in
-                </Link>
+                {checkInId ? (
+                  <Link
+                    to="/complete/$checkInId"
+                    params={{ checkInId }}
+                    className="inline-flex h-[46px] items-center justify-center whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 lg:h-[52px] lg:px-10 lg:text-button"
+                  >
+                    How are you feeling now?
+                  </Link>
+                ) : (
+                  <Link
+                    to="/check-in"
+                    className="inline-flex h-[46px] items-center justify-center whitespace-nowrap rounded-pill bg-action px-8 text-button-sm text-white transition-colors hover:bg-brand-4 lg:h-[52px] lg:px-10 lg:text-button"
+                  >
+                    Start a new check-in
+                  </Link>
+                )}
               </div>
             )}
 
-            {!loading && !loadFailed && !done && voiceState === 'recording' && (
+            {!loading && !loadFailed && !readOnly && voiceState === 'recording' && (
               <div className="flex h-[48px] items-center gap-3 rounded-pill border-[1.5px] border-accent bg-white pl-5 pr-2 lg:h-[60px] lg:pl-7 lg:pr-2.5">
                 <span className="relative grid size-3 shrink-0 place-items-center" aria-hidden="true">
                   <span className="absolute size-3 animate-ping rounded-full bg-accent opacity-60" />
@@ -918,7 +894,7 @@ function Reflection() {
               </div>
             )}
 
-            {!loading && !loadFailed && !done && voiceState !== 'recording' && (
+            {!loading && !loadFailed && !readOnly && voiceState !== 'recording' && (
               <form
                 onSubmit={(event) => {
                   event.preventDefault()
@@ -969,18 +945,18 @@ function Reflection() {
               </form>
             )}
 
-            <p className="mt-2 text-center text-caption text-muted lg:mt-5">
+            <p className="mt-1.5 text-center text-caption text-muted lg:mt-2.5">
               Reflection prompts only. Not medical advice or therapy.
             </p>
           </div>
         </div>
 
-        <aside className="hidden w-[320px] shrink-0 lg:block xl:w-[360px]">
-          <h2 className="text-section text-heading">Your check-in</h2>
-          {checkIn && <CheckInSummary checkIn={checkIn} circle className="mt-8" />}
+        <aside className="hidden w-[320px] shrink-0 flex-col lg:flex xl:w-[360px]">
+          <h2 className="shrink-0 text-section text-heading">Your check-in</h2>
+          {checkIn && <CheckInSummary checkIn={checkIn} circle className="mt-5 shrink-0" />}
           <Link
             to="/support"
-            className="mt-10 flex w-full items-center gap-3.5 rounded-card border border-accent bg-peach p-4 text-left transition-colors hover:bg-blush/70"
+            className="mt-6 flex w-full shrink-0 items-center gap-3.5 rounded-card border border-accent bg-peach p-4 text-left transition-colors hover:bg-blush/70"
           >
             <span className="grid size-[52px] shrink-0 place-items-center rounded-full bg-counsellor text-white">
               <UserRound className="size-6" />
@@ -995,9 +971,15 @@ function Reflection() {
             </span>
             <ChevronRight className="size-5 shrink-0 text-peach-ink/70" />
           </Link>
-          <div className="mt-10">
-            <h3 className="text-section text-heading">Past reflections</h3>
-            <div className="mt-4 max-h-[340px] overflow-y-auto pr-1">{historyList}</div>
+          <div className="mt-6 flex min-h-0 flex-1 flex-col">
+            <h3 className="shrink-0 text-section text-heading">Past reflections</h3>
+            <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+              <PastReflectionsList
+                activeConversationId={conversationId}
+                dense
+                entries={history}
+              />
+            </div>
           </div>
         </aside>
       </div>
@@ -1008,6 +990,43 @@ function Reflection() {
           onDeclined={() => navigate({ to: '/welcome', replace: true })}
         />
       )}
+
+      <dialog
+        ref={confirmDialogRef}
+        aria-labelledby="complete-check-in-title"
+        onCancel={() => setConfirmComplete(false)}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) setConfirmComplete(false)
+        }}
+        className="m-auto w-[min(420px,calc(100%_-_32px))] rounded-panel border border-hairline bg-white p-6 text-body backdrop:bg-scrim/40"
+      >
+        <h2 id="complete-check-in-title" className="text-section text-heading">
+          Complete this reflection?
+        </h2>
+        <p className="mt-2 text-copy-sm text-muted">
+          The chat with the reflection guide ends. You can read it back any
+          time, but you can't add messages to it — we'll ask how you're feeling
+          now.
+        </p>
+        <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={() => setConfirmComplete(false)}
+            className="inline-flex h-11 items-center justify-center rounded-pill bg-surface px-6 text-button-sm text-ink transition-colors hover:bg-neutral-10"
+          >
+            Keep talking
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleContinue()}
+            disabled={closing || consentState !== 'accepted'}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-pill bg-action px-6 text-button-sm text-white transition-colors hover:bg-brand-4 disabled:opacity-50"
+          >
+            {closing && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+            {closing ? 'Finishing…' : 'Complete reflection'}
+          </button>
+        </div>
+      </dialog>
 
       <Flash message={flashMessage} hiding={hiding} />
     </div>

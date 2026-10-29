@@ -55,59 +55,82 @@ export function SchoolsTable({
     )
   }
 
+  const menuItems = (school: SchoolRow): RowMenuItem[] => [
+    {
+      label: 'Open school',
+      icon: ExternalLink,
+      onSelect: () => {
+        void navigate({
+          to: '/admin/schools/$id',
+          params: { id: school.id },
+        })
+      },
+    },
+    { label: 'Rename', icon: Pencil, onSelect: () => actions.onRename(school) },
+    { label: 'Add school admin', icon: UserPlus, onSelect: () => actions.onAddAdmin(school) },
+    school.status === 'SUSPENDED'
+      ? { label: 'Reactivate', icon: Play, onSelect: () => actions.onToggleStatus(school) }
+      : {
+          label: 'Suspend',
+          icon: Pause,
+          tone: 'danger' as const,
+          onSelect: () => actions.onToggleStatus(school),
+        },
+  ]
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-left">
-        <thead>
-          <tr className="border-b border-hairline text-meta uppercase tracking-wider text-muted">
-            <th className="py-3 pr-4 font-semibold">School</th>
-            <th className="py-3 pr-4 font-semibold">Students</th>
-            <th className="py-3 pr-4 font-semibold">Staff</th>
-            <th className="py-3 pr-4 font-semibold">Pending chats</th>
-            <th className="py-3 pr-4 font-semibold">Last activity</th>
-            <th className="py-3 pr-4 font-semibold">Status</th>
-            <th className="py-3 pl-2 font-semibold">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-hairline">
-          {schools.map((school) => {
-            const menuItems: RowMenuItem[] = [
-              {
-                label: 'Open school',
-                icon: ExternalLink,
-                onSelect: () => {
-                  void navigate({
-                    to: '/admin/schools/$id',
-                    params: { id: school.id },
-                  })
-                },
-              },
-              {
-                label: 'Rename',
-                icon: Pencil,
-                onSelect: () => actions.onRename(school),
-              },
-              {
-                label: 'Add school admin',
-                icon: UserPlus,
-                onSelect: () => actions.onAddAdmin(school),
-              },
-              school.status === 'SUSPENDED'
-                ? {
-                    label: 'Reactivate',
-                    icon: Play,
-                    onSelect: () => actions.onToggleStatus(school),
-                  }
-                : {
-                    label: 'Suspend',
-                    icon: Pause,
-                    tone: 'danger' as const,
-                    onSelect: () => actions.onToggleStatus(school),
-                  },
-            ]
-            return (
+    <>
+      {/* Phone: one card per school. A 760px table in a 294px card is a
+          scrollbar inside a scrollbar, which is what this replaced. */}
+      <ul className="flex flex-col divide-y divide-hairline md:hidden">
+        {schools.map((school) => (
+          <li key={school.id} className="flex items-start gap-2 py-3 first:pt-0 last:pb-0">
+            <div className="min-w-0 flex-1">
+              <Link
+                to="/admin/schools/$id"
+                params={{ id: school.id }}
+                className="block truncate text-card text-heading transition-colors hover:text-action"
+              >
+                {school.name}
+              </Link>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                {school.status === 'ACTIVE' ? (
+                  <Tag tone="success">Active</Tag>
+                ) : (
+                  <Tag tone="danger">Suspended</Tag>
+                )}
+                {school.pendingChats > 0 && (
+                  <Tag tone="accent">{formatNumber(school.pendingChats)} pending</Tag>
+                )}
+              </p>
+              <p className="mt-1.5 truncate text-caption text-muted">
+                {formatNumber(school.students)} students ·{' '}
+                {formatNumber(school.professionals)} staff ·{' '}
+                {school.lastActivityAt ? timeAgo(school.lastActivityAt) : 'no activity'}
+              </p>
+            </div>
+            <RowMenu label={`Actions for ${school.name}`} items={menuItems(school)} />
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[760px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-hairline text-meta uppercase tracking-wider text-muted">
+              <th className="py-3 pr-4 font-semibold">School</th>
+              <th className="py-3 pr-4 font-semibold">Students</th>
+              <th className="py-3 pr-4 font-semibold">Staff</th>
+              <th className="py-3 pr-4 font-semibold">Pending chats</th>
+              <th className="py-3 pr-4 font-semibold">Last activity</th>
+              <th className="py-3 pr-4 font-semibold">Status</th>
+              <th className="py-3 pl-2 font-semibold">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-hairline">
+            {schools.map((school) => (
               <tr key={school.id} className="align-middle text-copy-sm">
                 <td className="py-3.5 pr-4">
                   <Link
@@ -147,16 +170,13 @@ export function SchoolsTable({
                   )}
                 </td>
                 <td className="py-3.5 pl-2 text-right">
-                  <RowMenu
-                    label={`Actions for ${school.name}`}
-                    items={menuItems}
-                  />
+                  <RowMenu label={`Actions for ${school.name}`} items={menuItems(school)} />
                 </td>
               </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }

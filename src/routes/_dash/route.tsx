@@ -50,7 +50,10 @@ function DashLayout() {
   return (
     <div className="flex h-dvh flex-col-reverse lg:flex-row">
       <RailNav />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-page">
+      {/* overflow-x-hidden is the hard guarantee the rail never slides off:
+          one wide descendant used to widen the whole page and drag the bottom
+          nav sideways with it. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-page">
         <Outlet />
       </div>
     </div>

@@ -182,7 +182,11 @@ function PoolRow({
   const originalMessage = thread.messages?.find((message) => message.role === 'STUDENT')
 
   return (
-    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+    // Padding lives on the row, not the li, so the whole band is clickable.
+    // `first:pt-0 last:pb-0` cannot be added back here: each row is the only
+    // child of its li, so both variants matched every row and the list
+    // rendered with zero vertical padding against its own dividers.
+    <div className="flex items-start gap-3 py-4">
       <AvatarInitials name={name} className="size-10 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-card text-heading">{name}</p>
@@ -229,7 +233,7 @@ function ConversationRow({
     <Link
       to="/school/inbox/$threadId"
       params={{ threadId: thread.id }}
-      className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+      className="flex items-center gap-4 py-4"
     >
       <AvatarInitials name={name} className="size-10 shrink-0" />
       <div className="min-w-0 flex-1">
