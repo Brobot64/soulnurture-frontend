@@ -7,7 +7,6 @@ import { ResourceCard, ResourceSupport, ResourceToolboxNotice } from '#/componen
 import { useApiQuery } from '#/lib/dash'
 import {
   RESOURCE_CATEGORIES,
-  RESOURCE_TYPES,
   fetchResources,
   useResourceAuthError,
   useResourceStudent,
@@ -55,7 +54,7 @@ function StudentResources() {
     event.preventDefault()
     updateFilters({ search: draft })
   }
-  const hasFilters = !!(filters.category || filters.type || filters.search)
+  const hasFilters = !!(filters.category || filters.search)
 
   return (
     <div className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-5 py-8 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:content-start lg:gap-x-12 lg:px-12 lg:py-12 xl:px-[120px]">
@@ -156,23 +155,11 @@ function StudentResources() {
               <Button type="submit" className="h-12 shrink-0 px-5">Search</Button>
             </div>
           </form>
-          <label htmlFor="resource-type" className="flex flex-col gap-2 text-chip font-medium text-heading md:w-[230px]">
-            Resource type
-            <select
-              id="resource-type"
-              value={filters.type ?? ''}
-              onChange={(event) => updateFilters({ type: event.target.value })}
-              className="h-12 w-full rounded-pill border border-hairline bg-white px-4 text-copy-sm text-heading"
-            >
-              <option value="">All types</option>
-              {Object.entries(RESOURCE_TYPES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
         </div>
         {hasFilters && (
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
             {filters.search && <p className="break-words text-copy-sm text-body">Results for “{filters.search}”</p>}
-            <button type="button" onClick={() => updateFilters({ category: undefined, type: undefined, search: undefined })} className="min-h-11 rounded-pill text-button-sm text-action underline underline-offset-4">
+            <button type="button" onClick={() => updateFilters({ category: undefined, search: undefined })} className="min-h-11 rounded-pill text-button-sm text-action underline underline-offset-4">
               Clear filters
             </button>
           </div>
@@ -199,7 +186,7 @@ function ResourceResults({ filters, toolbox }: { filters: ResourceSearch; toolbo
     return <p role="status" className="mt-5 rounded-panel border border-hairline bg-panel px-6 py-12 text-copy text-body">Loading resources…</p>
   }
   const items = query.data.items
-  const filtered = !!(filters.search || filters.category || filters.type)
+  const filtered = !!(filters.search || filters.category)
   return (
     <div className="mt-5" aria-busy={query.loading}>
       <p role="status" className="mb-4 text-chip text-body">

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 
 import { Button, ErrorNote } from '#/components/dash/ui'
-import { ResourceCard, ResourceSupport, ResourceToolboxNotice } from '#/components/ResourceCard'
+import { ResourceCard, ResourceNextStep, ResourceSupport, ResourceToolboxNotice } from '#/components/ResourceCard'
 import { useApiQuery } from '#/lib/dash'
 import {
   RESOURCE_CATEGORIES,
@@ -71,6 +71,7 @@ function StudentResourceDetail({ resourceId }: { resourceId: string }) {
             <>
               {catalogue.loading && <p role="status" className="mb-3 text-chip text-body">Refreshing resource…</p>}
               <ResourceCard resource={resource} toolbox={toolbox} search={search} detail />
+              <ResourceNextStep resource={resource} />
             </>
           )}
         </div>

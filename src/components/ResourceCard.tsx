@@ -1,4 +1,5 @@
-import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
+import { Link, useNavigate } from '@tanstack/react-router'
 import {
   ArrowUpRight,
   BookOpen,
@@ -19,10 +20,14 @@ import {
 import { Button, ErrorNote } from '#/components/dash/ui'
 import {
   RESOURCE_CATEGORIES,
+  RESOURCE_FEEDBACK_OPTIONS,
   RESOURCE_TYPES,
   resourceDuration,
+  resourceSteps,
   safeResourceUrl,
+  submitResourceFeedback,
   type Resource,
+  type ResourceFeedbackChoice,
   type ResourceSearch,
   type ResourceToolbox,
   type ResourceType,
@@ -52,6 +57,7 @@ export function ResourceCard({
 }) {
   const Icon = TYPE_ICONS[resource.type] ?? BookOpen
   const duration = resourceDuration(resource)
+  const steps = resourceSteps(resource)
   const saved = toolbox.savedIds.has(resource.id)
   const saving = toolbox.savingId === resource.id
   const error = toolbox.saveError?.resourceId === resource.id ? toolbox.saveError.error : null
@@ -119,6 +125,40 @@ export function ResourceCard({
             </li>
           ))}
         </ul>
+      )}
+
+      {detail && resource.intendedSituation?.trim() && (
+        <section className="mt-8">
+          <h2 className="text-card text-heading">When this might help</h2>
+          <p className="mt-3 break-words whitespace-pre-line text-copy text-body">{resource.intendedSituation}</p>
+        </section>
+      )}
+      {detail && steps.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-card text-heading">How to try it</h2>
+          <ol className="mt-4 space-y-3">
+            {steps.map((step, index) => (
+              <li key={`${resource.id}-step-${index}`} className="flex gap-3">
+                <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-panel text-chip font-semibold text-action">
+                  {index + 1}
+                </span>
+                <span className="break-words whitespace-pre-line text-copy text-body">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+      {detail && resource.reflectionPrompt?.trim() && (
+        <section className="mt-8">
+          <h2 className="text-card text-heading">Afterwards</h2>
+          <p className="mt-3 break-words whitespace-pre-line text-copy text-body">{resource.reflectionPrompt}</p>
+        </section>
+      )}
+      {detail && resource.safetyNote?.trim() && (
+        <section className="mt-8 rounded-card border border-hairline bg-panel p-5">
+          <h2 className="text-card text-heading">Good to know</h2>
+          <p className="mt-3 break-words whitespace-pre-line text-copy-sm text-body">{resource.safetyNote}</p>
+        </section>
       )}
 
       {detail && (
@@ -189,6 +229,89 @@ export function ResourceToolboxNotice({ toolbox }: { toolbox: ResourceToolbox })
       <Button variant="ghost" className="mt-3" onClick={toolbox.reload}>
         <RefreshCw aria-hidden="true" className="size-4" /> Retry toolbox
       </Button>
+    </section>
+  )
+}
+
+/**
+ * Doc B §5 "what next?" block. A refusal or a "not helpful" is stored as an
+ * answer to this prompt only and never becomes a safeguarding signal (Doc C
+ * §5.1), which is why nothing here reaches a support or flagging endpoint.
+ */
+export function ResourceNextStep({ resource }: { resource: Resource }) {
+  const navigate = useNavigate()
+  const [answer, setAnswer] = useState<ResourceFeedbackChoice | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  const respond = async (choice: ResourceFeedbackChoice) => {
+    if (busy) return
+    setBusy(true)
+    setFailed(false)
+    const recorded = await submitResourceFeedback(resource.id, choice)
+      .then(() => true)
+      .catch(() => false)
+    setBusy(false)
+    // Leaving this page must never depend on a bookkeeping write succeeding.
+    if (choice === 'WANT_TO_TALK') {
+      void navigate({ to: '/support' })
+      return
+    }
+    if (choice === 'TRY_SOMETHING_ELSE') {
+      void navigate({ to: '/resources', search: { category: resource.category } })
+      return
+    }
+    if (choice === 'DECLINED' || recorded) {
+      setAnswer(choice)
+      return
+    }
+    setFailed(true)
+  }
+
+  if (answer === 'DECLINED') return null
+
+  return (
+    <section className="mt-6 rounded-panel border border-hairline bg-white p-6" aria-labelledby="resource-next-step-heading">
+      <h2 id="resource-next-step-heading" className="text-card text-heading">
+        {answer === 'NOT_HELPFUL' ? 'Thanks for telling us' : 'What next?'}
+      </h2>
+      {answer === 'NOT_HELPFUL' ? (
+        <p className="mt-3 text-copy-sm text-body">
+          That is noted. You can browse another resource or talk to someone at your school.
+        </p>
+      ) : (
+        <>
+          <p className="mt-2 text-copy-sm text-body">
+            Pick any answer, or none. This only shapes what we show you here.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {RESOURCE_FEEDBACK_OPTIONS.map((option) => (
+              <button
+                key={option.choice}
+                type="button"
+                disabled={busy}
+                onClick={() => void respond(option.choice)}
+                className="min-h-11 rounded-pill border border-hairline px-4 py-2 text-chip text-action transition-colors hover:bg-panel disabled:cursor-default disabled:text-muted"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {failed && (
+            <ErrorNote className="mt-4">
+              We could not record your answer. Your choice still works here — try again if you want us to remember it.
+            </ErrorNote>
+          )}
+        </>
+      )}
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Link to="/resources" search={{}} className="inline-flex min-h-11 items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4">
+          Browse other resources <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
+        <Link to="/support" className="inline-flex min-h-11 items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4">
+          Talk to someone <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
+      </div>
     </section>
   )
 }
