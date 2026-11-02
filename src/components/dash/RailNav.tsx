@@ -19,7 +19,12 @@ import {
 
 import logoUrl from '#/assets/soul-nurture-logo.png'
 import { isChatStaff, useSession } from '#/lib/auth'
-import { refreshChatPool, useChatPoolCount, watchChatUnread } from '#/lib/chat'
+import { useChatUnread, watchChatUnread } from '#/lib/chat'
+import {
+  SUPPORT_REQUESTS_CHANGED,
+  fetchSupportQueueCounts,
+} from '#/lib/support-queue'
+import { useApiQuery } from '#/lib/dash'
 import { REVIEWER_ROLES } from '#/lib/ai-response-reports'
 
 type RailPath =
@@ -79,14 +84,35 @@ function itemsForRole(role?: string | null): RailItem[] {
 
 export function RailNav() {
   const { user } = useSession()
+  if (!user) return null
+  return <RailNavContent key={user.id} />
+}
+
+function RailNavContent() {
+  const { user } = useSession()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const poolCount = useChatPoolCount()
-  const items = itemsForRole(user?.role)
+  const chatUnread = useChatUnread()
+  const staff = isChatStaff(user?.role)
+  const queueCounts = useApiQuery(
+    () => (staff ? fetchSupportQueueCounts() : Promise.resolve(null)),
+    [staff, user?.id, pathname],
+  )
+  const reloadQueueCounts = queueCounts.reload
 
   useEffect(() => {
-    watchChatUnread()
-    void refreshChatPool()
-  }, [])
+    if (staff) watchChatUnread()
+  }, [staff])
+
+  useEffect(() => {
+    if (!staff) return
+    const refresh = () => reloadQueueCounts()
+    window.addEventListener(SUPPORT_REQUESTS_CHANGED, refresh)
+    return () => window.removeEventListener(SUPPORT_REQUESTS_CHANGED, refresh)
+  }, [staff, reloadQueueCounts])
+
+  const items = itemsForRole(user?.role)
+  const unreadRequestCount = queueCounts.data?.unread ?? 0
+  const unreadActionCount = queueCounts.data?.awaitingUnread ?? unreadRequestCount
 
   // Longest-prefix match so /admin never lights up while on /admin/schools.
   const active = [...items]
@@ -102,13 +128,23 @@ export function RailNav() {
       {items.map((item) => {
         const isActive = active?.to === item.to
         const Icon = item.icon
+        const count =
+          item.to === '/school'
+            ? staff
+              ? unreadActionCount
+              : 0
+            : item.to === '/school/inbox'
+              ? chatUnread.total
+              : item.to === '/school/requests'
+                ? unreadRequestCount
+                : 0
         return (
           <Link
             key={item.to}
             to={item.to}
-            aria-label={item.label}
+            aria-label={count > 0 ? `${item.label} — ${count} unread` : item.label}
             aria-current={isActive ? 'page' : undefined}
-            title={item.label}
+            title={count > 0 ? `${item.label} (${count} unread)` : item.label}
             className={`relative flex size-11 shrink-0 items-center justify-center rounded-2xl transition-colors focus-visible:outline-white ${
               isActive
                 ? 'bg-brand-4 text-white ring-1 ring-brand-8/40'
@@ -116,9 +152,9 @@ export function RailNav() {
             }`}
           >
             <Icon aria-hidden="true" className="size-5" />
-            {item.to === '/school/inbox' && poolCount > 0 && (
+            {count > 0 && (
               <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-white">
-                {poolCount > 99 ? '99+' : poolCount}
+                {count > 99 ? '99+' : count}
               </span>
             )}
           </Link>

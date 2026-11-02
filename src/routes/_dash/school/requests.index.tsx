@@ -32,6 +32,7 @@ import {
   QUEUE_STATUS_LABELS,
   REQUEST_STATUS_LABELS,
   REVIEW_STATUS_LABELS,
+  markSupportRequestRead,
   reviewSupportRequest,
   shortName,
   TIMING_LABELS,
@@ -44,6 +45,8 @@ import {
 } from '#/lib/support-queue'
 
 export const Route = createFileRoute('/_dash/school/requests/')({
+  validateSearch: (search: Record<string, unknown>): { requestId?: string } =>
+    typeof search.requestId === 'string' && search.requestId ? { requestId: search.requestId } : {},
   head: () => ({ meta: [{ title: 'Support requests · Soul Nurture AI' }] }),
   component: SupportRequestsPage,
 })
@@ -51,6 +54,7 @@ export const Route = createFileRoute('/_dash/school/requests/')({
 const CHIPS: { value: QueueFilter | 'ALL'; label: string; countKey: keyof SupportQueueResponse['counts'] }[] = [
   { value: 'ALL', label: 'All', countKey: 'all' },
   { value: 'NEW', label: 'New', countKey: 'new' },
+  { value: 'UNREAD', label: 'Unread', countKey: 'unread' },
   { value: 'REVIEWED', label: 'Reviewed', countKey: 'reviewed' },
   { value: 'FOLLOW_UP_REQUIRED', label: 'Follow-Up Required', countKey: 'followUpRequired' },
   { value: 'FOLLOW_UP_COMPLETED', label: 'Follow-Up Completed', countKey: 'followUpCompleted' },
@@ -70,6 +74,8 @@ const REQUEST_STATUS_PILLS: Record<RequestStatus, string> = {
 
 function SupportRequestsPage() {
   const user = useRoleGuard([...CHAT_STAFF_ROLES])
+  const { requestId } = Route.useSearch()
+  const navigate = Route.useNavigate()
   const [chip, setChip] = useState<QueueFilter | 'ALL'>('ALL')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -101,6 +107,8 @@ function SupportRequestsPage() {
           onChipChange={setChip}
           search={debouncedSearch}
           schoolName={schoolName}
+          requestId={requestId}
+          onSelect={(id) => void navigate({ search: id ? { requestId: id } : {}, replace: true })}
         />
       </main>
     </>
@@ -112,11 +120,15 @@ function QueuePanels({
   onChipChange,
   search,
   schoolName,
+  requestId,
+  onSelect,
 }: {
   chip: QueueFilter | 'ALL'
   onChipChange: (next: QueueFilter | 'ALL') => void
   search: string
   schoolName: string
+  requestId?: string
+  onSelect: (id: string | null) => void
 }) {
   const queue = useApiQuery(
     () => fetchSupportQueue({ status: chip === 'ALL' ? undefined : chip, q: search }),
@@ -125,13 +137,23 @@ function QueuePanels({
   const [selected, setSelected] = useState<SupportQueueItem | null>(null)
   const [confirmation, setConfirmation] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!requestId) {
+      setSelected(null)
+      return
+    }
+    const current = queue.data?.items.find((item) => item.id === requestId)
+    if (current) setSelected((existing) => existing?.id === requestId ? { ...current, readAt: existing.readAt ?? current.readAt } : current)
+  }, [requestId, queue.data])
+
   const counts = queue.data?.counts
 
   return (
     <>
       {confirmation && <p role="status" className="text-copy-sm text-action">{confirmation}</p>}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
         <StatTile dotClass="bg-accent" label="New requests" value={counts?.new} />
+        <StatTile dotClass="bg-action" label="Unread" value={counts?.unread} />
         <StatTile dotClass="bg-action" label="Follow-up required" value={counts?.followUpRequired} />
         <StatTile dotClass="bg-action" label="Completed this week" value={counts?.completedThisWeek} />
       </div>
@@ -160,7 +182,7 @@ function QueuePanels({
       {counts && (
         <p className="text-caption text-muted">
           Each number is exactly the rows that chip shows. They overlap — a request can be
-          New and still need a follow-up — so they do not add up to All.
+          unread and urgent at once — so they do not add up to All.
         </p>
       )}
 
@@ -174,6 +196,11 @@ function QueuePanels({
           </Button>
         </div>
       )}
+      {requestId && !selected && !queue.error && (
+        <p role="status" className="text-copy-sm text-muted">
+          {queue.loading ? 'Opening this request…' : 'That request is not in this filtered view.'}
+        </p>
+      )}
       {queue.loading && !queue.data ? (
         <TableSkeleton />
       ) : queue.data ? (
@@ -183,15 +210,18 @@ function QueuePanels({
           onSelect={(item) => {
             setConfirmation(null)
             setSelected(item)
+            onSelect(item.id)
           }}
         />
       ) : null}
 
       <ReviewDialog
         item={selected}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          onSelect(null)
+        }}
         onChanged={(message) => {
-          setSelected(null)
+          onSelect(null)
           setConfirmation(message)
           queue.reload()
         }}
@@ -315,6 +345,11 @@ function RequestsTable({
                     >
                       {REQUEST_STATUS_LABELS[item.requestStatus] ?? item.requestStatus}
                     </span>
+                    {item.readAt === null && (
+                      <span className="inline-flex items-center rounded-pill border border-action px-3 py-1 text-chip font-medium text-action">
+                        Unread
+                      </span>
+                    )}
                     {item.followUpState !== 'NONE' && (
                       <span className="inline-flex items-center rounded-pill border border-hairline px-3 py-1 text-chip text-body">
                         {FOLLOW_UP_STATE_LABELS[item.followUpState]}
@@ -381,6 +416,7 @@ function ReviewDialog({
   const [error, setError] = useState<string | null>(null)
   const [editingSchedule, setEditingSchedule] = useState(false)
   const [dueAt, setDueAt] = useState('')
+  const [openReceipt, setOpenReceipt] = useState<{ requestId: string; readAt: string } | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -392,11 +428,18 @@ function ReviewDialog({
     setEditingSchedule(false)
     setError(null)
     setSaving(false)
+    setOpenReceipt(null)
+    if (item.readAt === null) {
+      void markSupportRequestRead(item.id)
+        .then((receipt) => setOpenReceipt({ requestId: item.id, readAt: receipt.readAt }))
+        .catch(() => {})
+    }
   }, [item])
 
   if (!item) return null
 
   const studentName = shortName(item.student)
+  const readAt = openReceipt?.requestId === item.id ? openReceipt.readAt : item.readAt
   const changed = !isUnchangedDraft(draft, baseline)
   const arrangementMissing =
     draft.status === 'SCHEDULED' && (!draft.scheduledAt || !draft.locationLabel.trim())
@@ -421,6 +464,11 @@ function ReviewDialog({
       }
       const result = await reviewSupportRequest(item.id, body)
       setBaseline(draft)
+      if (readAt === null) {
+        void markSupportRequestRead(item.id)
+          .then((receipt) => setOpenReceipt({ requestId: item.id, readAt: receipt.readAt }))
+          .catch(() => {})
+      }
       onChanged('Review saved.')
       // Accepting opens the staff↔student chat — land straight in it.
       if (draft.status === 'ACCEPTED' && result.chatThreadId) {
@@ -499,6 +547,11 @@ function ReviewDialog({
       }
     >
       <div className="flex flex-col gap-4">
+        <p className="text-caption text-muted" aria-live="polite">
+          {readAt === null
+            ? 'Unread by you — opening this record does not mark it reviewed or acknowledge an escalation.'
+            : 'You have opened this request. Its review and escalation status remain unchanged.'}
+        </p>
         <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-copy-sm">
           <dt className="text-muted">Student</dt>
           <dd className="text-heading">
