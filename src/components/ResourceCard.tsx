@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 
 import { Button, ErrorNote } from '#/components/dash/ui'
+import { SUPPORT_EMERGENCY_NOTICE, SUPPORT_RESPONSE_NOTICE } from '#/lib/support'
 import {
   RESOURCE_CATEGORIES,
   RESOURCE_FEEDBACK_OPTIONS,
@@ -312,6 +313,88 @@ export function ResourceNextStep({ resource }: { resource: Resource }) {
           Talk to someone <ChevronRight aria-hidden="true" className="size-4" />
         </Link>
       </div>
+    </section>
+  )
+}
+
+/**
+ * Doc B's two standing lines, on every Epic F board.
+ *
+ * The first is now enforced rather than promised: the catalogue reads only the
+ * codes the content register approves, so an unreviewed string cannot reach
+ * this page. It says "before students see it" rather than the design's "by
+ * school counsellors", because the register records an authorised reviewer
+ * (`approvedBy`), not that a counsellor specifically read this row.
+ */
+export function ResourceReviewStrip() {
+  return (
+    <section
+      aria-label="How resources are chosen"
+      className="mt-8 grid gap-x-8 gap-y-2 rounded-card border border-hairline bg-panel-2/60 p-5 sm:grid-cols-2"
+    >
+      <p className="text-caption text-body">
+        Every resource is reviewed and approved before students see it.
+      </p>
+      <p className="text-caption text-body">
+        Resources are for self-support. They do not replace a counsellor, doctor or emergency help.
+      </p>
+    </section>
+  )
+}
+
+/**
+ * Epic F artboard 4 — the way out of a resource that does not pretend the
+ * resource was the answer. The three "what happens next" lines are the workflow
+ * /support already ships, and both notices come from the support library
+ * instead of being re-typed, so safety copy cannot drift between surfaces.
+ */
+export function ResourceStillHeavy({ resource }: { resource: Resource }) {
+  return (
+    <section
+      className="mt-6 rounded-panel border border-accent bg-peach p-6 sm:p-8"
+      aria-labelledby="resource-still-heavy-heading"
+    >
+      <h2 id="resource-still-heavy-heading" className="text-section text-peach-ink">
+        Still feeling heavy?
+      </h2>
+      <p className="mt-3 text-copy-sm text-peach-ink">
+        These steps can help, but a real person can help more. You can ask to talk to someone at your school.
+      </p>
+      <Link
+        to="/support"
+        className="mt-5 inline-flex min-h-11 w-full max-w-md items-center justify-center gap-2 rounded-pill bg-action px-5 py-3 text-center text-button-sm font-semibold text-white transition-colors hover:bg-brand-4"
+      >
+        <span className="min-w-0 break-words">Talk to a school counsellor</span>
+        <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
+      </Link>
+
+      <div className="mt-6 rounded-card border border-hairline bg-white p-5">
+        <h3 className="text-chip font-semibold text-heading">What happens next</h3>
+        <ul className="mt-3 space-y-2 text-copy-sm text-body">
+          <li>Your request goes to a school professional.</li>
+          <li>A person decides what support is right, not the AI.</li>
+          <li>You can see its status in the app.</li>
+        </ul>
+        <p className="mt-3 text-caption text-muted">{SUPPORT_RESPONSE_NOTICE}</p>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <Link
+          to="/resources"
+          search={{ category: resource.category }}
+          className="inline-flex min-h-11 items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4"
+        >
+          Keep browsing this topic <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
+        <Link
+          to="/support/status-guide"
+          className="inline-flex min-h-11 items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4"
+        >
+          See how a request moves
+        </Link>
+      </div>
+
+      <p className="mt-5 text-caption text-peach-ink">{SUPPORT_EMERGENCY_NOTICE}</p>
     </section>
   )
 }

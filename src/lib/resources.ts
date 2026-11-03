@@ -101,6 +101,28 @@ export async function fetchResources(filters: ResourceSearch = {}) {
   return { ...response, items: response.items.filter(isAvailableResource) }
 }
 
+/**
+ * Which rule actually built the tailored list. Doc B §2 permits the words
+ * "Picked for you" only when a stated need or a chosen category drove the
+ * selection, so the server reports the basis instead of leaving the surface to
+ * infer it from the phrasing of a title.
+ */
+export type ResourceSelectionBasis = 'STATED_NEED' | 'NEWEST_APPROVED'
+
+export interface TailoredResources {
+  title: string
+  rationale: string
+  basis: ResourceSelectionBasis
+  items: Resource[]
+}
+
+export async function fetchTailoredResources(): Promise<TailoredResources> {
+  const response = await apiFetch<Omit<TailoredResources, 'items'> & { items: Resource[] }>(
+    '/api/v1/resources/tailored',
+  )
+  return { ...response, items: response.items.filter(isAvailableResource) }
+}
+
 interface ToolboxResponse {
   items: Resource[]
   count: number
