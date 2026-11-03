@@ -65,6 +65,64 @@ export const SUPPORT_STATUS_INFO: Record<SupportRequestStatus, {
   },
 }
 
+/**
+ * The design shows students one four-stage track. The backend records seven
+ * statuses, so a stage is a grouping rather than a step every request walks
+ * through — CANCELLED belongs to none of them.
+ */
+export const SUPPORT_STEPS = [
+  'NEW',
+  'REVIEWED',
+  'FOLLOW_UP_REQUIRED',
+  'FOLLOW_UP_COMPLETED',
+] as const
+
+export type SupportStep = (typeof SUPPORT_STEPS)[number]
+
+export const SUPPORT_STEP_INFO: Record<
+  SupportStep,
+  { label: string; meaning: string; guidance: string; className: string }
+> = {
+  NEW: {
+    label: 'New',
+    meaning: 'We’ve received your request. It’s waiting for an authorised professional to read it.',
+    guidance: 'You can keep using Soul Nurture AI and the wellbeing resources while you wait.',
+    className: 'bg-peach text-peach-ink',
+  },
+  REVIEWED: {
+    label: 'Reviewed',
+    meaning: 'A school professional has seen your request and is deciding what follow-up is right.',
+    guidance: 'Nothing else is needed from you right now.',
+    className: 'bg-panel text-brand-4',
+  },
+  FOLLOW_UP_REQUIRED: {
+    label: 'Follow-Up Required',
+    meaning: 'The professional has decided follow-up is needed and will arrange it through your school.',
+    guidance: 'Look out for contact from your school. You can view this page any time.',
+    className: 'bg-peach text-peach-ink',
+  },
+  FOLLOW_UP_COMPLETED: {
+    label: 'Follow-Up Completed',
+    meaning: 'Follow-up has been completed.',
+    guidance: 'If you still need support, you can send a new request at any time.',
+    className: 'bg-action text-white',
+  },
+}
+
+const STEP_BY_STATUS: Partial<Record<SupportRequestStatus, SupportStep>> = {
+  PENDING: 'NEW',
+  ACCEPTED: 'REVIEWED',
+  SCHEDULED: 'FOLLOW_UP_REQUIRED',
+  IN_PROGRESS: 'FOLLOW_UP_REQUIRED',
+  ESCALATED: 'FOLLOW_UP_REQUIRED',
+  COMPLETED: 'FOLLOW_UP_COMPLETED',
+}
+
+/** Null for statuses that sit outside the track, e.g. CANCELLED. */
+export function supportStepOf(status: SupportRequestStatus): SupportStep | null {
+  return STEP_BY_STATUS[status] ?? null
+}
+
 export const SUPPORT_TIMING_LABELS: Record<SupportRequestTiming, string> = {
   GENTLE_1_2_DAYS: 'Within 1–2 days',
   TODAY_STUDY_PERIOD: 'Today, during a study period',

@@ -193,16 +193,16 @@ function CheckInComplete() {
               <ChevronRight className="size-5 shrink-0 text-peach-ink/70" />
             </Link>
           </div>
-
-          <button
-            type="button"
-            onClick={() => navigate({ to: '/welcome' })}
-            className="mt-10 inline-flex h-[52px] shrink-0 items-center justify-center whitespace-nowrap rounded-pill bg-surface px-10 text-button text-ink transition-colors hover:bg-neutral-10 lg:mt-auto lg:h-14 lg:px-6"
-          >
-            I'm done for now
-          </button>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => navigate({ to: '/welcome' })}
+        className="mx-auto mt-10 inline-flex h-[52px] shrink-0 items-center justify-center whitespace-nowrap self-center rounded-pill bg-surface px-10 text-button text-ink transition-colors hover:bg-neutral-10 lg:mt-14 lg:h-14"
+      >
+        I'm done for now
+      </button>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { MailCheck } from 'lucide-react'
+import { Mail, MailCheck, ShieldCheck } from 'lucide-react'
 
 import { AuthField, AuthShell } from '#/components/AuthShell'
 import { Spinner, StatusBadge } from '#/components/StatusBadge'
@@ -53,11 +53,17 @@ function ForgotPassword() {
   return (
     <AuthShell
       illustrated
+      chip="Reset password"
+      panel={{
+        Icon: ShieldCheck,
+        heading: 'Resetting is safe',
+        caption: 'You will choose a new private password. Your school account stays the same.',
+      }}
       title={requested ? 'Check your inbox' : 'Forgot your password?'}
       subtitle={
         requested
           ? 'Here’s what to do next.'
-          : 'Enter the email you use to sign in to request a password reset link.'
+          : 'Enter your school email. If it matches an account, we will send you instructions to reset your password.'
       }
       footer={
         <Link
@@ -96,9 +102,10 @@ function ForgotPassword() {
               id="reset-email"
               label="Email"
               type="email"
+              Icon={Mail}
               value={email}
               onChange={setEmail}
-              placeholder="you@example.com"
+              placeholder="e.g. name@school.edu.ng"
               autoComplete="email"
               required
             />
@@ -113,9 +120,13 @@ function ForgotPassword() {
                   Requesting link…
                 </>
               ) : (
-                'Send reset link'
+                'Send reset instructions'
               )}
             </button>
+            <p className="rounded-card border border-mint bg-panel p-4 text-caption text-body">
+              For your privacy, you will see this same message whether or not an account was found.
+              Instructions are sent through your school’s approved recovery method.
+            </p>
           </fieldset>
         </form>
       )}

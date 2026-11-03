@@ -1,8 +1,21 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, Eye, EyeOff, LockKeyhole } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, LockKeyhole, type LucideIcon } from 'lucide-react'
 
 import logo from '#/assets/soul-nurture-logo.png'
+
+/** The reassuring line each auth screen earns its name with, in the mint panel. */
+export interface AuthPanel {
+  Icon: LucideIcon
+  heading: string
+  caption: string
+}
+
+const DEFAULT_PANEL: AuthPanel = {
+  Icon: LockKeyhole,
+  heading: 'Protected by role',
+  caption: 'Access to student information is restricted to authorised professionals.',
+}
 
 interface AuthShellProps {
   title: string
@@ -11,6 +24,9 @@ interface AuthShellProps {
   footer?: ReactNode
   illustrated?: boolean
   standalone?: boolean
+  /** The small mint pill above the heading — "Student access", "Reset password". */
+  chip?: string
+  panel?: AuthPanel
 }
 
 export function AuthShell({
@@ -20,6 +36,8 @@ export function AuthShell({
   footer,
   illustrated = false,
   standalone = false,
+  chip,
+  panel = DEFAULT_PANEL,
 }: AuthShellProps) {
   const content = (
     <>
@@ -40,7 +58,14 @@ export function AuthShell({
         </Link>
       )}
 
-      <h1 className="mt-10 text-title text-heading lg:text-hero-sm">{title}</h1>
+      {chip && (
+        <p className="mt-10 inline-flex w-fit items-center gap-2 rounded-pill bg-mint px-3.5 py-1.5 text-caption font-semibold text-brand-4">
+          <span className="size-1.5 rounded-full bg-action" aria-hidden="true" />
+          {chip}
+        </p>
+      )}
+
+      <h1 className={`text-title text-heading lg:text-hero-sm ${chip ? 'mt-5' : 'mt-10'}`}>{title}</h1>
       <p className="mt-3 text-copy text-body">{subtitle}</p>
 
       <div className="mt-9">{children}</div>
@@ -66,18 +91,21 @@ export function AuthShell({
         <>
           <div className="w-full min-w-0 max-w-[520px]">{content}</div>
           <div
-            aria-hidden="true"
-            className="hidden min-h-[640px] items-center justify-center self-stretch overflow-hidden rounded-hero bg-panel p-6 lg:flex"
+            className="hidden min-h-[640px] flex-col items-center justify-center gap-10 self-stretch overflow-hidden rounded-hero bg-panel p-6 lg:flex"
           >
             <div className="relative grid aspect-square w-full max-w-[300px] place-items-center rounded-full bg-surface">
               <div className="grid size-[72%] place-items-center rounded-full bg-mint/50">
                 <div className="grid size-[61%] place-items-center rounded-full bg-action text-white">
-                  <LockKeyhole className="size-14" strokeWidth={1.75} />
+                  <panel.Icon className="size-14" strokeWidth={1.75} aria-hidden="true" />
                 </div>
               </div>
               <span className="absolute right-[7%] top-[10%] size-10 rounded-full bg-accent" />
               <span className="absolute bottom-[17%] left-[8%] size-6 rounded-full bg-mint" />
               <span className="absolute bottom-[23%] right-[3%] size-[18px] rounded-full bg-blush" />
+            </div>
+            <div className="max-w-[420px] text-center">
+              <h2 className="text-section text-heading">{panel.heading}</h2>
+              <p className="mt-3 text-copy text-body">{panel.caption}</p>
             </div>
           </div>
         </>
@@ -101,6 +129,7 @@ interface AuthFieldProps {
   hint?: string
   invalid?: boolean
   errorId?: string
+  Icon?: LucideIcon
 }
 
 export function AuthField({
@@ -116,6 +145,7 @@ export function AuthField({
   hint,
   invalid = false,
   errorId,
+  Icon,
 }: AuthFieldProps) {
   const [revealed, setRevealed] = useState(false)
   const isPassword = type === 'password'
@@ -129,6 +159,12 @@ export function AuthField({
         {label}
       </label>
       <div className="relative">
+        {Icon && (
+          <Icon
+            className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-muted"
+            aria-hidden="true"
+          />
+        )}
         <input
           id={id}
           type={inputType}
@@ -140,11 +176,11 @@ export function AuthField({
           minLength={minLength}
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
-          className={`h-[60px] w-full rounded-3xl border bg-white px-6 text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 ${
+          className={`h-[60px] w-full rounded-3xl border bg-white text-copy text-ink outline-none transition-colors placeholder:text-neutral-8 ${
             invalid
               ? 'border-destructive focus:border-destructive'
               : 'border-hairline focus:border-action'
-          } ${isPassword ? 'pr-14' : ''}`}
+          } ${Icon ? 'pl-13' : 'pl-6'} ${isPassword ? 'pr-14' : 'pr-6'}`}
         />
         {isPassword && (
           <button
