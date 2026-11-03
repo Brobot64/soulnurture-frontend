@@ -1,5 +1,5 @@
 // Staff "Support indicators" review surface — mirrors
-// GET /api/v1/support-flags[?level=&severity=&status=], GET /:id and
+// GET /api/v1/support-flags[?level=&severity=&status=&q=], GET /:id and
 // POST /:id/review-decision (Natlas backend, Doc A US-D02/D10).
 //
 // A level is a dimension of its own: it is never derived from `severity`, never
@@ -8,6 +8,15 @@
 // can filter — and `Level U` renders as unclear evidence, not a milder Level A.
 
 import { apiFetch } from '#/lib/api'
+import type { RequestStatus } from '#/lib/support-queue'
+
+/** The newest student-initiated request sharing this flag’s conversation, when
+ * one exists. A reference across two records — its status never moves the
+ * indicator’s own, and `null` means none was found (US-D05). */
+export interface LinkedRequestRef {
+  id: string
+  status: RequestStatus
+}
 
 export const INDICATOR_LEVELS = ['A', 'B', 'C', 'U'] as const
 export type IndicatorLevel = (typeof INDICATOR_LEVELS)[number]
@@ -55,6 +64,7 @@ export interface IndicatorFlagRow {
   aiContextSummary: string | null
   autoActions: string[]
   conversationId: string | null
+  linkedRequest: LinkedRequestRef | null
   createdAt: string
   updatedAt: string
   resolvedAt: string | null
@@ -91,6 +101,7 @@ export interface IndicatorFlagDetail {
     updatedAt: string
     resolvedAt: string | null
     conversationId: string | null
+    linkedRequest: LinkedRequestRef | null
     ruleId: string | null
     ruleVersion: string | null
     ruleLabel: string | null
@@ -136,11 +147,13 @@ export function fetchIndicatorFlags(filters: {
   level?: LevelFilter
   severity?: FlagSeverity
   status?: FlagStatus
+  q?: string
 }): Promise<IndicatorFlagList> {
   const params = new URLSearchParams()
   if (filters.level) params.set('level', filters.level)
   if (filters.severity) params.set('severity', filters.severity)
   if (filters.status) params.set('status', filters.status)
+  if (filters.q?.trim()) params.set('q', filters.q.trim())
   const suffix = params.size > 0 ? `?${params.toString()}` : ''
   return apiFetch<IndicatorFlagList>(`${root}${suffix}`)
 }
@@ -151,10 +164,17 @@ export function fetchIndicatorFlag(id: string): Promise<IndicatorFlagDetail> {
 
 /** Records the reviewer’s read. Moves no workflow status (Doc A G4). */
 export function recordIndicatorDecision(id: string, decision: ReviewDecision) {
-  return apiFetch<{ message: string; decision: ReviewDecision }>(
-    `${root}/${encodeURIComponent(id)}/review-decision`,
-    { method: 'POST', body: JSON.stringify({ decision }) },
-  )
+  return apiFetch<{
+    message: string
+    decision: ReviewDecision
+    /** Server write time, so the confirmation does not quote the reviewer’s clock. */
+    recordedAt: string
+    /** The status this write left untouched — the confirmation has to name it. */
+    status: FlagStatus
+  }>(`${root}/${encodeURIComponent(id)}/review-decision`, {
+    method: 'POST',
+    body: JSON.stringify({ decision }),
+  })
 }
 
 export function acknowledgeIndicator(id: string) {

@@ -9,15 +9,17 @@
 // milder Level A); no "close" or "resolve" action (nothing here may close a
 // record); and indicator counts never merged with support-request counts.
 
-import { useState, type ReactNode } from 'react'
-import { Link, createFileRoute } from '@tanstack/react-router'
-import { CircleAlert, Inbox, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { CircleAlert, Inbox, LockKeyhole, ShieldCheck, TriangleAlert } from 'lucide-react'
 
 import { DashHeader } from '#/components/dash/DashHeader'
+import { SupportSurfaceTabs } from '#/components/dash/SupportSurfaceTabs'
 import { Button, Dialog, EmptyState, ErrorNote, Skeleton } from '#/components/dash/ui'
 import { ApiError } from '#/lib/api'
 import { REVIEWER_ROLES } from '#/lib/ai-response-reports'
-import { formatDateTime, useApiQuery, useRoleGuard } from '#/lib/dash'
+import { homeForRole, roleLabel, type SessionUser } from '#/lib/auth'
+import { formatDateTime, useApiQuery, useRoleAccess } from '#/lib/dash'
 import {
   LEVEL_CHIPS,
   REVIEW_DECISION_LABELS,
@@ -32,6 +34,7 @@ import {
   type FlagStatus,
   type IndicatorFlagRow,
   type LevelFilter,
+  type LinkedRequestRef,
   type ReviewDecision,
 } from '#/lib/indicators'
 
@@ -47,30 +50,54 @@ const STATUSES: FlagStatus[] = ['OPEN', 'IN_REVIEW', 'ACKNOWLEDGED', 'RESOLVED',
 /** Mirrors the backend `take` on GET /support-flags: a page, not the backlog. */
 const LIST_LIMIT = 50
 
+/** What POST /:id/review-decision answers with, kept for the confirmation view. */
+interface RecordedReview {
+  decision: ReviewDecision
+  recordedAt: string
+  status: FlagStatus
+}
+
 function SupportIndicatorsPage() {
-  const user = useRoleGuard(REVIEWER_ROLES)
+  const access = useRoleAccess(REVIEWER_ROLES)
   const [level, setLevel] = useState<LevelFilter | 'ALL'>('ALL')
   const [severity, setSeverity] = useState<FlagSeverity | ''>('')
   const [status, setStatus] = useState<FlagStatus | ''>('')
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const { flagId } = Route.useSearch()
   const navigate = Route.useNavigate()
 
-  if (!user) return null
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 250)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
+  if (access.denied) return <RoleDenied user={access.user} />
+  if (!access.permitted || !access.user) return null
+
+  const user = access.user
   const schoolName = user.school?.name ?? 'your school'
-  const filtered = level !== 'ALL' || severity !== '' || status !== ''
+  const filtered =
+    level !== 'ALL' || severity !== '' || status !== '' || debouncedSearch.trim() !== ''
 
   return (
     <>
       <DashHeader
         title="Support indicators"
         subtitle={`Prompts raised for human review at ${schoolName}. Each one is a suggestion to look, not a diagnosis or a decision.`}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: 'Search by Student ID/email',
+        }}
       />
+      <SupportSurfaceTabs active="/school/indicators" />
       <main className="mx-auto flex w-full max-w-[1160px] flex-1 flex-col gap-6 px-6 py-8 lg:px-10 lg:py-10">
         <IndicatorList
           level={level}
           severity={severity}
           status={status}
+          search={debouncedSearch}
           filtered={filtered}
           onLevelChange={setLevel}
           onSeverityChange={setSeverity}
@@ -79,6 +106,7 @@ function SupportIndicatorsPage() {
             setLevel('ALL')
             setSeverity('')
             setStatus('')
+            setSearch('')
           }}
           schoolName={schoolName}
           flagId={flagId}
@@ -95,10 +123,66 @@ function SupportIndicatorsPage() {
   )
 }
 
+/**
+ * ab05: the answer a signed-in professional gets when this queue is not theirs.
+ * Redirecting them elsewhere left three possible readings — a broken page, an
+ * empty school, or a permission they did not have — and only one of them is
+ * true. The copy names the roles this screen serves, and says nothing about
+ * whether that split is right; D2 is still an open decision, not policy.
+ */
+function RoleDenied({ user }: { user: SessionUser | null }) {
+  const navigate = useNavigate()
+
+  return (
+    <main className="mx-auto flex w-full max-w-[560px] flex-1 flex-col items-center gap-6 px-6 py-14 lg:px-10">
+      <section
+        aria-labelledby="indicator-role-denied"
+        className="flex w-full flex-col items-center gap-5 rounded-panel border border-hairline bg-white px-6 py-9 text-center sm:px-10"
+      >
+        <span aria-hidden="true" className="grid size-16 place-items-center rounded-full bg-panel text-action">
+          <LockKeyhole className="size-7" />
+        </span>
+        <div>
+          <h1 id="indicator-role-denied" className="text-title-sm text-heading sm:text-title">
+            Indicators aren’t available for this role
+          </h1>
+          <p className="mt-4 text-copy text-body">
+            Only counsellor and psychologist accounts see the support indicator queue. Your
+            account is signed in as {roleLabel(user?.role)}, so no indicator is listed here.
+            Nothing is broken, and nothing was taken from you by mistake — this screen is simply
+            not part of your role.
+          </p>
+        </div>
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
+          <Button
+            className="min-h-11 flex-1 sm:flex-none"
+            onClick={() => void navigate({ to: homeForRole(user), replace: true })}
+          >
+            Go to my dashboard
+          </Button>
+          <Button variant="ghost" className="min-h-11 flex-1 sm:flex-none" onClick={() => void navigate({ to: '/' })}>
+            Back to home
+          </Button>
+        </div>
+        <p className="flex w-full items-start gap-3 rounded-card bg-panel px-4 py-3 text-left text-copy-sm text-body">
+          <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-action" />
+          <span>Think you should have access? Ask your school administrator.</span>
+        </p>
+      </section>
+      <p className="text-caption text-muted">
+        Students who ask for help themselves appear on Support requests, which is a separate
+        record and a separate screen. Concerned about a student’s immediate safety? Follow your
+        school’s safeguarding procedures — Soul Nurture AI is not an emergency service.
+      </p>
+    </main>
+  )
+}
+
 function IndicatorList({
   level,
   severity,
   status,
+  search,
   filtered,
   onLevelChange,
   onSeverityChange,
@@ -111,6 +195,7 @@ function IndicatorList({
   level: LevelFilter | 'ALL'
   severity: FlagSeverity | ''
   status: FlagStatus | ''
+  search: string
   filtered: boolean
   onLevelChange: (next: LevelFilter | 'ALL') => void
   onSeverityChange: (next: FlagSeverity | '') => void
@@ -121,14 +206,16 @@ function IndicatorList({
   onSelect: (id: string | null) => void
 }) {
   const [confirmation, setConfirmation] = useState<string | null>(null)
+  const trimmedSearch = search.trim()
   const list = useApiQuery(
     () =>
       fetchIndicatorFlags({
         level: level === 'ALL' ? undefined : level,
         severity: severity || undefined,
         status: status || undefined,
+        q: trimmedSearch || undefined,
       }),
-    [level, severity, status],
+    [level, severity, status, trimmedSearch],
   )
 
   const counts = list.data?.levelCounts
@@ -204,12 +291,16 @@ function IndicatorList({
       </div>
 
       <p className="text-caption text-muted">
-        Each level number is exactly the set that chip filters, within the tier and status
-        filters; the list itself returns the {LIST_LIMIT} newest. “Unclassified” is a real
-        bucket — a flag no rule with an approved level produced, not a mild one. Level U means
-        the evidence is unclear or conflicting; it is never a softer shade of Level A.
-        Indicator counts say nothing about support requests, which are separate records on
-        their own page.
+        Each level number is exactly the set that chip filters, within the tier, status and
+        search filters; the list itself returns the {LIST_LIMIT} newest. A search matches the
+        student code or email a reviewer already has, and narrows the chip counts with it — an
+        “Open for review” tile above does not, because that one is a school-wide fact.
+        “Unclassified” is a real bucket — a flag no rule with an approved level produced, not a
+        mild one. Level U means the evidence is unclear or conflicting; it is never a softer
+        shade of Level A. Indicator counts say nothing about support requests, which are
+        separate records on their own page: “Linked request” only means a request the student
+        sent shares this indicator’s conversation. It has its own status, and the link makes an
+        indicator into neither a request nor a decision.
       </p>
 
       {list.error && (
@@ -228,7 +319,23 @@ function IndicatorList({
         <TableSkeleton />
       ) : list.data ? (
         items.length === 0 ? (
-          filtered ? (
+          trimmedSearch ? (
+            <EmptyState
+              icon={Inbox}
+              title={`No indicator matches “${trimmedSearch}”`}
+              body="Search looks at the student code and the address on their account, inside your school only. Nothing here is hidden from you because of another filter — a name typed by mistake simply has no rows behind it."
+              action={
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    onClearFilters()
+                  }}
+                >
+                  Clear search and filters
+                </Button>
+              }
+            />
+          ) : filtered ? (
             <EmptyState
               icon={Inbox}
               title="No indicators match these filters"
@@ -292,11 +399,12 @@ function FlagsTable({
 }) {
   return (
     <div className="overflow-hidden rounded-panel border border-hairline bg-white">
-      <div className="hidden grid-cols-[minmax(0,1.3fr)_minmax(0,0.9fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.9fr)] items-center gap-4 bg-panel px-6 py-3 text-chip font-medium text-body md:grid">
+      <div className="hidden grid-cols-[minmax(0,1.15fr)_minmax(0,0.7fr)_minmax(0,0.95fr)_minmax(0,0.9fr)_minmax(0,0.75fr)_minmax(0,0.9fr)] items-center gap-4 bg-panel px-6 py-3 text-chip font-medium text-body md:grid">
         <span>Student</span>
         <span>Level</span>
         <span>Raised by</span>
         <span>Decision</span>
+        <span>Linked request</span>
         <span>Raised</span>
       </div>
       <ul className="flex flex-col divide-y divide-hairline">
@@ -305,7 +413,7 @@ function FlagsTable({
             <button
               type="button"
               onClick={() => onSelect(item)}
-              className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-panel-2/50 md:grid md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.9fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.9fr)] md:gap-4 md:px-6"
+              className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-panel-2/50 md:grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.7fr)_minmax(0,0.95fr)_minmax(0,0.9fr)_minmax(0,0.75fr)_minmax(0,0.9fr)] md:gap-4 md:px-6"
             >
               <span className="flex min-w-0 flex-1 flex-col gap-1 md:flex-none">
                 <span className="block truncate text-card text-heading">{item.studentRef}</span>
@@ -327,6 +435,17 @@ function FlagsTable({
                   <span className="text-heading">{REVIEW_DECISION_LABELS[item.reviewDecision]}</span>
                 ) : (
                   <span className="text-muted">Not recorded</span>
+                )}
+              </span>
+              {/* Hidden below md: this column is a reference to another record, and
+                  the detail dialog carries it with the conversation behind it. A link
+                  here would put a link inside the row button. "None linked" is a fact
+                  about the request table only — the student may still have spoken. */}
+              <span className="hidden min-w-0 text-copy-sm md:block md:truncate">
+                {item.linkedRequest ? (
+                  <span className="text-heading">Linked request</span>
+                ) : (
+                  <span className="text-muted">None linked</span>
                 )}
               </span>
               <time dateTime={item.createdAt} className="text-caption text-muted">
@@ -375,6 +494,7 @@ function FlagDetail({
   const [picked, setPicked] = useState<ReviewDecision | ''>('')
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [justRecorded, setJustRecorded] = useState<RecordedReview | null>(null)
 
   if (detail.error && !detail.data) {
     return (
@@ -410,7 +530,12 @@ function FlagDetail({
     try {
       if (kind === 'decision') {
         if (!chosen) return
-        await recordIndicatorDecision(id, chosen)
+        const result = await recordIndicatorDecision(id, chosen)
+        setJustRecorded({
+          decision: result.decision,
+          recordedAt: result.recordedAt,
+          status: result.status,
+        })
         onChanged('Your decision is recorded. The workflow status did not change.')
       } else {
         const result =
@@ -426,6 +551,22 @@ function FlagDetail({
     } finally {
       setSaving(null)
     }
+  }
+
+  if (justRecorded) {
+    return (
+      <ReviewRecorded
+        studentRef={student.ref}
+        record={justRecorded}
+        conversationId={systemMetadata.conversationId}
+        linkedRequest={systemMetadata.linkedRequest}
+        onBack={() => {
+          setJustRecorded(null)
+          detail.reload()
+        }}
+        onClose={onClose}
+      />
+    )
   }
 
   return (
@@ -608,6 +749,114 @@ function FlagDetail({
     </Dialog>
   )
 }
+
+/**
+ * ab06: the confirmation a reviewer gets after recording a decision, and the
+ * three things that are (and are not) now true. It repeats the server's own
+ * write time and status rather than a local guess, because the design's promise
+ * — "nothing happens automatically" — is only reassuring if the status shown is
+ * the real one. A review note is deliberately absent: nothing stores one yet.
+ */
+function ReviewRecorded({
+  studentRef,
+  record,
+  conversationId,
+  linkedRequest,
+  onBack,
+  onClose,
+}: {
+  studentRef: string
+  record: RecordedReview
+  conversationId: string | null
+  linkedRequest: LinkedRequestRef | null
+  onBack: () => void
+  onClose: () => void
+}) {
+  const navigate = useNavigate()
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={`Review recorded · ${studentRef}`}
+      icon={ShieldCheck}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onBack}>
+            Back to this indicator
+          </Button>
+          <Button
+            onClick={() => {
+              onClose()
+              void navigate({
+                to: '/school/requests',
+                search: linkedRequest ? { requestId: linkedRequest.id } : {},
+              })
+            }}
+          >
+            {linkedRequest ? 'Open the linked request' : 'Go to support requests'}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        <p role="status" className="text-copy-sm text-heading">
+          Your decision is saved against this indicator. Nothing was sent to the student, and
+          the workflow status is still {enumLabel(record.status)} — a decision is not a
+          transition.
+        </p>
+
+        <dl className="grid grid-cols-[9rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-copy-sm">
+          <Term value="Your decision" detail={REVIEW_DECISION_LABELS[record.decision]} />
+          <Term value="Recorded" detail={formatDateTime(record.recordedAt)} />
+          <Term value="Workflow status" detail={enumLabel(record.status)} />
+          <Term value="Linked request" detail={linkedRequest ? enumLabel(linkedRequest.status) : 'None found'} />
+        </dl>
+
+        <div className="flex flex-col gap-3">
+          <h3 className="text-chip font-semibold text-heading">What happens next</h3>
+          {NEXT_STEPS.map((step) => (
+            <section key={step.title} className="rounded-card border border-hairline px-4 py-3">
+              <p className="text-chip font-medium text-heading">{step.title}</p>
+              <p className="mt-1 text-copy-sm text-body">{step.body}</p>
+            </section>
+          ))}
+        </div>
+
+        {conversationId && (
+          <Link
+            to="/school/requests/$conversationId"
+            params={{ conversationId }}
+            onClick={onClose}
+            className="inline-flex min-h-11 items-center gap-2 text-chip font-medium text-action transition-colors hover:text-brand-4"
+          >
+            Open the conversation this indicator came from
+          </Link>
+        )}
+
+        <p className="text-caption text-muted">
+          Concerns that cannot wait should follow your school’s emergency procedure. Soul
+          Nurture AI is not an emergency service.
+        </p>
+      </div>
+    </Dialog>
+  )
+}
+
+const NEXT_STEPS = [
+  {
+    title: 'Your decision is on record',
+    body: 'It is stored against this indicator and written to the audit trail with your name and the time. That is all this button did.',
+  },
+  {
+    title: 'Update the support request, if there is one',
+    body: 'A request the student sent is a separate record with its own follow-up status. Set that on the support requests screen — doing it here would not change it.',
+  },
+  {
+    title: 'No automatic action',
+    body: 'The system does not contact the student, raise a safeguarding report, or decide their care. You decide next steps using your school’s safeguarding procedures.',
+  },
+]
 
 function Section({
   title,

@@ -11,6 +11,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ChevronRight, CircleAlert, Inbox, TriangleAlert } from 'lucide-react'
 
 import { DashHeader } from '#/components/dash/DashHeader'
+import { SupportSurfaceTabs } from '#/components/dash/SupportSurfaceTabs'
 import {
   AvatarInitials,
   Button,
@@ -100,6 +101,7 @@ function SupportRequestsPage() {
           placeholder: 'Search by Student ID/email',
         }}
       />
+      <SupportSurfaceTabs active="/school/requests" />
       <main className="flex flex-1 flex-col gap-6 p-6 lg:p-8">
         <QueuePanels
           key={`${user.id}:${user.schoolId ?? user.school?.id ?? 'no-school'}`}
