@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Check, KeyRound } from 'lucide-react'
 
 import { AuthField, AuthShell } from '#/components/AuthShell'
 import { Spinner, StatusBadge } from '#/components/StatusBadge'
@@ -19,6 +20,38 @@ export const Route = createFileRoute('/first-password')({
   }),
   component: FirstPassword,
 })
+
+/// The three rules the design shows ticking off as the student types. The
+/// server only enforces length, so the client is the stricter of the two.
+const RULES: { id: string; label: string; ok: (value: string) => boolean }[] = [
+  { id: 'length', label: 'At least 8 characters', ok: (value) => value.length >= 8 },
+  { id: 'letter', label: 'At least one letter', ok: (value) => /[A-Za-z]/.test(value) },
+  { id: 'number', label: 'At least one number', ok: (value) => /\d/.test(value) },
+]
+
+function RequirementList({ password }: { password: string }) {
+  return (
+    <ul className="mt-3 flex flex-col gap-1.5" aria-label="Password requirements">
+      {RULES.map((rule) => {
+        const met = rule.ok(password)
+        return (
+          <li
+            key={rule.id}
+            className={`flex items-center gap-2 text-caption ${met ? 'font-medium text-action' : 'text-muted'}`}
+          >
+            {met ? (
+              <Check className="size-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <span className="size-4 shrink-0 rounded-full border border-hairline" aria-hidden="true" />
+            )}
+            {rule.label}
+            <span className="sr-only">{met ? 'met' : 'not met yet'}</span>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
 
 /// Standalone (no app/dash chrome): accounts land here mid-onboarding, on the
 /// school's default password, and leave with their own.
@@ -55,8 +88,8 @@ function FirstPassword() {
     event.preventDefault()
     if (busy) return
     setError(null)
-    if (password.length < 8) {
-      setError('Use at least 8 characters.')
+    if (RULES.some((rule) => !rule.ok(password))) {
+      setError('Use at least 8 characters, with one letter and one number.')
       return
     }
     if (password !== confirm) {
@@ -85,32 +118,51 @@ function FirstPassword() {
       <AuthShell
         illustrated
         standalone
-        title="Choose a new password"
-        subtitle="You signed in with a temporary password. Pick one only you know — you'll use it from now on."
+        panel={{
+          Icon: KeyRound,
+          heading: 'A password just for you',
+          caption: 'Your school account stays the same. Your password is the key only you hold.',
+        }}
+        title="Create unique password"
+        subtitle="Create a unique password you can remember."
       >
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {error && <StatusBadge tone="error">{error}</StatusBadge>}
 
-          <AuthField
-            id="new-password"
-            label="New password"
-            type="password"
-            value={password}
-            onChange={setPassword}
-            autoComplete="new-password"
-            minLength={8}
-            hint="At least 8 characters."
-            required
-          />
-          <AuthField
-            id="confirm-password"
-            label="Confirm new password"
-            type="password"
-            value={confirm}
-            onChange={setConfirm}
-            autoComplete="new-password"
-            required
-          />
+          <div>
+            <AuthField
+              id="new-password"
+              label="Create your new password"
+              type="password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+            <RequirementList password={password} />
+          </div>
+          <div>
+            <AuthField
+              id="confirm-password"
+              label="Confirm password"
+              type="password"
+              value={confirm}
+              onChange={setConfirm}
+              autoComplete="new-password"
+              required
+            />
+            {confirm && (
+              <p
+                className={`mt-2 flex items-center gap-2 text-caption ${
+                  password === confirm ? 'font-medium text-action' : 'text-destructive'
+                }`}
+              >
+                {password === confirm && <Check className="size-4" aria-hidden="true" />}
+                {password === confirm ? 'Passwords match' : 'Passwords do not match yet'}
+              </p>
+            )}
+          </div>
 
           <button
             type="submit"
@@ -123,9 +175,12 @@ function FirstPassword() {
                 Saving…
               </>
             ) : (
-              'Save and continue'
+              'Activate my account'
             )}
           </button>
+          <p className="text-caption text-muted">
+            You will be signed in automatically and taken to your dashboard.
+          </p>
         </form>
       </AuthShell>
     </div>

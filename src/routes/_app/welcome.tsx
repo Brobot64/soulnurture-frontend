@@ -31,8 +31,8 @@ function Welcome() {
     <div className="flex flex-1 items-center justify-center">
       <div className="mx-auto grid w-full max-w-[1440px] items-center gap-8 px-6 py-10 lg:grid-cols-2 lg:gap-20 lg:px-[120px] lg:py-16">
         <div className="order-2 lg:order-1">
-          <span className="hidden h-[30px] w-fit items-center gap-2 rounded-pill bg-surface px-4 text-chip text-heading lg:inline-flex">
-            <span className="size-3 rounded-full bg-action" />
+          <span className="inline-flex h-[30px] w-fit items-center gap-2 rounded-pill bg-panel px-4 text-chip font-semibold text-brand-4">
+            <span aria-hidden="true" className="size-2 rounded-full bg-action" />
             Student check-in
           </span>
           <TextsReveal>
