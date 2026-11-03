@@ -20,6 +20,7 @@ import {
   Skeleton,
   TextField,
 } from '#/components/dash/ui'
+import { REVIEWER_ROLES } from '#/lib/ai-response-reports'
 import { CHAT_STAFF_ROLES } from '#/lib/auth'
 import { useApiQuery, useRoleGuard } from '#/lib/dash'
 import { ApiError } from '#/lib/api'
@@ -89,6 +90,11 @@ function SupportRequestsPage() {
   if (!user) return null
 
   const schoolName = user.school?.name ?? 'your school'
+  // The column that names the indicator beside a request is a reader-dependent
+  // fact, not a layout choice: Doc A has not approved indicator content for
+  // support staff and the indicators screen refuses them, so the queue does not
+  // offer a column — or a link into it — that the viewer cannot open.
+  const seesIndicators = REVIEWER_ROLES.some((role) => role === user.role)
 
   return (
     <>
@@ -109,6 +115,7 @@ function SupportRequestsPage() {
           onChipChange={setChip}
           search={debouncedSearch}
           schoolName={schoolName}
+          seesIndicators={seesIndicators}
           requestId={requestId}
           onSelect={(id) => void navigate({ search: id ? { requestId: id } : {}, replace: true })}
         />
@@ -122,6 +129,7 @@ function QueuePanels({
   onChipChange,
   search,
   schoolName,
+  seesIndicators,
   requestId,
   onSelect,
 }: {
@@ -129,6 +137,7 @@ function QueuePanels({
   onChipChange: (next: QueueFilter | 'ALL') => void
   search: string
   schoolName: string
+  seesIndicators: boolean
   requestId?: string
   onSelect: (id: string | null) => void
 }) {
@@ -209,6 +218,7 @@ function QueuePanels({
         <RequestsTable
           items={queue.data.items}
           schoolName={schoolName}
+          seesIndicators={seesIndicators}
           onSelect={(item) => {
             setConfirmation(null)
             setSelected(item)
@@ -232,7 +242,9 @@ function QueuePanels({
       <p className="flex items-start gap-2 text-caption text-muted">
         <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         Support prompts are suggestions for human review. They are not diagnoses or
-        decisions. You only see requests you are authorised to view.
+        decisions. A student can ask for help with no indicator beside the request, and where
+        the two share a conversation they stay two records with two statuses — reading one
+        here changes neither. You only see requests you are authorised to view.
       </p>
     </>
   )
@@ -265,10 +277,12 @@ function StatTile({
 function RequestsTable({
   items,
   schoolName,
+  seesIndicators,
   onSelect,
 }: {
   items: SupportQueueItem[]
   schoolName: string
+  seesIndicators: boolean
   onSelect: (item: SupportQueueItem) => void
 }) {
   if (items.length === 0) {
@@ -287,11 +301,21 @@ function RequestsTable({
 
   return (
     <div className="overflow-hidden rounded-panel border border-hairline bg-white">
-      <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem] items-center gap-4 bg-panel px-6 py-3 text-chip font-medium text-body md:grid">
+      {/* Both column templates are spelled out in full. Tailwind's scanner
+          cannot see a class built by interpolating a shared constant, so one
+          string variable would compile cleanly and render unstyled. */}
+      <div
+        className={`hidden items-center gap-4 bg-panel px-6 py-3 text-chip font-medium text-body md:grid ${
+          seesIndicators
+            ? 'md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem]'
+            : 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem]'
+        }`}
+      >
         <span>Student · urgency</span>
         <span>Requested</span>
         <span>Support prompt</span>
         <span>Request status</span>
+        {seesIndicators && <span>Linked indicator</span>}
         <span aria-hidden="true" />
       </div>
       <ul className="flex flex-col divide-y divide-hairline">
@@ -300,12 +324,16 @@ function RequestsTable({
             <button
               type="button"
               onClick={() => onSelect(item)}
-              // One row, two shapes. Below md the five columns cannot each hold
+              // One row, two shapes. Below md these columns cannot each hold
               // a pill, so the row stacks: identity on top, the meta fields on
               // a wrapped line under it. At md+ both wrapper spans become
               // `display: contents`, which hands their children to the grid and
               // restores the aligned table columns.
-              className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-panel-2/50 md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem] md:gap-4 md:px-6"
+              className={`flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-panel-2/50 md:grid md:gap-4 md:px-6 ${
+                seesIndicators
+                  ? 'md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem]'
+                  : 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem]'
+              }`}
             >
               <span className="flex min-w-0 flex-1 flex-col gap-2 md:contents">
                 <span className="flex min-w-0 items-center gap-3 md:flex-none">
@@ -360,6 +388,28 @@ function RequestsTable({
                   </span>
                 </span>
               </span>
+              {/* A pointer to a separate record, not a second status for this
+                  one. Hidden below md like the other columns — and it can never
+                  be a link here, because the whole row is the button that opens
+                  the review dialog. The dialog carries the way through to the
+                  indicator instead. */}
+              {seesIndicators && (
+                <span className="hidden min-w-0 text-copy-sm md:block">
+                  {item.linkedIndicator ? (
+                    <span className="block truncate">
+                      <span className="text-heading">{item.linkedIndicator.triggerLabel}</span>
+                      <span className="text-muted">
+                        {' · '}
+                        {item.linkedIndicator.level
+                          ? `Level ${item.linkedIndicator.level}`
+                          : 'Unclassified'}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-muted">None linked</span>
+                  )}
+                </span>
+              )}
               <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted" />
             </button>
           </li>
@@ -579,6 +629,33 @@ function ReviewDialog({
               {QUEUE_STATUS_LABELS[item.queueStatus]}
             </span>
           </dd>
+          {item.linkedIndicator && (
+            <>
+              <dt className="text-muted">Linked indicator</dt>
+              <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="min-w-0 truncate text-heading">
+                  {item.linkedIndicator.triggerLabel}
+                  <span className="text-muted">
+                    {' · '}
+                    {item.linkedIndicator.level
+                      ? `Level ${item.linkedIndicator.level}`
+                      : 'Unclassified'}
+                  </span>
+                </span>
+                {/* The row button cannot hold a link, so the way across lives
+                    here. Opening the indicator does not change this request,
+                    and reviewing it here does not change the indicator. */}
+                <Link
+                  to="/school/indicators"
+                  search={{ flagId: item.linkedIndicator.id }}
+                  onClick={onClose}
+                  className="text-chip font-medium text-action transition-colors hover:text-brand-4"
+                >
+                  Open in Support indicators
+                </Link>
+              </dd>
+            </>
+          )}
           <dt className="text-muted">Urgency</dt>
           <dd className="flex flex-wrap items-center gap-2 text-heading">
             {item.urgency === 'URGENT' ? (

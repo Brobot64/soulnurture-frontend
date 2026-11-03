@@ -3,11 +3,16 @@
 // A row carries four independent facts and renders each one separately: the
 // stored lifecycle (`requestStatus`), the coarse NEW/REVIEWED chip split, the
 // follow-up state, and the urgency the student asked for themselves. Collapsing
-// any of them into another is what made statuses read wrong.
+// any of them into another is what made statuses read wrong. A fifth field,
+// `linkedIndicator`, is not a fifth status — it is a pointer to a separate
+// record, and the one thing it must never do is describe this row.
 
 import { useEffect, useState } from 'react'
 
 import { apiFetch } from '#/lib/api'
+// Both directions are type-only, so the two modules can name each other's
+// reference without either importing the other at runtime.
+import type { FlagSeverity, FlagStatus, IndicatorLevel } from '#/lib/indicators'
 
 export const SUPPORT_REQUESTS_CHANGED = 'support-requests:changed'
 
@@ -62,6 +67,19 @@ export interface SupportQueueStudent {
   email: string
 }
 
+/** The newest indicator raised on this request's conversation, when one exists
+ * (US-D05, read from the request side). A reference between two separate
+ * records: its status never moves the request's, `null` means the student asked
+ * for help with no indicator beside it, and neither record becomes the other. */
+export interface LinkedIndicatorRef {
+  id: string
+  status: FlagStatus
+  severity: FlagSeverity
+  /** `null` is the real "unclassified" bucket, not a value the client invented. */
+  level: IndicatorLevel | null
+  triggerLabel: string
+}
+
 export interface SupportQueueItem {
   id: string
   readAt: string | null
@@ -80,6 +98,7 @@ export interface SupportQueueItem {
   /** Did the student say they do not feel safe. Sorts the table. */
   urgency: Urgency
   prompt: SupportPrompt
+  linkedIndicator: LinkedIndicatorRef | null
   /** The arrangement the student already sees on their request page. */
   scheduledAt: string | null
   locationLabel: string | null
