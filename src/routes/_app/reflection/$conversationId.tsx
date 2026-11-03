@@ -96,7 +96,7 @@ function Reflection() {
   const [thinking, setThinking] = useState(false)
   const [input, setInput] = useState('')
   const [composerError, setComposerError] = useState<string | null>(null)
-  const [recommendation, setRecommendation] = useState<HumanCareRecommendation | null>(null)
+  const [humanCare, setHumanCare] = useState<HumanCareRecommendation | null>(null)
   const [closing, setClosing] = useState(false)
   const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'transcribing'>('idle')
   const [voiceElapsed, setVoiceElapsed] = useState(0)
@@ -127,6 +127,10 @@ function Reflection() {
   const streamIds = useRef<Set<string>>(new Set())
   const recorderRef = useRef<VoiceRecorder | null>(null)
   const confirmDialogRef = useRef<HTMLDialogElement>(null)
+  const humanCareDialogRef = useRef<HTMLDialogElement>(null)
+  // One offer per conversation: once the student has seen or dismissed it, a
+  // later turn does not interrupt them again.
+  const humanCareOfferedFor = useRef<string | null>(null)
   // Timers and microphone permission prompts must see the latest consent state.
   const consentStateRef = useRef(consentState)
   consentStateRef.current = consentState
@@ -143,6 +147,13 @@ function Reflection() {
   // True while the composer holds an unsent transcript — marks the next send
   // as a voice turn for the pilot analytics.
   const voiceDraftRef = useRef(false)
+
+  /** Offers the human-support popup once per conversation, from any AI turn. */
+  const offerHumanCare = (next: HumanCareRecommendation | null) => {
+    if (!next?.show || humanCareOfferedFor.current === conversationId) return
+    humanCareOfferedFor.current = conversationId
+    setHumanCare(next)
+  }
 
   useEffect(() => {
     if (authStatus !== 'ready') return
@@ -340,7 +351,7 @@ function Reflection() {
           ...prev.map((entry) => (entry.id === tempId ? result.userMessage : entry)),
           result.assistantMessage,
         ])
-        if (result.humanCareRecommendation?.show) setRecommendation(result.humanCareRecommendation)
+        offerHumanCare(result.humanCareRecommendation)
       } catch (caught) {
         if (!isCurrent()) return
         setMessages([])
@@ -392,6 +403,16 @@ function Reflection() {
     if (confirmComplete) dialog.showModal()
     else dialog.close()
   }, [confirmComplete])
+
+  // Same native <dialog> treatment for the human-support offer: it arrives over
+  // the chat instead of pushing the thread around, and dismisses like the rest
+  // of the UI rather than staying pinned under the composer.
+  useEffect(() => {
+    const dialog = humanCareDialogRef.current
+    if (!dialog) return
+    if (humanCare) dialog.showModal()
+    else dialog.close()
+  }, [humanCare])
 
   // Restored placeholders and new sends use the same state-driven polling path.
   useEffect(() => {
@@ -455,7 +476,7 @@ function Reflection() {
         ...prev.map((entry) => (entry.id === tempId ? result.userMessage : entry)),
         result.assistantMessage,
       ])
-      if (result.humanCareRecommendation?.show) setRecommendation(result.humanCareRecommendation)
+      offerHumanCare(result.humanCareRecommendation)
     } catch (caught) {
       if (!sync.isCurrent()) return
       if (caught instanceof ApiError && caught.status === 401) {
@@ -815,21 +836,6 @@ function Reflection() {
           </div>
 
           <div className="mt-2 shrink-0 lg:mt-3">
-            {recommendation?.show && (
-              <div className="mb-3 rounded-panel bg-peach px-5 py-4 lg:px-6 lg:py-4">
-                <p className="text-copy text-peach-ink">
-                  {recommendation.message ??
-                    'It might help to talk with someone at your school.'}
-                </p>
-                <Link
-                  to="/support"
-                  className="mt-3 inline-flex text-button-sm text-action transition-colors hover:text-brand-4"
-                >
-                  Talk to a person
-                </Link>
-              </div>
-            )}
-
             {composerError && (
               <div className="mb-4">
                 <StatusBadge tone="error">{composerError}</StatusBadge>
@@ -1025,6 +1031,40 @@ function Reflection() {
             {closing && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
             {closing ? 'Finishing…' : 'Complete reflection'}
           </button>
+        </div>
+      </dialog>
+
+      <dialog
+        ref={humanCareDialogRef}
+        aria-labelledby="human-care-title"
+        onCancel={() => setHumanCare(null)}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) setHumanCare(null)
+        }}
+        className="m-auto w-[min(460px,calc(100%_-_32px))] rounded-panel border border-accent bg-peach p-6 backdrop:bg-scrim/40"
+      >
+        <h2 id="human-care-title" className="text-section text-peach-ink">
+          Would you like to talk to a person?
+        </h2>
+        <p className="mt-2 text-copy-sm text-peach-ink">
+          {humanCare?.message ??
+            'It might help to talk with someone at your school.'}
+        </p>
+        <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={() => setHumanCare(null)}
+            className="inline-flex h-11 items-center justify-center rounded-pill bg-white/70 px-6 text-button-sm text-peach-ink transition-colors hover:bg-white"
+          >
+            Not right now
+          </button>
+          <Link
+            to="/support"
+            onClick={() => setHumanCare(null)}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-pill bg-action px-6 text-button-sm text-white transition-colors hover:bg-brand-4"
+          >
+            Talk to a person
+          </Link>
         </div>
       </dialog>
 
