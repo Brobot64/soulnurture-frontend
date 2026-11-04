@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowRight, Check, ChevronRight, Loader2, Mic, RefreshCw, Square, UserRound, X } from 'lucide-react'
 
+import { AiSupportSafetySheet } from '#/components/AiSupportSafetySheet'
 import { BoundaryNotice } from '#/components/BoundaryNotice'
 import { CheckInSummary } from '#/components/CheckInSummary'
 import { ConsentGate, useAiConsent } from '#/components/ConsentGate'
@@ -674,10 +675,10 @@ function Reflection() {
             />
           )}
 
-          <p className="mx-auto flex w-fit shrink-0 items-center gap-2 rounded-pill bg-peach px-4 py-1.5 text-caption text-peach-ink lg:mt-3 lg:gap-2.5 lg:px-5 lg:py-1.5 lg:text-chip">
-            <span className="size-1.5 rounded-full bg-accent lg:size-2" aria-hidden="true" />
-            AI-guided reflection · not a therapist or doctor
-          </p>
+          {/* The boundary line is also the door to Epic G's "Using AI support
+              safely" panel, so the limit a student reads is the one they
+              agreed to — never a shorter paraphrase of it. */}
+          <AiSupportSafetySheet />
 
           <div ref={scrollRef} role="log" className="mt-2 min-h-0 flex-1 overflow-y-auto lg:mt-3">
             <div className="flex flex-col gap-5 pb-4 lg:gap-7">

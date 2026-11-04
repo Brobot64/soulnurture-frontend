@@ -3,8 +3,9 @@
 // and describes rules the server enforces — nothing here is clinical policy, and
 // nothing is asserted that the running config does not actually do.
 
+import type { ReactNode } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowLeft, CircleSlash, PhoneIncoming, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, CircleSlash, PhoneIncoming, ShieldAlert, ShieldCheck } from 'lucide-react'
 
 import { DashHeader } from '#/components/dash/DashHeader'
 import { Button, ErrorNote, Skeleton, Tag, type TagTone } from '#/components/dash/ui'
@@ -81,6 +82,43 @@ function Boundaries() {
               />
             </div>
 
+            {/* Epic G's counsellor explainer. Each line is checked against what
+                this deployment actually runs, so the one the design asserts —
+                that rules and wording already carry a professional sign-off —
+                is stated as the pending workflow it is instead. */}
+            <section className="rounded-panel border border-hairline bg-white p-5 sm:p-7" aria-labelledby="remit-heading">
+              <h2 id="remit-heading" className="text-title-sm text-heading">What the AI does and never does</h2>
+              <p className="mt-2 text-copy-sm text-muted">
+                A short guide to the limits of Soul Nurture AI, for the people who review what it surfaces.
+              </p>
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                <RemitList
+                  title="The AI can"
+                  tone="can"
+                  items={[
+                    'Guide an emotional check-in and a guided reflection.',
+                    'Offer only the wellbeing resources the content register has approved for students.',
+                    'Encourage a student to reach a person at their school, and hand them the route to do it.',
+                    'Raise a server-policy flag on a conversation so a person can review it.',
+                    'Stop its own reply when it crosses a boundary listed below, and say so to the student.',
+                  ]}
+                />
+                <RemitList
+                  title="The AI never"
+                  tone="never"
+                  items={[
+                    'Diagnoses a mental-health condition or any other illness.',
+                    'Presents itself as a therapist, counsellor, doctor or a person.',
+                    'Gives therapy or medical advice, including anything about medication.',
+                    'Predicts a student’s future mental health or promises how things will turn out.',
+                    'Decides a student’s care, follow-up or the outcome of a request.',
+                    'Turns an indicator into a clinical finding — a flag is a prompt for your review, not a diagnosis.',
+                    'Acts as an emergency service or dispatches help.',
+                  ]}
+                />
+              </div>
+            </section>
+
             <section className="rounded-panel border border-hairline bg-white p-5 sm:p-7" aria-labelledby="banned-claims-heading">
               <h2 id="banned-claims-heading" className="text-title-sm text-heading">What the AI may never claim</h2>
               <p className="mt-2 text-copy-sm text-muted">
@@ -139,6 +177,30 @@ function Boundaries() {
               </p>
             </section>
 
+            <section className="rounded-panel border border-hairline bg-white p-5 sm:p-7" aria-labelledby="review-heading">
+              <h2 id="review-heading" className="text-title-sm text-heading">How AI behaviour is reviewed</h2>
+              <ul className="mt-5 flex flex-col gap-3">
+                <ReviewLine>
+                  A student can report any AI reply in their reflection. Each report arrives in{' '}
+                  <Link to="/school/reports" className="font-semibold text-action hover:text-brand-4">AI reply reports</Link>
+                  {' '}with the reason the student chose and the reply frozen as they saw it.
+                </ReviewLine>
+                <ReviewLine>
+                  A reviewer’s decision is recorded on the report only. It changes no reply, no conversation, no support request and
+                  sends the student no message — which is why the student’s receipt never shows that a review happened.
+                </ReviewLine>
+                <ReviewLine>
+                  The rules on this page are read from the running configuration, not from a policy document. Professional sign-off of
+                  rule wording is a workflow this deployment does not record yet: every Doc A indicator rule is still awaiting the
+                  threshold only a qualified professional can set, so the keyword floor below is the only automatic safety net.
+                </ReviewLine>
+              </ul>
+              <p className="mt-5 border-t border-hairline pt-5 text-copy-sm text-heading">
+                <span className="font-semibold">Human oversight principle:</span> AI supports identification and reflection.
+                Qualified humans remain responsible for professional review, safeguarding decisions and follow-up.
+              </p>
+            </section>
+
             <div className="rounded-card bg-panel px-6 py-5 text-copy-sm text-brand-4">
               These are technical guardrails, not a safeguarding procedure. Your school’s own policy decides what happens after a
               flag or a report reaches you.
@@ -156,6 +218,28 @@ function Boundaries() {
 
 function countSevere(claims: BannedClaimSpec[]): number {
   return claims.filter((claim) => claim.severity === 'severe').length
+}
+
+function RemitList({ title, tone, items }: { title: string; tone: 'can' | 'never'; items: string[] }) {
+  return (
+    <div className={`rounded-card border p-5 ${tone === 'can' ? 'border-hairline bg-panel' : 'border-apricot-10 bg-peach'}`}>
+      <h3 className={`text-card ${tone === 'can' ? 'text-heading' : 'text-peach-ink'}`}>{title}</h3>
+      <ul className="mt-3 flex list-disc flex-col gap-2 pl-5">
+        {items.map((item) => (
+          <li key={item} className={`text-copy-sm ${tone === 'can' ? 'text-body' : 'text-peach-ink'}`}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function ReviewLine({ children }: { children: ReactNode }) {
+  return (
+    <li className="flex gap-3 rounded-card border border-hairline p-4">
+      <ShieldCheck className="mt-0.5 size-4 shrink-0 text-action" aria-hidden="true" />
+      <p className="min-w-0 text-copy-sm text-body">{children}</p>
+    </li>
+  )
 }
 
 function BoundaryCard({ icon: Icon, title, body }: { icon: typeof ShieldAlert; title: string; body: string }) {
