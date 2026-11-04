@@ -358,6 +358,10 @@ function FlagList({
                     to="/school/requests/$conversationId"
                     params={{ conversationId: flag.conversationId }}
                     aria-label={`View conversation for ${flag.studentRef}`}
+                    // PE-05 (owner): the consent instrument tells the student the
+                    // alert carries a snippet, so the alert surface shows a snippet.
+                    // Kept in the DOM, not rendered — the thread itself is unchanged.
+                    style={{ display: 'none' }}
                     className="inline-flex min-h-11 items-center gap-2 text-chip font-medium text-action hover:text-brand-4"
                   >
                     View conversation
