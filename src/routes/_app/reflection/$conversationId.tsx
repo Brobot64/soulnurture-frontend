@@ -33,6 +33,7 @@ import {
   newId,
   readPendingOpening,
   sendMessage,
+  type AiBoundary,
   type CheckIn,
   type CheckInHistoryEntry,
   type ConversationDetail,
@@ -98,6 +99,11 @@ function Reflection() {
   const [input, setInput] = useState('')
   const [composerError, setComposerError] = useState<string | null>(null)
   const [humanCare, setHumanCare] = useState<HumanCareRecommendation | null>(null)
+  /** Why the last boundary turn left the AI's remit, told once per kind as a
+   * popup over the chat rather than a block pushed into the thread. */
+  const [boundaryNotice, setBoundaryNotice] = useState<AiBoundary | null>(null)
+  /** True only once this visit has watched the chat end — see the read-only band. */
+  const [endedThisVisit, setEndedThisVisit] = useState(false)
   const [closing, setClosing] = useState(false)
   const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'transcribing'>('idle')
   const [voiceElapsed, setVoiceElapsed] = useState(0)
@@ -132,6 +138,10 @@ function Reflection() {
   // One offer per conversation: once the student has seen or dismissed it, a
   // later turn does not interrupt them again.
   const humanCareOfferedFor = useRef<string | null>(null)
+  // Same once-only latch for the boundary popup, keyed per kind: a second
+  // out-of-scope turn doesn't interrupt the chat again, but an acute route is a
+  // different decision and still gets said out loud.
+  const boundaryNoticedFor = useRef<Set<string>>(new Set())
   // Timers and microphone permission prompts must see the latest consent state.
   const consentStateRef = useRef(consentState)
   consentStateRef.current = consentState
@@ -149,9 +159,12 @@ function Reflection() {
   // as a voice turn for the pilot analytics.
   const voiceDraftRef = useRef(false)
 
-  /** Offers the human-support popup once per conversation, from any AI turn. */
-  const offerHumanCare = (next: HumanCareRecommendation | null) => {
+  /** Offers the human-support popup once per conversation, from any AI turn. An
+   * acute route is the exception: that turn's own notice already says a person
+   * has been told and opens the same door, so a second popup would only stack. */
+  const offerHumanCare = (next: HumanCareRecommendation | null, turn?: Message) => {
     if (!next?.show || humanCareOfferedFor.current === conversationId) return
+    if (turn?.aiPayload?.boundary?.kind === 'ACUTE_SAFEGUARD_ROUTE') return
     humanCareOfferedFor.current = conversationId
     setHumanCare(next)
   }
@@ -270,6 +283,7 @@ function Reflection() {
       if (push.conversationId !== conversationId || !isCurrent()) return
       setEndedByExpiry(push.reason === 'IDLE')
       setConversationStatus('CLOSED')
+      setEndedThisVisit(true)
       if (push.reason === 'IDLE') {
         flash('Your reflection timed out — your words are saved. Finish with a quick mood check.')
       }
@@ -352,7 +366,7 @@ function Reflection() {
           ...prev.map((entry) => (entry.id === tempId ? result.userMessage : entry)),
           result.assistantMessage,
         ])
-        offerHumanCare(result.humanCareRecommendation)
+        offerHumanCare(result.humanCareRecommendation, result.assistantMessage)
       } catch (caught) {
         if (!isCurrent()) return
         setMessages([])
@@ -414,6 +428,22 @@ function Reflection() {
     if (humanCare) dialog.showModal()
     else dialog.close()
   }, [humanCare])
+
+  // The server writes the boundary onto the assistant turn, so the thread is
+  // the source of truth: the same scan finds it whether the reply arrived on a
+  // send, on a poll, or on a page opened later to read it back.
+  useEffect(() => {
+    if (loading || loadFailed || humanCare) return
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const boundary = messages[index].aiPayload?.boundary
+      if (!boundary) continue
+      const key = `${conversationId}:${boundary.kind}`
+      if (boundaryNoticedFor.current.has(key)) continue
+      boundaryNoticedFor.current.add(key)
+      setBoundaryNotice(boundary)
+      return
+    }
+  }, [messages, conversationId, loading, loadFailed, humanCare])
 
   // Restored placeholders and new sends use the same state-driven polling path.
   useEffect(() => {
@@ -477,7 +507,7 @@ function Reflection() {
         ...prev.map((entry) => (entry.id === tempId ? result.userMessage : entry)),
         result.assistantMessage,
       ])
-      offerHumanCare(result.humanCareRecommendation)
+      offerHumanCare(result.humanCareRecommendation, result.assistantMessage)
     } catch (caught) {
       if (!sync.isCurrent()) return
       if (caught instanceof ApiError && caught.status === 401) {
@@ -499,6 +529,7 @@ function Reflection() {
       if (caught instanceof ApiError && caught.status === 409) {
         // the conversation was closed elsewhere — flip the screen to read-only
         setConversationStatus('CLOSED')
+        setEndedThisVisit(true)
       }
       setMessages((prev) => prev.filter((entry) => entry.id !== tempId))
       setInput(content)
@@ -751,9 +782,6 @@ function Reflection() {
                             <p className="text-copy text-ink sm:text-lede">{entry.content}</p>
                           </Reveal>
                         )}
-                        {entry.aiPayload?.boundary && (
-                          <BoundaryNotice boundary={entry.aiPayload.boundary} />
-                        )}
                         {!loadFailed && user?.role === 'STUDENT' && consentState === 'accepted' && entry.role === 'ASSISTANT' && entry.content &&
                           entry.aiPayload?.asyncState !== 'PENDING_AI' && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(entry.id) && (
                           <ReportResponseButton
@@ -843,7 +871,11 @@ function Reflection() {
               </div>
             )}
 
-            {!loading && !loadFailed && readOnly && (
+            {/* The end-of-chat band belongs to the visit that watched it end.
+                Opening an old reflection is reading history — the check-in is
+                long finished, so it gets no mood-check prompt and no new
+                check-in button; /history and the header are how you leave. */}
+            {!loading && !loadFailed && readOnly && endedThisVisit && (
               <div className="flex flex-col items-center gap-2.5 py-1.5 lg:gap-3 lg:py-2">
                 <p className="text-center text-copy text-muted">
                   {endedByExpiry
@@ -1068,6 +1100,13 @@ function Reflection() {
           </Link>
         </div>
       </dialog>
+
+      {boundaryNotice && (
+        <BoundaryNotice
+          boundary={boundaryNotice}
+          onDismiss={() => setBoundaryNotice(null)}
+        />
+      )}
 
       <Flash message={flashMessage} hiding={hiding} />
     </div>
