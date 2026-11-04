@@ -101,9 +101,12 @@ function NotFound() {
         <div className="w-full max-w-md rounded-panel border border-hairline bg-white p-8 text-center sm:p-12">
           <span className="mx-auto grid size-16 place-items-center rounded-full bg-panel text-action"><LockKeyhole className="size-7" aria-hidden="true" /></span>
           <h1 className="mt-6 text-title-sm text-heading">Page not found</h1>
-          <p className="mt-3 text-copy-sm text-body">The link you entered doesn’t lead to a page. No private information is shown here.</p>
-          <Link to="/" className="mt-7 inline-flex min-h-11 items-center justify-center rounded-pill bg-action px-6 text-chip font-semibold text-white hover:bg-brand-4">Back to home</Link>
-          <p className="mt-6 text-caption text-muted">If you’re in danger, tell a trusted adult or contact local emergency services.</p>
+          <p className="mt-3 text-copy-sm text-body">The link you entered did not produce any results.</p>
+          <Link to="/" className="mt-7 inline-flex min-h-11 items-center justify-center rounded-pill bg-surface px-6 text-chip font-semibold text-brand-4 hover:bg-neutral-10">Back to home</Link>
+          <p className="mt-6 text-caption text-muted">
+            Think this is a mistake?{' '}
+            <Link to="/support" className="text-action underline">Talk to a school counsellor</Link>.
+          </p>
         </div>
       </main>
     </div>

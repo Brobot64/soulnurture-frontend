@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { LockKeyhole, UserRound } from 'lucide-react'
 
 import { AuthField, AuthShell } from '#/components/AuthShell'
 import { Spinner, StatusBadge } from '#/components/StatusBadge'
@@ -76,7 +77,7 @@ function SignIn() {
       }
       if (apiError?.status === 401) {
         setInvalidCredentials(true)
-        setError('Email or password is incorrect.')
+        setError('We couldn’t sign you in. Please check your email and your password, then try again.')
       } else {
         setError('We couldn’t sign you in right now. Please try again.')
       }
@@ -88,8 +89,14 @@ function SignIn() {
   return (
     <AuthShell
       illustrated
+      chip="Welcome back"
+      panel={{
+        Icon: LockKeyhole,
+        heading: 'Good to see you again',
+        caption: 'Your wellbeing space is just as you left it.',
+      }}
       title="Welcome back"
-      subtitle="Students and professionals: sign in with your account email and password."
+      subtitle="Sign in with your school email and your password."
       footer={
         <p className="mt-7 text-copy text-body">
           New here? Accounts are set up by your school or organisation — ask your administrator.
@@ -112,6 +119,7 @@ function SignIn() {
           id="email"
           label="Email"
           type="email"
+          Icon={UserRound}
           value={email}
           onChange={(value) => {
             setEmail(value)
@@ -127,6 +135,7 @@ function SignIn() {
           id="password"
           label="Password"
           type="password"
+          Icon={LockKeyhole}
           value={password}
           onChange={(value) => {
             setPassword(value)

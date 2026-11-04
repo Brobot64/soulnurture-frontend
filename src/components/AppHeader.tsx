@@ -69,7 +69,7 @@ export function AppHeader() {
       exact: true,
       active: path === '/' || path === '/welcome' || ['/check-in', '/reflection', '/complete'].some(inSection),
     },
-    { to: '/resources' as const, label: 'Wellbeing resources', icon: BookOpen, exact: false, active: inSection('/resources') },
+    { to: '/resources' as const, label: 'Wellbeing Resources', icon: BookOpen, exact: false, active: inSection('/resources') },
     // Students only: the page is @Roles('STUDENT') server-side, so a staff
     // account clicking it would be refused rather than redirected.
     ...(isStudent
@@ -96,7 +96,7 @@ export function AppHeader() {
         </nav>
         <div className="flex items-center gap-2 lg:gap-3">
           <Link to="/support" aria-current={supportActive ? 'page' : undefined} className={`relative hidden min-h-11 items-center gap-2 rounded-pill border px-5 text-chip font-semibold text-action transition-colors hover:bg-panel lg:inline-flex ${supportActive ? 'border-action bg-panel' : 'border-action/40'}`}>
-            Request counsellor support
+            Request Counsellor Support
             {user && chatUnread.total > 0 && (
               <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">
                 {chatUnread.total > 99 ? '99+' : chatUnread.total}
@@ -140,9 +140,9 @@ export function AppHeader() {
           {!user && <Link to="/signin" onClick={() => setMobileOpen(false)} className="mt-3 flex min-h-11 items-center justify-center rounded-pill bg-action text-copy-sm font-semibold text-white">Sign in with your school account</Link>}
         </nav>
       )}
-      <Dialog open={signOutOpen} onClose={() => { if (!signingOut) setSignOutOpen(false) }} title="Sign out of Soul Nurture AI?" icon={LogOut} footer={<><Button variant="ghost" disabled={signingOut} onClick={() => setSignOutOpen(false)}>Stay signed in</Button><Button disabled={signingOut} onClick={() => void handleSignOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</Button></>}>
-        <p className="text-copy-sm text-body">Your saved check-ins and conversations will still be here when you sign in again. On a shared device, always sign out when you are done.</p>
-        {signOutError && <p role="alert" className="mt-3 text-copy-sm text-destructive">Could not sign out. Check your connection and try again.</p>}
+      <Dialog open={signOutOpen} onClose={() => { if (!signingOut) setSignOutOpen(false) }} title="Log out of Soul Nurture AI?" icon={LogOut} footer={<><Button variant="ghost" disabled={signingOut} onClick={() => setSignOutOpen(false)}>Stay signed in</Button><Button disabled={signingOut} onClick={() => void handleSignOut()}>{signingOut ? 'Logging out…' : 'Log out'}</Button></>}>
+        <p className="text-copy-sm text-body">You will need your email and your password to sign in again. On a shared device, always log out when you are done.</p>
+        {signOutError && <p role="alert" className="mt-3 text-copy-sm text-destructive">Could not log out. Check your connection and try again.</p>}
       </Dialog>
     </header>
   )

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ShieldAlert, TriangleAlert } from 'lucide-react'
+import { ShieldAlert, TriangleAlert, type LucideIcon } from 'lucide-react'
 
 import { SUPPORT_EMERGENCY_NOTICE } from '#/lib/support'
 import type { AiBoundary } from '#/lib/journey'
@@ -12,68 +12,117 @@ import type { AiBoundary } from '#/lib/journey'
  * left guessing which one just happened. It claims nothing the backend did not
  * record: no diagnosis, no promised response time, no emergency dispatch.
  *
- * It arrives as a popup over the chat rather than a block inside the thread:
- * the student reads it, closes it and keeps talking. A boundary is a decision
- * about one turn, not an end to the conversation.
+ * It is a popup, not a block in the thread: the full text interrupts once, the
+ * thread keeps a one-line marker so the record survives after the student
+ * closes it, and closing returns them to a chat that is still open.
  */
-export function BoundaryNotice({
+
+interface BoundaryCopy {
+  Icon: LucideIcon
+  heading: string
+  body: string
+  /** The acute lane is the peach warning; the out-of-scope lane is neutral. */
+  acute: boolean
+}
+
+function boundaryCopy(boundary: AiBoundary): BoundaryCopy {
+  const acute = boundary.kind === 'ACUTE_SAFEGUARD_ROUTE'
+  return {
+    Icon: acute ? TriangleAlert : ShieldAlert,
+    heading: acute ? 'Not an emergency service' : 'Outside what the AI can help with',
+    body: acute
+      ? `What you shared is with your school’s support team now, so a person can follow up with you. ${SUPPORT_EMERGENCY_NOTICE}`
+      : 'That answer was stopped before it reached you. Diagnosing a condition, advising on medication, writing certificates and promising how things will turn out are outside what this AI may do — they need a person with the right training.',
+    acute,
+  }
+}
+
+/** The thread's standing record of a turn that left the AI's remit. */
+export function BoundaryNoticeMarker({
   boundary,
-  onDismiss,
+  onOpen,
 }: {
   boundary: AiBoundary
-  onDismiss: () => void
+  onOpen: () => void
+}) {
+  const { Icon, heading, acute } = boundaryCopy(boundary)
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`mt-2 flex max-w-[560px] items-center gap-2 rounded-card border px-3 py-2 text-left text-caption transition-colors ${
+        acute
+          ? 'border-apricot-10 bg-peach/60 text-peach-ink hover:bg-peach'
+          : 'border-hairline bg-panel text-heading hover:bg-surface'
+      }`}
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1">{heading}</span>
+      <span className="shrink-0 underline">View</span>
+    </button>
+  )
+}
+
+/**
+ * Shown over the chat as soon as a turn leaves the AI's remit. Dismissing it
+ * (button, backdrop or Esc) only closes the popup — nothing about the
+ * conversation changes, and the marker stays in the thread.
+ */
+export function BoundaryNoticeDialog({
+  boundary,
+  onClose,
+}: {
+  boundary: AiBoundary | null
+  onClose: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const outOfScope = boundary.kind === 'OUT_OF_SCOPE'
-  const Icon = outOfScope ? ShieldAlert : TriangleAlert
 
-  // Mounted only while showing, so showModal() here is what gives the backdrop,
-  // focus trap and Esc for free.
   useEffect(() => {
-    dialogRef.current?.showModal()
-  }, [])
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (boundary) dialog.showModal()
+    else dialog.close()
+  }, [boundary])
+
+  const copy = boundaryCopy(boundary ?? { kind: 'OUT_OF_SCOPE', intentId: null })
+  const { Icon } = copy
 
   return (
     <dialog
       ref={dialogRef}
       aria-labelledby="boundary-notice-title"
-      onCancel={onDismiss}
+      onCancel={onClose}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onDismiss()
+        if (event.target === event.currentTarget) onClose()
       }}
-      className={`m-auto w-[min(460px,calc(100%_-_32px))] rounded-panel border p-6 backdrop:bg-scrim/40 ${
-        outOfScope ? 'border-hairline bg-white' : 'border-accent bg-peach'
+      className={`m-auto w-[min(520px,calc(100%_-_32px))] rounded-panel border p-7 text-center backdrop:bg-scrim/45 backdrop:backdrop-blur-sm ${
+        copy.acute ? 'border-apricot-10 bg-peach text-peach-ink' : 'border-hairline bg-page text-body'
       }`}
     >
+      <span
+        aria-hidden="true"
+        className={`mx-auto grid size-16 place-items-center rounded-full ${copy.acute ? 'bg-white/70' : 'bg-panel text-action'}`}
+      >
+        <Icon className="size-8" />
+      </span>
       <h2
         id="boundary-notice-title"
-        className={`flex items-center gap-2.5 text-section ${
-          outOfScope ? 'text-heading' : 'text-peach-ink'
-        }`}
+        className="mt-5 text-section text-heading"
       >
-        <Icon className="size-4 shrink-0" aria-hidden="true" />
-        {outOfScope ? 'Outside what the AI can help with' : 'Not an emergency service'}
+        {copy.heading}
       </h2>
-      <p className={`mt-2 text-copy-sm ${outOfScope ? 'text-body' : 'text-peach-ink'}`}>
-        {outOfScope
-          ? 'That answer was stopped before it reached you. Diagnosing a condition, advising on medication, writing certificates and promising how things will turn out are outside what this AI may do — they need a person with the right training.'
-          : `What you shared is with your school’s support team now, so a person can follow up with you. ${SUPPORT_EMERGENCY_NOTICE}`}
-      </p>
-      <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+      <p className="mx-auto mt-3 max-w-[420px] text-copy-sm">{copy.body}</p>
+      <div className="mt-7 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-center sm:items-center">
         <button
           type="button"
-          onClick={onDismiss}
-          className={`inline-flex h-11 items-center justify-center rounded-pill px-6 text-button-sm transition-colors ${
-            outOfScope
-              ? 'bg-surface text-ink hover:bg-neutral-10'
-              : 'bg-white/70 text-peach-ink hover:bg-white'
-          }`}
+          onClick={onClose}
+          className="inline-flex h-11 items-center justify-center rounded-pill bg-white/70 px-6 text-button-sm text-ink transition-colors hover:bg-white"
         >
-          Keep talking
+          Back to the chat
         </button>
         <Link
           to="/support"
-          onClick={onDismiss}
+          onClick={onClose}
           className="inline-flex h-11 items-center justify-center gap-2 rounded-pill bg-action px-6 text-button-sm text-white transition-colors hover:bg-brand-4"
         >
           Talk to a person
