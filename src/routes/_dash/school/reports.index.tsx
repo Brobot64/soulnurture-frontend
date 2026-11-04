@@ -4,7 +4,7 @@ import { ArrowRight, Flag } from 'lucide-react'
 
 import { DashHeader } from '#/components/dash/DashHeader'
 import { Button, EmptyState, ErrorNote, Skeleton, Tag } from '#/components/dash/ui'
-import { fetchAiResponseReports, REVIEW_OUTCOME_LABELS, REVIEWER_ROLES } from '#/lib/ai-response-reports'
+import { fetchAiResponseReports, NO_REASON_LABEL, REPORT_REASON_LABELS, REVIEW_OUTCOME_LABELS, REVIEWER_ROLES } from '#/lib/ai-response-reports'
 import { formatDateTime, useApiQuery, useRoleGuard } from '#/lib/dash'
 
 export const Route = createFileRoute('/_dash/school/reports/')({
@@ -50,6 +50,9 @@ function ReportQueue() {
                   </div>
                   <time dateTime={report.createdAt} className="text-caption text-muted">Submitted {formatDateTime(report.createdAt)}</time>
                 </div>
+                <p className="mt-4 text-chip text-heading">
+                  Student said: <span className="font-semibold">{report.reason ? REPORT_REASON_LABELS[report.reason] : NO_REASON_LABEL}</span>
+                </p>
                 <p className="mt-4 line-clamp-3 whitespace-pre-wrap break-words border-l-4 border-action pl-4 text-copy-sm text-body">{report.responseContent}</p>
                 <p className="mt-4 line-clamp-2 whitespace-pre-wrap break-words text-copy-sm text-muted">{report.note ? `Student note: ${report.note}` : 'No note added.'}</p>
                 <Link to="/school/reports/$reportId" params={{ reportId: report.id }} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-pill text-chip font-semibold text-action hover:text-brand-4 focus-visible:outline-2 focus-visible:outline-action">

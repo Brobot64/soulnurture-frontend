@@ -9,6 +9,7 @@ export interface AiResponseReport {
   conversationId: string
   responseContent: string
   responseLanguage: string | null
+  reason: ReportReason | null
   note: string | null
   reviewOutcome: ReviewOutcome | null
   reviewedAt: string | null
@@ -28,6 +29,28 @@ export const REVIEW_OUTCOME_LABELS: Record<ReviewOutcome, string> = {
   FOLLOWED_UP_WITH_STUDENT: 'Followed up with the student',
   CANNOT_ASSESS: 'Cannot assess yet',
 }
+
+/** The student's own words for why a reply felt wrong (Epic G "What went
+ * wrong?"). The set is closed with "Something else", so choosing is never a
+ * dead end — which is why the server requires one. Reports filed before the
+ * reason existed read as null and say so rather than inventing a category. */
+export const REPORT_REASONS = [
+  'DIAGNOSIS_OR_MEDICAL_ADVICE',
+  'UNSAFE_OR_UNKIND',
+  'DID_NOT_UNDERSTAND',
+  'OTHER',
+] as const
+
+export type ReportReason = (typeof REPORT_REASONS)[number]
+
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  DIAGNOSIS_OR_MEDICAL_ADVICE: 'It sounded like a diagnosis or medical advice',
+  UNSAFE_OR_UNKIND: 'It felt unsafe or unkind',
+  DID_NOT_UNDERSTAND: 'It did not understand me',
+  OTHER: 'Something else',
+}
+
+export const NO_REASON_LABEL = 'No reason given'
 
 export type ReportReceipt = Pick<AiResponseReport, 'id' | 'messageId' | 'createdAt'>
 
@@ -63,7 +86,12 @@ export interface ReviewContext {
 
 const root = '/api/v1/ai-response-reports'
 
-export function submitAiResponseReport(input: { messageId: string; expectedContent: string; note?: string }) {
+export function submitAiResponseReport(input: {
+  messageId: string
+  expectedContent: string
+  reason: ReportReason
+  note?: string
+}) {
   return apiFetch<{ report: AiResponseReport; alreadyReported: boolean }>(root, {
     method: 'POST',
     body: JSON.stringify(input),

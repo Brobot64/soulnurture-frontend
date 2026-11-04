@@ -8,7 +8,9 @@ import { Button, ErrorNote, Skeleton, Tag } from '#/components/dash/ui'
 import {
   fetchAiResponseReport,
   fetchReviewContext,
+  NO_REASON_LABEL,
   recordAiResponseReportReview,
+  REPORT_REASON_LABELS,
   REVIEW_OUTCOME_LABELS,
   REVIEW_OUTCOMES,
   REVIEWER_ROLES,
@@ -51,6 +53,8 @@ function ReportDetail({ reportId }: { reportId: string }) {
             <section className="rounded-panel border border-hairline bg-white p-5 sm:p-7">
               <h2 className="text-title-sm text-heading">Reported reply</h2>
               <blockquote className="mt-5 whitespace-pre-wrap break-words border-l-4 border-action pl-5 text-copy text-body">{report.responseContent}</blockquote>
+              <h3 className="mt-7 text-card text-heading">What went wrong, in the student’s words</h3>
+              <p className="mt-3 text-copy-sm text-body">{report.reason ? REPORT_REASON_LABELS[report.reason] : NO_REASON_LABEL}</p>
               <h3 className="mt-7 text-card text-heading">Student’s note</h3>
               <p className="mt-3 whitespace-pre-wrap break-words text-copy-sm text-body">{report.note ?? 'No note added.'}</p>
             </section>
