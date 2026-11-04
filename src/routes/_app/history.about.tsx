@@ -136,19 +136,37 @@ function HistoryAboutPage() {
           <h2 id="asking-removal" className="text-card font-semibold text-heading">Asking for it to be removed</h2>
         </div>
         <p className="mt-3 text-copy-sm text-body">
-          The button under your history files a request; it does not delete anything by itself. You choose one of three
-          scopes — {(Object.keys(DELETION_SCOPE_LABELS) as (keyof typeof DELETION_SCOPE_LABELS)[])
+          The button under your history schedules a removal; it does not delete anything at the moment you send it. You
+          choose one of three scopes — {(Object.keys(DELETION_SCOPE_LABELS) as (keyof typeof DELETION_SCOPE_LABELS)[])
             .map((scope) => `“${DELETION_SCOPE_LABELS[scope]}”`)
             .join(', ')} — and can add why.
         </p>
         <ul className="mt-4 flex list-disc flex-col gap-2 pl-5">
-          <li className="text-copy-sm text-body">A person at your school reviews it before anything is removed.</li>
-          <li className="text-copy-sm text-body">Some information may have to be kept for safeguarding or legal reasons, and a review can decide to keep it.</li>
           <li className="text-copy-sm text-body">
-            Your history page tells you whether a reviewer was actually reached when you sent the request. If we could
-            not reach them, use Support so a person is certain to see it.
+            This decision is yours. A person at your school is told the removal is coming; they are not asked to approve
+            it, and nothing is held back waiting for a review.
+          </li>
+          <li className="text-copy-sm text-body">
+            The removal runs 24 hours after you send it, and your history page shows the countdown with a button to stop
+            it. Cancel in that window and nothing is removed at all.
+          </li>
+          <li className="text-copy-sm text-body">
+            Once the 24 hours are up it happens and cannot be undone. Each removal leaves one note in the audit record
+            saying only what scope ran and how many rows went — no names, no content.
+          </li>
+          <li className="text-copy-sm text-body">
+            “All of my history” goes further than the entries: it takes the account itself, the login, and the
+            safeguarding record raised on it, out of this product.
+          </li>
+          <li className="text-copy-sm text-body">
+            If we could not reach a person at your school when you sent it, your history page says so. The removal is
+            still scheduled; use Support too if you want a person to know in time to talk with you first.
           </li>
         </ul>
+        <p className="mt-4 text-copy-sm text-muted">
+          What is removed is what this product holds. Anything already copied out of it — a backup, a document a
+          professional wrote elsewhere — is outside what these pages can reach, so ask the school directly about that.
+        </p>
       </section>
 
       <div className="mt-10 max-w-[760px] rounded-card border border-apricot-10 bg-peach p-6 text-peach-ink">

@@ -3,6 +3,7 @@ import { CalendarDays, ListChecks, Trash2 } from 'lucide-react'
 
 import { Button, Dialog, ErrorNote } from '#/components/dash/ui'
 import {
+  DELETION_ACCOUNT_WARNING,
   DELETION_SCOPES,
   DELETION_SCOPE_LABELS,
   HISTORY_DELETION_NOTICE,
@@ -26,10 +27,10 @@ function missingField(scope: DeletionScope, beforeDate: string, selected: string
 }
 
 /**
- * Epic H "Ask to delete your history?". Files a request; it cannot delete
- * anything, and the dialog says so rather than letting the word "delete" imply
- * an instant action. The list of check-ins to offer comes from the student's own
- * history, already loaded on the page — no second fetch, no ids invented here.
+ * Epic H "Ask to delete your history?". Files the ask and schedules the removal
+ * 24 hours out; it deletes nothing here and now, which is what the undo window
+ * is FOR. The list of check-ins to offer comes from the student's own history,
+ * already loaded on the page — no second fetch, no ids invented here.
  */
 export function HistoryDeletionDialog({
   open,
@@ -102,6 +103,12 @@ export function HistoryDeletionDialog({
           })}
         </fieldset>
 
+        {scope === 'ALL_HISTORY' && (
+          <p className="rounded-card border border-accent/30 bg-panel p-4 text-copy-sm text-peach-ink">
+            {DELETION_ACCOUNT_WARNING}
+          </p>
+        )}
+
         {scope === 'BEFORE_DATE' && (
           <label className="flex flex-col gap-2 text-chip font-medium text-heading">
             Delete check-ins before
@@ -162,12 +169,13 @@ export function HistoryDeletionDialog({
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-md text-caption text-muted">
-            A person at your school reviews the request. Nothing is removed when you send it.
+            Nothing is removed when you send it. The removal runs 24 hours later, and you can cancel it on
+            your history page until then.
           </p>
           <div className="flex gap-3">
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
             <Button onClick={() => void submit()} disabled={saving || blocked !== null}>
-              {saving ? 'Sending…' : 'Send deletion request'}
+              {saving ? 'Sending…' : 'Schedule the removal'}
             </Button>
           </div>
         </div>

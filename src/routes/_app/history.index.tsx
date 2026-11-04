@@ -11,6 +11,9 @@ import {
   HISTORY_RETENTION_TRUTH,
   HISTORY_TABS,
   DELETION_SCOPE_LABELS,
+  cancelHistoryDeletion,
+  deletionState,
+  deletionStateLine,
   fetchDeletionRequests,
   fetchHistory,
   feelingTitle,
@@ -52,6 +55,9 @@ function HistoryPage() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<HistoryTab>('all')
   const [askOpen, setAskOpen] = useState(false)
+  const [cancelling, setCancelling] = useState<string | null>(null)
+  const [deletionNotice, setDeletionNotice] = useState<string | null>(null)
+  const [clock, setClock] = useState(() => Date.now())
 
   const load = useCallback(async () => {
     setError(null)
@@ -59,6 +65,10 @@ function HistoryPage() {
       const [history, asks] = await Promise.all([fetchHistory(), fetchDeletionRequests()])
       setData(history)
       setReceipts(asks.items)
+      // The countdown is measured against the moment the schedule was read, not
+      // against when the page first mounted — otherwise an ask filed a minute
+      // after load reads "24 hours 1 minute".
+      setClock(Date.now())
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Your history could not be loaded.')
     }
@@ -68,6 +78,33 @@ function HistoryPage() {
     if (!student) return
     void load()
   }, [student, load])
+
+  // The countdown only needs a clock while something is still on the timer.
+  const anythingScheduled = receipts.some((receipt) => deletionState(receipt) === 'scheduled')
+  useEffect(() => {
+    if (!anythingScheduled) return
+    const tick = setInterval(() => setClock(Date.now()), 30_000)
+    return () => clearInterval(tick)
+  }, [anythingScheduled])
+
+  async function cancelAsk(requestId: string) {
+    if (cancelling) return
+    setCancelling(requestId)
+    setDeletionNotice(null)
+    try {
+      const stopped = await cancelHistoryDeletion(requestId)
+      setReceipts((rows) => rows.map((row) => (row.id === requestId ? stopped : row)))
+      setDeletionNotice('Stopped. Nothing was removed.')
+    } catch (cause) {
+      // Whatever the reason, the server now knows better than this page: a cancel
+      // that arrived after the erasure is an erasure. Say what it answered, then
+      // re-read the list instead of leaving a stale row on screen.
+      setDeletionNotice(cause instanceof Error ? cause.message : 'This request could not be cancelled.')
+      await load()
+    } finally {
+      setCancelling(null)
+    }
+  }
 
   if (!student) {
     return <p role="status" className="mx-auto w-full max-w-[1160px] px-6 py-12 text-copy text-body">Checking your access…</p>
@@ -98,7 +135,7 @@ function HistoryPage() {
           ? entry.supportRequest !== null
           : true,
   )
-  const now = Date.now()
+  const now = clock
   const thisWeek = shown.filter((entry) => withinWeek(entry.createdAt, now))
   const earlier = shown.filter((entry) => !withinWeek(entry.createdAt, now))
 
@@ -164,15 +201,22 @@ function HistoryPage() {
             <section aria-labelledby="delete-history" className="rounded-card border border-hairline bg-white p-6">
               <div className="flex items-center gap-3">
                 <Trash2 aria-hidden="true" className="size-5 shrink-0 text-action" />
-                <h2 id="delete-history" className="text-card text-heading">Ask to delete your history</h2>
+                <h2 id="delete-history" className="text-card text-heading">Delete your history</h2>
               </div>
               <p className="mt-3 text-copy-sm text-body">
-                A request, not a switch: a person reviews it before anything is removed, and some information may have to be kept.
+                This one is your decision, not a review. A removal you schedule runs 24 hours later, and you can
+                cancel it until then. A person at your school is told it is coming.
               </p>
               <Button className="mt-4" variant="ghost" onClick={() => setAskOpen(true)}>
                 <CalendarFold aria-hidden="true" className="size-4" />
-                Ask to delete your history
+                Schedule a removal
               </Button>
+
+              {deletionNotice && (
+                <p role="status" className="mt-4 rounded-card border border-hairline bg-panel p-3 text-caption text-heading">
+                  {deletionNotice}
+                </p>
+              )}
 
               {receipts.length > 0 && (
                 <ul className="mt-5 flex flex-col gap-3 border-t border-hairline pt-5">
@@ -184,13 +228,32 @@ function HistoryPage() {
                         {receipt.beforeDate ? ` · before ${receipt.beforeDate}` : ''}
                         {receipt.checkInIds.length > 0 ? ` · ${receipt.checkInIds.length} check-in(s)` : ''}
                       </p>
-                      {/* alertedAt is the honest part of the receipt: it says whether
-                          anyone was actually told, instead of assuming a review. */}
-                      <p className={`mt-2 text-caption ${receipt.alertedAt ? 'text-muted' : 'text-peach-ink'}`}>
-                        {receipt.alertedAt
-                          ? 'Your school’s team has been told to review it.'
-                          : 'We could not reach your school’s team about this request. To be sure a person sees it, tell them through Support.'}
+                      <p className={`mt-2 text-caption ${
+                        deletionState(receipt) === 'scheduled'
+                          ? 'text-peach-ink'
+                          : deletionState(receipt) === 'removed'
+                            ? 'text-muted'
+                            : 'text-body'
+                      }`}>
+                        {deletionStateLine(receipt, now)}
                       </p>
+                      {/* alertedAt stays its own line: it says whether a person was
+                          actually told, which is a different fact from the schedule. */}
+                      {receipt.alertedAt === null && deletionState(receipt) === 'scheduled' && (
+                        <p className="mt-1 text-caption text-peach-ink">
+                          We could not reach your school’s team about this request. The removal is still scheduled. To be sure a person sees it, tell them through Support.
+                        </p>
+                      )}
+                      {deletionState(receipt) === 'scheduled' && (
+                        <Button
+                          variant="ghost"
+                          className="mt-3"
+                          disabled={cancelling !== null}
+                          onClick={() => void cancelAsk(receipt.id)}
+                        >
+                          {cancelling === receipt.id ? 'Cancelling…' : 'Cancel this removal'}
+                        </Button>
+                      )}
                     </li>
                   ))}
                 </ul>

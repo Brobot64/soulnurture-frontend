@@ -126,10 +126,12 @@ export function requestStage(request: HistorySupportRequest): { label: string; d
 }
 
 /* ── Deletion requests ─────────────────────────────────────────────────────
- * A student's ask, filed and read back. There is deliberately no status or
- * outcome field in this client or in the response: nothing has been decided,
- * and inventing a "reviewed" flag would be a promise the server cannot keep.
- * What IS reported is `alertedAt` — whether a person was actually told.       */
+ * A student's ask, read back with the state it reached. The decision is the
+ * student's: a person at the school is told, not asked to approve, and there is
+ * deliberately no "reviewed"/"approved" field to invent. What the server
+ * actually reports is a schedule (`scheduledPurgeAt`), the undo (`cancelledAt`),
+ * the outcome (`purgedAt` and the counts it removed), `holdReason` when the
+ * account could not be erased, and `alertedAt` — whether a person was told.   */
 
 export const DELETION_SCOPES = ['ALL_HISTORY', 'BEFORE_DATE', 'SELECTED_CHECK_INS'] as const
 export type DeletionScope = (typeof DELETION_SCOPES)[number]
@@ -140,6 +142,14 @@ export const DELETION_SCOPE_LABELS: Record<DeletionScope, string> = {
   SELECTED_CHECK_INS: 'Only the check-ins I select',
 }
 
+/**
+ * What "all of my history" really takes, said in full wherever it is offered.
+ * The account-wide erasure is the one ask that cannot be answered casually: it
+ * goes the login, the safeguarding record and all of it.
+ */
+export const DELETION_ACCOUNT_WARNING =
+  'This removes the whole account — every check-in, reflection, chat, journal entry, support request and safeguarding record, and your login itself. A person at your school is told, not asked to approve. After the 24 hours are up it cannot be undone.'
+
 export interface DeletionReceipt {
   id: string
   scope: DeletionScope
@@ -147,7 +157,24 @@ export interface DeletionReceipt {
   checkInIds: string[]
   note: string | null
   alertedAt: string | null
+  /** When the removal runs. While this is in the future, the student can stop it. */
+  scheduledPurgeAt: string | null
+  cancelledAt: string | null
+  purgedAt: string | null
+  holdReason: string | null
+  removedCheckIns: number
+  removedConversations: number
   createdAt: string
+}
+
+export type DeletionState = 'scheduled' | 'cancelled' | 'removed' | 'held'
+
+/** `purgedAt` wins the ordering: a cancel that arrived late is still an erasure. */
+export function deletionState(receipt: DeletionReceipt): DeletionState {
+  if (receipt.purgedAt) return 'removed'
+  if (receipt.cancelledAt) return 'cancelled'
+  if (receipt.holdReason) return 'held'
+  return 'scheduled'
 }
 
 export function fetchDeletionRequests(): Promise<{ items: DeletionReceipt[] }> {
@@ -166,6 +193,56 @@ export function requestHistoryDeletion(input: {
   })
 }
 
+export function cancelHistoryDeletion(requestId: string): Promise<DeletionReceipt> {
+  return apiFetch<DeletionReceipt>(`/api/v1/history/deletion-requests/${requestId}/cancel`, {
+    method: 'POST',
+  })
+}
+
+/** Whole minutes the student still has, floored at zero. */
+export function undoMinutesLeft(scheduledPurgeAt: string | null, now: number): number {
+  if (!scheduledPurgeAt) return 0
+  const at = new Date(scheduledPurgeAt).getTime()
+  if (Number.isNaN(at)) return 0
+  return Math.max(0, Math.floor((at - now) / 60_000))
+}
+
+function formatUndoWindow(minutes: number): string {
+  if (minutes <= 0) return 'any moment now'
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  const tail = rest ? ` ${rest} minute${rest === 1 ? '' : 's'}` : ''
+  return hours ? `${hours} hour${hours === 1 ? '' : 's'}${tail}` : `${rest} minute${rest === 1 ? '' : 's'}`
+}
+
+function deletionDay(iso: string): string {
+  const when = new Date(iso)
+  return Number.isNaN(when.getTime())
+    ? iso
+    : when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+const HOLD_LINES: Record<string, string> = {
+  ACCOUNT_INACTIVE:
+    'On hold, and nothing was erased. This account cannot sign in right now, so cancelling would not have been possible — we do not remove history from someone who cannot reach the undo.',
+  SCHOOL_SUSPENDED:
+    'On hold, and nothing was erased. Your school is suspended right now, so the ask stays scheduled until it is back.',
+}
+
+/** The one line that says where this ask actually got to. */
+export function deletionStateLine(receipt: DeletionReceipt, now: number): string {
+  switch (deletionState(receipt)) {
+    case 'removed':
+      return `Removed on ${deletionDay(receipt.purgedAt ?? '')} — ${receipt.removedCheckIns} check-in(s) and ${receipt.removedConversations} reflection(s) went.`
+    case 'cancelled':
+      return `Cancelled on ${deletionDay(receipt.cancelledAt ?? '')}. Nothing was removed.`
+    case 'held':
+      return HOLD_LINES[receipt.holdReason ?? ''] ?? 'On hold — the removal was not carried out, and nothing was erased.'
+    case 'scheduled':
+      return `Removal runs in ${formatUndoWindow(undoMinutesLeft(receipt.scheduledPurgeAt, now))}. You can cancel it until then.`
+  }
+}
+
 export function isNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.status === 404
 }
@@ -180,15 +257,15 @@ export const HISTORY_EMPTY =
 
 /**
  * The retention line the design shows ("Entries are removed automatically after
- * your school's retention period") is NOT here, because no expiry job exists in
- * the server. Saying so is kinder than leaving a student to wait for a deletion
- * that will never arrive on its own.
+ * your school's retention period") is still NOT here, because no expiry of that
+ * kind runs. What does exist is the student's own scheduled erasure: a request
+ * they file, that fires 24 hours later, that they can cancel until it fires.
  */
 export const HISTORY_RETENTION_TRUTH =
-  'Nothing here is removed on a timer. There is no automatic expiry running in this product, so an entry stays until a deletion request you make is agreed to by a person at your school.'
+  'Nothing here is removed on its own — there is no automatic expiry in this product. An entry stays until you file a deletion request yourself. That request is yours to make and yours to undo: it runs 24 hours after you send it, and you can cancel it any time before then. A person at your school is told, not asked to approve. Once it has run, it cannot be brought back.'
 
 export const HISTORY_DELETION_NOTICE =
-  'Your request is reviewed before anything is removed. Some information may need to be kept for safeguarding or legal reasons. Filing a request deletes nothing by itself.'
+  'Filing this schedules the removal 24 hours out — it does not need anyone’s approval, and nothing is removed the moment you send it. You can cancel it on this page until the window closes. A request that names part of your history leaves your account and your school’s safeguarding record standing; only “all of my history” removes the account.'
 
 export const HISTORY_NOT_EMERGENCY =
   'Soul Nurture AI is not an emergency service and does not dispatch emergency help. If you are in danger right now, tell a trusted adult near you or use your school’s emergency contact.'
