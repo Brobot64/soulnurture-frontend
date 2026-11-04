@@ -24,6 +24,9 @@ import { Route as AppWelcomeRouteImport } from './routes/_app/welcome'
 import { Route as AppCheckInIndexRouteImport } from './routes/_app/check-in/index'
 import { Route as AppCheckInWhyRouteImport } from './routes/_app/check-in/why'
 import { Route as AppCompleteCheckInIdRouteImport } from './routes/_app/complete/$checkInId'
+import { Route as AppHistoryIndexRouteImport } from './routes/_app/history.index'
+import { Route as AppHistoryCheckInIdRouteImport } from './routes/_app/history.$checkInId'
+import { Route as AppHistoryAboutRouteImport } from './routes/_app/history.about'
 import { Route as AppReflectionConversationIdRouteImport } from './routes/_app/reflection/$conversationId'
 import { Route as AppResourcesIndexRouteImport } from './routes/_app/resources.index'
 import { Route as AppResourcesResourceIdRouteImport } from './routes/_app/resources.$resourceId'
@@ -122,6 +125,21 @@ const AppCheckInWhyRoute = AppCheckInWhyRouteImport.update({
 const AppCompleteCheckInIdRoute = AppCompleteCheckInIdRouteImport.update({
   id: '/complete/$checkInId',
   path: '/complete/$checkInId',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppHistoryIndexRoute = AppHistoryIndexRouteImport.update({
+  id: '/history/',
+  path: '/history/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppHistoryCheckInIdRoute = AppHistoryCheckInIdRouteImport.update({
+  id: '/history/$checkInId',
+  path: '/history/$checkInId',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppHistoryAboutRoute = AppHistoryAboutRouteImport.update({
+  id: '/history/about',
+  path: '/history/about',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppReflectionConversationIdRoute =
@@ -275,6 +293,8 @@ export interface FileRoutesByFullPath {
   '/welcome': typeof AppWelcomeRoute
   '/check-in/why': typeof AppCheckInWhyRoute
   '/complete/$checkInId': typeof AppCompleteCheckInIdRoute
+  '/history/$checkInId': typeof AppHistoryCheckInIdRoute
+  '/history/about': typeof AppHistoryAboutRoute
   '/reflection/$conversationId': typeof AppReflectionConversationIdRoute
   '/resources/$resourceId': typeof AppResourcesResourceIdRoute
   '/support/$threadId': typeof AppSupportThreadIdRoute
@@ -285,6 +305,7 @@ export interface FileRoutesByFullPath {
   '/school/settings': typeof DashSchoolSettingsRoute
   '/school/users': typeof DashSchoolUsersRoute
   '/check-in/': typeof AppCheckInIndexRoute
+  '/history/': typeof AppHistoryIndexRoute
   '/resources/': typeof AppResourcesIndexRoute
   '/support/': typeof AppSupportIndexRoute
   '/admin/': typeof DashAdminIndexRoute
@@ -316,6 +337,8 @@ export interface FileRoutesByTo {
   '/welcome': typeof AppWelcomeRoute
   '/check-in/why': typeof AppCheckInWhyRoute
   '/complete/$checkInId': typeof AppCompleteCheckInIdRoute
+  '/history/$checkInId': typeof AppHistoryCheckInIdRoute
+  '/history/about': typeof AppHistoryAboutRoute
   '/reflection/$conversationId': typeof AppReflectionConversationIdRoute
   '/resources/$resourceId': typeof AppResourcesResourceIdRoute
   '/support/$threadId': typeof AppSupportThreadIdRoute
@@ -326,6 +349,7 @@ export interface FileRoutesByTo {
   '/school/settings': typeof DashSchoolSettingsRoute
   '/school/users': typeof DashSchoolUsersRoute
   '/check-in': typeof AppCheckInIndexRoute
+  '/history': typeof AppHistoryIndexRoute
   '/resources': typeof AppResourcesIndexRoute
   '/support': typeof AppSupportIndexRoute
   '/admin': typeof DashAdminIndexRoute
@@ -360,6 +384,8 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/check-in/why': typeof AppCheckInWhyRoute
   '/_app/complete/$checkInId': typeof AppCompleteCheckInIdRoute
+  '/_app/history/$checkInId': typeof AppHistoryCheckInIdRoute
+  '/_app/history/about': typeof AppHistoryAboutRoute
   '/_app/reflection/$conversationId': typeof AppReflectionConversationIdRoute
   '/_app/resources/$resourceId': typeof AppResourcesResourceIdRoute
   '/_app/support/$threadId': typeof AppSupportThreadIdRoute
@@ -370,6 +396,7 @@ export interface FileRoutesById {
   '/_dash/school/settings': typeof DashSchoolSettingsRoute
   '/_dash/school/users': typeof DashSchoolUsersRoute
   '/_app/check-in/': typeof AppCheckInIndexRoute
+  '/_app/history/': typeof AppHistoryIndexRoute
   '/_app/resources/': typeof AppResourcesIndexRoute
   '/_app/support/': typeof AppSupportIndexRoute
   '/_dash/admin/': typeof DashAdminIndexRoute
@@ -403,6 +430,8 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/check-in/why'
     | '/complete/$checkInId'
+    | '/history/$checkInId'
+    | '/history/about'
     | '/reflection/$conversationId'
     | '/resources/$resourceId'
     | '/support/$threadId'
@@ -413,6 +442,7 @@ export interface FileRouteTypes {
     | '/school/settings'
     | '/school/users'
     | '/check-in/'
+    | '/history/'
     | '/resources/'
     | '/support/'
     | '/admin/'
@@ -444,6 +474,8 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/check-in/why'
     | '/complete/$checkInId'
+    | '/history/$checkInId'
+    | '/history/about'
     | '/reflection/$conversationId'
     | '/resources/$resourceId'
     | '/support/$threadId'
@@ -454,6 +486,7 @@ export interface FileRouteTypes {
     | '/school/settings'
     | '/school/users'
     | '/check-in'
+    | '/history'
     | '/resources'
     | '/support'
     | '/admin'
@@ -487,6 +520,8 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/check-in/why'
     | '/_app/complete/$checkInId'
+    | '/_app/history/$checkInId'
+    | '/_app/history/about'
     | '/_app/reflection/$conversationId'
     | '/_app/resources/$resourceId'
     | '/_app/support/$threadId'
@@ -497,6 +532,7 @@ export interface FileRouteTypes {
     | '/_dash/school/settings'
     | '/_dash/school/users'
     | '/_app/check-in/'
+    | '/_app/history/'
     | '/_app/resources/'
     | '/_app/support/'
     | '/_dash/admin/'
@@ -627,6 +663,27 @@ declare module '@tanstack/react-router' {
       path: '/complete/$checkInId'
       fullPath: '/complete/$checkInId'
       preLoaderRoute: typeof AppCompleteCheckInIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/history/': {
+      id: '/_app/history/'
+      path: '/history'
+      fullPath: '/history/'
+      preLoaderRoute: typeof AppHistoryIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/history/$checkInId': {
+      id: '/_app/history/$checkInId'
+      path: '/history/$checkInId'
+      fullPath: '/history/$checkInId'
+      preLoaderRoute: typeof AppHistoryCheckInIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/history/about': {
+      id: '/_app/history/about'
+      path: '/history/about'
+      fullPath: '/history/about'
+      preLoaderRoute: typeof AppHistoryAboutRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/reflection/$conversationId': {
@@ -826,11 +883,14 @@ interface AppRouteRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppCheckInWhyRoute: typeof AppCheckInWhyRoute
   AppCompleteCheckInIdRoute: typeof AppCompleteCheckInIdRoute
+  AppHistoryCheckInIdRoute: typeof AppHistoryCheckInIdRoute
+  AppHistoryAboutRoute: typeof AppHistoryAboutRoute
   AppReflectionConversationIdRoute: typeof AppReflectionConversationIdRoute
   AppResourcesResourceIdRoute: typeof AppResourcesResourceIdRoute
   AppSupportThreadIdRoute: typeof AppSupportThreadIdRoute
   AppSupportStatusGuideRoute: typeof AppSupportStatusGuideRoute
   AppCheckInIndexRoute: typeof AppCheckInIndexRoute
+  AppHistoryIndexRoute: typeof AppHistoryIndexRoute
   AppResourcesIndexRoute: typeof AppResourcesIndexRoute
   AppSupportIndexRoute: typeof AppSupportIndexRoute
   AppSupportRequestsRequestIdRoute: typeof AppSupportRequestsRequestIdRoute
@@ -849,11 +909,14 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppCheckInWhyRoute: AppCheckInWhyRoute,
   AppCompleteCheckInIdRoute: AppCompleteCheckInIdRoute,
+  AppHistoryCheckInIdRoute: AppHistoryCheckInIdRoute,
+  AppHistoryAboutRoute: AppHistoryAboutRoute,
   AppReflectionConversationIdRoute: AppReflectionConversationIdRoute,
   AppResourcesResourceIdRoute: AppResourcesResourceIdRoute,
   AppSupportThreadIdRoute: AppSupportThreadIdRoute,
   AppSupportStatusGuideRoute: AppSupportStatusGuideRoute,
   AppCheckInIndexRoute: AppCheckInIndexRoute,
+  AppHistoryIndexRoute: AppHistoryIndexRoute,
   AppResourcesIndexRoute: AppResourcesIndexRoute,
   AppSupportIndexRoute: AppSupportIndexRoute,
   AppSupportRequestsRequestIdRoute: AppSupportRequestsRequestIdRoute,

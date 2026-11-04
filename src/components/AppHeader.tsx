@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import { BookOpen, ChevronDown, HeartHandshake, Home, LogOut, Menu, ShieldCheck, X } from 'lucide-react'
+import { BookOpen, CalendarFold, ChevronDown, HeartHandshake, Home, LogOut, Menu, ShieldCheck, X } from 'lucide-react'
 
 import logo from '#/assets/soul-nurture-logo.png'
 import { NotificationBell } from '#/components/dash/NotificationBell'
@@ -60,6 +60,7 @@ export function AppHeader() {
   const path = pathname.replace(/\/+$/, '') || '/'
   const inSection = (base: string) => path === base || path.startsWith(`${base}/`)
   const supportActive = inSection('/support')
+  const isStudent = user?.role === 'STUDENT'
   const links = [
     {
       to: home,
@@ -69,6 +70,11 @@ export function AppHeader() {
       active: path === '/' || path === '/welcome' || ['/check-in', '/reflection', '/complete'].some(inSection),
     },
     { to: '/resources' as const, label: 'Wellbeing resources', icon: BookOpen, exact: false, active: inSection('/resources') },
+    // Students only: the page is @Roles('STUDENT') server-side, so a staff
+    // account clicking it would be refused rather than redirected.
+    ...(isStudent
+      ? [{ to: '/history' as const, label: 'My history', icon: CalendarFold, exact: false, active: inSection('/history') }]
+      : []),
   ]
 
   return (
