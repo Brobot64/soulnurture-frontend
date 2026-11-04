@@ -32,6 +32,16 @@ export const RESOURCE_CATEGORIES = {
 export type ResourceType = keyof typeof RESOURCE_TYPES
 export type ResourceCategory = keyof typeof RESOURCE_CATEGORIES
 
+/** Doc B §5 — the four permitted "what next?" answers, in the order shown. */
+export const RESOURCE_FEEDBACK_OPTIONS = [
+  { choice: 'NOT_HELPFUL', label: 'Not helpful' },
+  { choice: 'TRY_SOMETHING_ELSE', label: 'Try something else' },
+  { choice: 'WANT_TO_TALK', label: 'I want to talk to someone' },
+  { choice: 'DECLINED', label: 'I do not want to answer' },
+] as const
+
+export type ResourceFeedbackChoice = (typeof RESOURCE_FEEDBACK_OPTIONS)[number]['choice']
+
 export interface Resource {
   id: string
   title: string
@@ -44,6 +54,11 @@ export interface Resource {
   ctaLabel: string | null
   mediaUrl: string | null
   tags: string[]
+  contentCode: string | null
+  intendedSituation: string | null
+  instructions: string[] | null
+  reflectionPrompt: string | null
+  safetyNote: string | null
   active: boolean
   approved: boolean
   createdAt: string
@@ -52,7 +67,6 @@ export interface Resource {
 
 export interface ResourceSearch {
   category?: ResourceCategory
-  type?: ResourceType
   search?: string
   savedOnly?: boolean
 }
@@ -62,10 +76,6 @@ export function validateResourceSearch(search: Record<string, unknown>): Resourc
     category:
       typeof search.category === 'string' && Object.hasOwn(RESOURCE_CATEGORIES, search.category)
         ? (search.category as ResourceCategory)
-        : undefined,
-    type:
-      typeof search.type === 'string' && Object.hasOwn(RESOURCE_TYPES, search.type)
-        ? (search.type as ResourceType)
         : undefined,
     search: typeof search.search === 'string' ? search.search.trim().slice(0, 200) || undefined : undefined,
     savedOnly:
@@ -84,10 +94,31 @@ export function isAvailableResource(resource: Resource): boolean {
 export async function fetchResources(filters: ResourceSearch = {}) {
   const params = new URLSearchParams({ savedOnly: String(filters.savedOnly === true) })
   if (filters.category) params.set('category', filters.category)
-  if (filters.type) params.set('type', filters.type)
   if (filters.search) params.set('search', filters.search)
   const response = await apiFetch<{ items: Resource[]; savedCount: number }>(
     `/api/v1/resources?${params.toString()}`,
+  )
+  return { ...response, items: response.items.filter(isAvailableResource) }
+}
+
+/**
+ * Which rule actually built the tailored list. Doc B §2 permits the words
+ * "Picked for you" only when a stated need or a chosen category drove the
+ * selection, so the server reports the basis instead of leaving the surface to
+ * infer it from the phrasing of a title.
+ */
+export type ResourceSelectionBasis = 'STATED_NEED' | 'NEWEST_APPROVED'
+
+export interface TailoredResources {
+  title: string
+  rationale: string
+  basis: ResourceSelectionBasis
+  items: Resource[]
+}
+
+export async function fetchTailoredResources(): Promise<TailoredResources> {
+  const response = await apiFetch<Omit<TailoredResources, 'items'> & { items: Resource[] }>(
+    '/api/v1/resources/tailored',
   )
   return { ...response, items: response.items.filter(isAvailableResource) }
 }
@@ -122,8 +153,22 @@ export function resourceDuration(resource: Resource): string | null {
   return minutes !== null && Number.isFinite(minutes) && minutes > 0 ? `${minutes} min` : null
 }
 
-/** Only link to real, absolute web URLs; never render arbitrary embedded content. */
-export function safeResourceUrl(value: string | null): string | null {
+/** The detail-template steps, tolerating a backend that predates the columns. */
+export function resourceSteps(resource: Resource): string[] {
+  return (resource.instructions ?? []).filter((step) => step.trim().length > 0)
+}
+
+export async function submitResourceFeedback(
+  resourceId: string,
+  choice: ResourceFeedbackChoice,
+): Promise<void> {
+  await apiFetch<{ recorded: boolean }>('/api/v1/resources/feedback', {
+    method: 'POST',
+    body: JSON.stringify({ resourceId, choice }),
+  })
+}
+
+/** Only link to real, absolute web URLs; never render arbitrary embedded content. */export function safeResourceUrl(value: string | null): string | null {
   if (!value || !/^https?:\/\//i.test(value.trim())) return null
   try {
     const url = new URL(value.trim())

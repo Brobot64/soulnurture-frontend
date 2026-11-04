@@ -128,6 +128,26 @@ export function useRoleGuard(allowed: readonly string[]): SessionUser | null {
   return permitted ? user : null
 }
 
+/**
+ * The same permission read as `useRoleGuard`, without the redirect. A surface
+ * that has been designed to answer "not for your role" in its own words has to
+ * render that answer; sending the professional away silently leaves them
+ * guessing whether the page was broken, empty, or never theirs.
+ */
+export function useRoleAccess(allowed: readonly string[]): {
+  user: SessionUser | null
+  permitted: boolean
+  denied: boolean
+} {
+  const { user, status } = useSession()
+  const permitted = !!user && !!user.role && allowed.includes(user.role)
+  return {
+    user,
+    permitted,
+    denied: status === 'ready' && !!user && !permitted,
+  }
+}
+
 // --- Formatting ------------------------------------------------------------
 
 export function timeAgo(iso: string): string {

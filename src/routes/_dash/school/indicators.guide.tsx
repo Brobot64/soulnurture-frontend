@@ -25,7 +25,7 @@ function IndicatorGuide() {
         <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
           {explanations.map(({ title, icon: Icon, text }) => <section key={title} className="rounded-panel border border-hairline bg-white p-6"><span className={`grid size-11 place-items-center rounded-full ${title === 'Not a diagnosis' ? 'bg-peach text-peach-ink' : 'bg-panel text-action'}`}><Icon className="size-5" aria-hidden="true" /></span><h2 className="mt-5 text-card text-heading">{title}</h2><p className="mt-3 text-copy-sm leading-relaxed text-body">{text}</p></section>)}
         </div>
-        <div className="mt-7 rounded-card bg-panel px-6 py-5 text-copy-sm text-brand-4">The review workspace is not available yet. No indicator rules or sample student records are presented here as approved clinical guidance.</div>
+        <div className="mt-7 rounded-card bg-panel px-6 py-5 text-copy-sm text-brand-4">The review workspace now lists the indicators raised for your school. Every rule in the indicator catalogue is still switched off, so what reaches you comes from the keyword safety net: no threshold, count or confidence figure has been approved, nothing closes an indicator automatically, and no sample student record is presented here as approved clinical guidance.</div>
         <p className="mt-8 text-caption text-muted">Concerned about a student’s immediate safety? Follow your school’s safeguarding procedures. Soul Nurture AI is not an emergency service.</p>
       </main>
     </>

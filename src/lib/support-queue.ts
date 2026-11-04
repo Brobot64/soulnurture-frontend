@@ -3,16 +3,29 @@
 // A row carries four independent facts and renders each one separately: the
 // stored lifecycle (`requestStatus`), the coarse NEW/REVIEWED chip split, the
 // follow-up state, and the urgency the student asked for themselves. Collapsing
-// any of them into another is what made statuses read wrong.
+// any of them into another is what made statuses read wrong. A fifth field,
+// `linkedIndicator`, is not a fifth status — it is a pointer to a separate
+// record, and the one thing it must never do is describe this row.
+
+import { useEffect, useState } from 'react'
 
 import { apiFetch } from '#/lib/api'
+// Both directions are type-only, so the two modules can name each other's
+// reference without either importing the other at runtime.
+import type { FlagSeverity, FlagStatus, IndicatorLevel } from '#/lib/indicators'
+
+export const SUPPORT_REQUESTS_CHANGED = 'support-requests:changed'
+
+function notifySupportRequestsChanged(): void {
+  window.dispatchEvent(new Event(SUPPORT_REQUESTS_CHANGED))
+}
 
 /** The coarse chip split: has a professional acted on this yet? */
 export type QueueStatus = 'NEW' | 'REVIEWED'
 
 /** What `?status=` accepts. Chips are filters, not a partition — one row can
  * sit under "New" and "Follow-Up Required" at the same time. */
-export type QueueFilter = QueueStatus | 'FOLLOW_UP_REQUIRED' | 'FOLLOW_UP_COMPLETED'
+export type QueueFilter = QueueStatus | 'UNREAD' | 'FOLLOW_UP_REQUIRED' | 'FOLLOW_UP_COMPLETED'
 
 export type FollowUpState = 'NONE' | 'REQUIRED' | 'COMPLETED'
 
@@ -54,8 +67,22 @@ export interface SupportQueueStudent {
   email: string
 }
 
+/** The newest indicator raised on this request's conversation, when one exists
+ * (US-D05, read from the request side). A reference between two separate
+ * records: its status never moves the request's, `null` means the student asked
+ * for help with no indicator beside it, and neither record becomes the other. */
+export interface LinkedIndicatorRef {
+  id: string
+  status: FlagStatus
+  severity: FlagSeverity
+  /** `null` is the real "unclassified" bucket, not a value the client invented. */
+  level: IndicatorLevel | null
+  triggerLabel: string
+}
+
 export interface SupportQueueItem {
   id: string
+  readAt: string | null
   requestedAt: string
   timing: SupportTiming
   note: string | null
@@ -71,6 +98,7 @@ export interface SupportQueueItem {
   /** Did the student say they do not feel safe. Sorts the table. */
   urgency: Urgency
   prompt: SupportPrompt
+  linkedIndicator: LinkedIndicatorRef | null
   /** The arrangement the student already sees on their request page. */
   scheduledAt: string | null
   locationLabel: string | null
@@ -86,6 +114,8 @@ export interface SupportQueueItem {
 
 export interface SupportQueueCounts {
   all: number
+  unread: number
+  awaitingUnread: number
   new: number
   reviewed: number
   followUpRequired: number
@@ -152,6 +182,19 @@ export async function fetchSupportQueue(filters: {
   return apiFetch<SupportQueueResponse>(`/api/v1/support-requests/queue${suffix}`)
 }
 
+export function fetchSupportQueueCounts(): Promise<SupportQueueCounts> {
+  return apiFetch<SupportQueueCounts>('/api/v1/support-requests/queue/counts')
+}
+
+export async function markSupportRequestRead(id: string): Promise<{ readAt: string }> {
+  const result = await apiFetch<{ readAt: string }>(
+    `/api/v1/support-requests/${encodeURIComponent(id)}/read`,
+    { method: 'POST' },
+  )
+  notifySupportRequestsChanged()
+  return result
+}
+
 /** ACCEPTED reviews return the staff↔student chat opened for the request. */
 export interface ReviewSupportRequestResult {
   chatThreadId?: string | null
@@ -170,43 +213,89 @@ export async function reviewSupportRequest(
   id: string,
   body: ReviewSupportRequestBody,
 ): Promise<ReviewSupportRequestResult> {
-  return apiFetch<ReviewSupportRequestResult>(
+  const result = await apiFetch<ReviewSupportRequestResult>(
     `/api/v1/support-requests/${encodeURIComponent(id)}`,
     {
       method: 'PATCH',
       body: JSON.stringify(body),
     },
   )
+  notifySupportRequestsChanged()
+  return result
 }
 
-export function bookFollowUp(body: {
+export async function bookFollowUp(body: {
   studentId: string
   supportRequestId: string
   dueAt: string
 }): Promise<unknown> {
-  return apiFetch('/api/v1/follow-ups', {
+  const result = await apiFetch('/api/v1/follow-ups', {
     method: 'POST',
     body: JSON.stringify({ ...body, status: 'SCHEDULED' }),
   })
+  notifySupportRequestsChanged()
+  return result
 }
 
-export function scheduleFollowUp(id: string, dueAt: string): Promise<unknown> {
-  return apiFetch(`/api/v1/follow-ups/${encodeURIComponent(id)}`, {
+export async function scheduleFollowUp(id: string, dueAt: string): Promise<unknown> {
+  const result = await apiFetch(`/api/v1/follow-ups/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ status: 'SCHEDULED', dueAt }),
   })
+  notifySupportRequestsChanged()
+  return result
 }
 
 export async function completeFollowUp(id: string): Promise<unknown> {
-  return apiFetch(`/api/v1/follow-ups/${encodeURIComponent(id)}`, {
+  const result = await apiFetch(`/api/v1/follow-ups/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ status: 'COMPLETED' }),
   })
+  notifySupportRequestsChanged()
+  return result
 }
 
 /** Design format: "Amara N." — first name plus the last-name initial. */
-export function shortName(student: SupportQueueStudent): string {
+export function shortName(
+  student: Pick<SupportQueueStudent, 'firstName' | 'lastName' | 'displayName'>,
+): string {
   const first = student.displayName?.trim() || student.firstName
   const initial = student.lastName?.trim()?.[0]
   return initial ? `${first} ${initial.toUpperCase()}.` : first
+}
+
+// ---------------------------------------------------------------------------
+// Navigation counts: unread requests for the account currently using the rail.
+//
+// A read receipt says this staff member opened this request. It is distinct
+// from NEW/REVIEWED (whether anyone has progressed it) and from urgent status:
+// opening an escalation makes it read for one reviewer without acknowledging
+// or removing it from the queue.
+// ---------------------------------------------------------------------------
+
+export function useSupportQueueCounts(userId: string): SupportQueueCounts | null {
+  const [counts, setCounts] = useState<SupportQueueCounts | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    const refresh = () => {
+      void fetchSupportQueueCounts()
+        .then((next) => {
+          if (alive) setCounts(next)
+        })
+        .catch(() => {
+          // Keep the last known value. A failed refresh must not read as zero
+          // unread work waiting for this professional.
+        })
+    }
+
+    refresh()
+    window.addEventListener(SUPPORT_REQUESTS_CHANGED, refresh)
+    return () => {
+      alive = false
+      window.removeEventListener(SUPPORT_REQUESTS_CHANGED, refresh)
+    }
+  }, [userId])
+
+  return counts
 }

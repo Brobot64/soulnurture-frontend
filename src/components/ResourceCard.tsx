@@ -1,4 +1,5 @@
-import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
+import { Link, useNavigate } from '@tanstack/react-router'
 import {
   ArrowUpRight,
   BookOpen,
@@ -17,12 +18,17 @@ import {
 } from 'lucide-react'
 
 import { Button, ErrorNote } from '#/components/dash/ui'
+import { SUPPORT_EMERGENCY_NOTICE, SUPPORT_RESPONSE_NOTICE } from '#/lib/support'
 import {
   RESOURCE_CATEGORIES,
+  RESOURCE_FEEDBACK_OPTIONS,
   RESOURCE_TYPES,
   resourceDuration,
+  resourceSteps,
   safeResourceUrl,
+  submitResourceFeedback,
   type Resource,
+  type ResourceFeedbackChoice,
   type ResourceSearch,
   type ResourceToolbox,
   type ResourceType,
@@ -52,6 +58,7 @@ export function ResourceCard({
 }) {
   const Icon = TYPE_ICONS[resource.type] ?? BookOpen
   const duration = resourceDuration(resource)
+  const steps = resourceSteps(resource)
   const saved = toolbox.savedIds.has(resource.id)
   const saving = toolbox.savingId === resource.id
   const error = toolbox.saveError?.resourceId === resource.id ? toolbox.saveError.error : null
@@ -119,6 +126,40 @@ export function ResourceCard({
             </li>
           ))}
         </ul>
+      )}
+
+      {detail && resource.intendedSituation?.trim() && (
+        <section className="mt-8">
+          <h2 className="text-card text-heading">When this might help</h2>
+          <p className="mt-3 break-words whitespace-pre-line text-copy text-body">{resource.intendedSituation}</p>
+        </section>
+      )}
+      {detail && steps.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-card text-heading">How to try it</h2>
+          <ol className="mt-4 space-y-3">
+            {steps.map((step, index) => (
+              <li key={`${resource.id}-step-${index}`} className="flex gap-3">
+                <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-panel text-chip font-semibold text-action">
+                  {index + 1}
+                </span>
+                <span className="break-words whitespace-pre-line text-copy text-body">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+      {detail && resource.reflectionPrompt?.trim() && (
+        <section className="mt-8">
+          <h2 className="text-card text-heading">Afterwards</h2>
+          <p className="mt-3 break-words whitespace-pre-line text-copy text-body">{resource.reflectionPrompt}</p>
+        </section>
+      )}
+      {detail && resource.safetyNote?.trim() && (
+        <section className="mt-8 rounded-card border border-hairline bg-panel p-5">
+          <h2 className="text-card text-heading">Good to know</h2>
+          <p className="mt-3 break-words whitespace-pre-line text-copy-sm text-body">{resource.safetyNote}</p>
+        </section>
       )}
 
       {detail && (
@@ -189,6 +230,171 @@ export function ResourceToolboxNotice({ toolbox }: { toolbox: ResourceToolbox })
       <Button variant="ghost" className="mt-3" onClick={toolbox.reload}>
         <RefreshCw aria-hidden="true" className="size-4" /> Retry toolbox
       </Button>
+    </section>
+  )
+}
+
+/**
+ * Doc B §5 "what next?" block. A refusal or a "not helpful" is stored as an
+ * answer to this prompt only and never becomes a safeguarding signal (Doc C
+ * §5.1), which is why nothing here reaches a support or flagging endpoint.
+ */
+export function ResourceNextStep({ resource }: { resource: Resource }) {
+  const navigate = useNavigate()
+  const [answer, setAnswer] = useState<ResourceFeedbackChoice | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  const respond = async (choice: ResourceFeedbackChoice) => {
+    if (busy) return
+    setBusy(true)
+    setFailed(false)
+    const recorded = await submitResourceFeedback(resource.id, choice)
+      .then(() => true)
+      .catch(() => false)
+    setBusy(false)
+    // Leaving this page must never depend on a bookkeeping write succeeding.
+    if (choice === 'WANT_TO_TALK') {
+      void navigate({ to: '/support' })
+      return
+    }
+    if (choice === 'TRY_SOMETHING_ELSE') {
+      void navigate({ to: '/resources', search: { category: resource.category } })
+      return
+    }
+    if (choice === 'DECLINED' || recorded) {
+      setAnswer(choice)
+      return
+    }
+    setFailed(true)
+  }
+
+  if (answer === 'DECLINED') return null
+
+  return (
+    <section className="mt-6 rounded-panel border border-hairline bg-white p-6" aria-labelledby="resource-next-step-heading">
+      <h2 id="resource-next-step-heading" className="text-card text-heading">
+        {answer === 'NOT_HELPFUL' ? 'Thanks for telling us' : 'What next?'}
+      </h2>
+      {answer === 'NOT_HELPFUL' ? (
+        <p className="mt-3 text-copy-sm text-body">
+          That is noted. You can browse another resource or talk to someone at your school.
+        </p>
+      ) : (
+        <>
+          <p className="mt-2 text-copy-sm text-body">
+            Pick any answer, or none. This only shapes what we show you here.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {RESOURCE_FEEDBACK_OPTIONS.map((option) => (
+              <button
+                key={option.choice}
+                type="button"
+                disabled={busy}
+                onClick={() => void respond(option.choice)}
+                className="min-h-11 rounded-pill border border-hairline px-4 py-2 text-chip text-action transition-colors hover:bg-panel disabled:cursor-default disabled:text-muted"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {failed && (
+            <ErrorNote className="mt-4">
+              We could not record your answer. Your choice still works here — try again if you want us to remember it.
+            </ErrorNote>
+          )}
+        </>
+      )}
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Link to="/resources" search={{}} className="inline-flex min-h-11 items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4">
+          Browse other resources <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
+        <Link to="/support" className="inline-flex min-h-11 items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4">
+          Talk to someone <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Doc B's two standing lines, on every Epic F board.
+ *
+ * The first is now enforced rather than promised: the catalogue reads only the
+ * codes the content register approves, so an unreviewed string cannot reach
+ * this page. It says "before students see it" rather than the design's "by
+ * school counsellors", because the register records an authorised reviewer
+ * (`approvedBy`), not that a counsellor specifically read this row.
+ */
+export function ResourceReviewStrip() {
+  return (
+    <section
+      aria-label="How resources are chosen"
+      className="mt-8 grid gap-x-8 gap-y-2 rounded-card border border-hairline bg-panel-2/60 p-5 sm:grid-cols-2"
+    >
+      <p className="text-caption text-body">
+        Every resource is reviewed and approved before students see it.
+      </p>
+      <p className="text-caption text-body">
+        Resources are for self-support. They do not replace a counsellor, doctor or emergency help.
+      </p>
+    </section>
+  )
+}
+
+/**
+ * Epic F artboard 4 — the way out of a resource that does not pretend the
+ * resource was the answer. The three "what happens next" lines are the workflow
+ * /support already ships, and both notices come from the support library
+ * instead of being re-typed, so safety copy cannot drift between surfaces.
+ */
+export function ResourceStillHeavy({ resource }: { resource: Resource }) {
+  return (
+    <section
+      className="mt-6 rounded-panel border border-accent bg-peach p-6 sm:p-8"
+      aria-labelledby="resource-still-heavy-heading"
+    >
+      <h2 id="resource-still-heavy-heading" className="text-section text-peach-ink">
+        Still feeling heavy?
+      </h2>
+      <p className="mt-3 text-copy-sm text-peach-ink">
+        These steps can help, but a real person can help more. You can ask to talk to someone at your school.
+      </p>
+      <Link
+        to="/support"
+        className="mt-5 inline-flex min-h-11 w-full max-w-md items-center justify-center gap-2 rounded-pill bg-action px-5 py-3 text-center text-button-sm font-semibold text-white transition-colors hover:bg-brand-4"
+      >
+        <span className="min-w-0 break-words">Talk to a school counsellor</span>
+        <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
+      </Link>
+
+      <div className="mt-6 rounded-card border border-hairline bg-white p-5">
+        <h3 className="text-chip font-semibold text-heading">What happens next</h3>
+        <ul className="mt-3 space-y-2 text-copy-sm text-body">
+          <li>Your request goes to a school professional.</li>
+          <li>A person decides what support is right, not the AI.</li>
+          <li>You can see its status in the app.</li>
+        </ul>
+        <p className="mt-3 text-caption text-muted">{SUPPORT_RESPONSE_NOTICE}</p>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <Link
+          to="/resources"
+          search={{ category: resource.category }}
+          className="inline-flex min-h-11 items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4"
+        >
+          Keep browsing this topic <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
+        <Link
+          to="/support/status-guide"
+          className="inline-flex min-h-11 items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4"
+        >
+          See how a request moves
+        </Link>
+      </div>
+
+      <p className="mt-5 text-caption text-peach-ink">{SUPPORT_EMERGENCY_NOTICE}</p>
     </section>
   )
 }

@@ -11,6 +11,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ChevronRight, CircleAlert, Inbox, TriangleAlert } from 'lucide-react'
 
 import { DashHeader } from '#/components/dash/DashHeader'
+import { SupportSurfaceTabs } from '#/components/dash/SupportSurfaceTabs'
 import {
   AvatarInitials,
   Button,
@@ -19,6 +20,7 @@ import {
   Skeleton,
   TextField,
 } from '#/components/dash/ui'
+import { REVIEWER_ROLES } from '#/lib/ai-response-reports'
 import { CHAT_STAFF_ROLES } from '#/lib/auth'
 import { useApiQuery, useRoleGuard } from '#/lib/dash'
 import { ApiError } from '#/lib/api'
@@ -32,6 +34,7 @@ import {
   QUEUE_STATUS_LABELS,
   REQUEST_STATUS_LABELS,
   REVIEW_STATUS_LABELS,
+  markSupportRequestRead,
   reviewSupportRequest,
   shortName,
   TIMING_LABELS,
@@ -44,6 +47,8 @@ import {
 } from '#/lib/support-queue'
 
 export const Route = createFileRoute('/_dash/school/requests/')({
+  validateSearch: (search: Record<string, unknown>): { requestId?: string } =>
+    typeof search.requestId === 'string' && search.requestId ? { requestId: search.requestId } : {},
   head: () => ({ meta: [{ title: 'Support requests · Soul Nurture AI' }] }),
   component: SupportRequestsPage,
 })
@@ -51,6 +56,7 @@ export const Route = createFileRoute('/_dash/school/requests/')({
 const CHIPS: { value: QueueFilter | 'ALL'; label: string; countKey: keyof SupportQueueResponse['counts'] }[] = [
   { value: 'ALL', label: 'All', countKey: 'all' },
   { value: 'NEW', label: 'New', countKey: 'new' },
+  { value: 'UNREAD', label: 'Unread', countKey: 'unread' },
   { value: 'REVIEWED', label: 'Reviewed', countKey: 'reviewed' },
   { value: 'FOLLOW_UP_REQUIRED', label: 'Follow-Up Required', countKey: 'followUpRequired' },
   { value: 'FOLLOW_UP_COMPLETED', label: 'Follow-Up Completed', countKey: 'followUpCompleted' },
@@ -70,6 +76,8 @@ const REQUEST_STATUS_PILLS: Record<RequestStatus, string> = {
 
 function SupportRequestsPage() {
   const user = useRoleGuard([...CHAT_STAFF_ROLES])
+  const { requestId } = Route.useSearch()
+  const navigate = Route.useNavigate()
   const [chip, setChip] = useState<QueueFilter | 'ALL'>('ALL')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -82,6 +90,11 @@ function SupportRequestsPage() {
   if (!user) return null
 
   const schoolName = user.school?.name ?? 'your school'
+  // The column that names the indicator beside a request is a reader-dependent
+  // fact, not a layout choice: Doc A has not approved indicator content for
+  // support staff and the indicators screen refuses them, so the queue does not
+  // offer a column — or a link into it — that the viewer cannot open.
+  const seesIndicators = REVIEWER_ROLES.some((role) => role === user.role)
 
   return (
     <>
@@ -94,6 +107,7 @@ function SupportRequestsPage() {
           placeholder: 'Search by Student ID/email',
         }}
       />
+      <SupportSurfaceTabs active="/school/requests" />
       <main className="flex flex-1 flex-col gap-6 p-6 lg:p-8">
         <QueuePanels
           key={`${user.id}:${user.schoolId ?? user.school?.id ?? 'no-school'}`}
@@ -101,6 +115,9 @@ function SupportRequestsPage() {
           onChipChange={setChip}
           search={debouncedSearch}
           schoolName={schoolName}
+          seesIndicators={seesIndicators}
+          requestId={requestId}
+          onSelect={(id) => void navigate({ search: id ? { requestId: id } : {}, replace: true })}
         />
       </main>
     </>
@@ -112,11 +129,17 @@ function QueuePanels({
   onChipChange,
   search,
   schoolName,
+  seesIndicators,
+  requestId,
+  onSelect,
 }: {
   chip: QueueFilter | 'ALL'
   onChipChange: (next: QueueFilter | 'ALL') => void
   search: string
   schoolName: string
+  seesIndicators: boolean
+  requestId?: string
+  onSelect: (id: string | null) => void
 }) {
   const queue = useApiQuery(
     () => fetchSupportQueue({ status: chip === 'ALL' ? undefined : chip, q: search }),
@@ -125,13 +148,23 @@ function QueuePanels({
   const [selected, setSelected] = useState<SupportQueueItem | null>(null)
   const [confirmation, setConfirmation] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!requestId) {
+      setSelected(null)
+      return
+    }
+    const current = queue.data?.items.find((item) => item.id === requestId)
+    if (current) setSelected((existing) => existing?.id === requestId ? { ...current, readAt: existing.readAt ?? current.readAt } : current)
+  }, [requestId, queue.data])
+
   const counts = queue.data?.counts
 
   return (
     <>
       {confirmation && <p role="status" className="text-copy-sm text-action">{confirmation}</p>}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
         <StatTile dotClass="bg-accent" label="New requests" value={counts?.new} />
+        <StatTile dotClass="bg-action" label="Unread" value={counts?.unread} />
         <StatTile dotClass="bg-action" label="Follow-up required" value={counts?.followUpRequired} />
         <StatTile dotClass="bg-action" label="Completed this week" value={counts?.completedThisWeek} />
       </div>
@@ -160,7 +193,7 @@ function QueuePanels({
       {counts && (
         <p className="text-caption text-muted">
           Each number is exactly the rows that chip shows. They overlap — a request can be
-          New and still need a follow-up — so they do not add up to All.
+          unread and urgent at once — so they do not add up to All.
         </p>
       )}
 
@@ -174,24 +207,33 @@ function QueuePanels({
           </Button>
         </div>
       )}
+      {requestId && !selected && !queue.error && (
+        <p role="status" className="text-copy-sm text-muted">
+          {queue.loading ? 'Opening this request…' : 'That request is not in this filtered view.'}
+        </p>
+      )}
       {queue.loading && !queue.data ? (
         <TableSkeleton />
       ) : queue.data ? (
         <RequestsTable
           items={queue.data.items}
           schoolName={schoolName}
+          seesIndicators={seesIndicators}
           onSelect={(item) => {
             setConfirmation(null)
             setSelected(item)
+            onSelect(item.id)
           }}
         />
       ) : null}
 
       <ReviewDialog
         item={selected}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          onSelect(null)
+        }}
         onChanged={(message) => {
-          setSelected(null)
+          onSelect(null)
           setConfirmation(message)
           queue.reload()
         }}
@@ -200,7 +242,9 @@ function QueuePanels({
       <p className="flex items-start gap-2 text-caption text-muted">
         <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         Support prompts are suggestions for human review. They are not diagnoses or
-        decisions. You only see requests you are authorised to view.
+        decisions. A student can ask for help with no indicator beside the request, and where
+        the two share a conversation they stay two records with two statuses — reading one
+        here changes neither. You only see requests you are authorised to view.
       </p>
     </>
   )
@@ -233,10 +277,12 @@ function StatTile({
 function RequestsTable({
   items,
   schoolName,
+  seesIndicators,
   onSelect,
 }: {
   items: SupportQueueItem[]
   schoolName: string
+  seesIndicators: boolean
   onSelect: (item: SupportQueueItem) => void
 }) {
   if (items.length === 0) {
@@ -255,11 +301,21 @@ function RequestsTable({
 
   return (
     <div className="overflow-hidden rounded-panel border border-hairline bg-white">
-      <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem] items-center gap-4 bg-panel px-6 py-3 text-chip font-medium text-body md:grid">
+      {/* Both column templates are spelled out in full. Tailwind's scanner
+          cannot see a class built by interpolating a shared constant, so one
+          string variable would compile cleanly and render unstyled. */}
+      <div
+        className={`hidden items-center gap-4 bg-panel px-6 py-3 text-chip font-medium text-body md:grid ${
+          seesIndicators
+            ? 'md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem]'
+            : 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem]'
+        }`}
+      >
         <span>Student · urgency</span>
         <span>Requested</span>
         <span>Support prompt</span>
         <span>Request status</span>
+        {seesIndicators && <span>Linked indicator</span>}
         <span aria-hidden="true" />
       </div>
       <ul className="flex flex-col divide-y divide-hairline">
@@ -268,12 +324,16 @@ function RequestsTable({
             <button
               type="button"
               onClick={() => onSelect(item)}
-              // One row, two shapes. Below md the five columns cannot each hold
+              // One row, two shapes. Below md these columns cannot each hold
               // a pill, so the row stacks: identity on top, the meta fields on
               // a wrapped line under it. At md+ both wrapper spans become
               // `display: contents`, which hands their children to the grid and
               // restores the aligned table columns.
-              className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-panel-2/50 md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem] md:gap-4 md:px-6"
+              className={`flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-panel-2/50 md:grid md:gap-4 md:px-6 ${
+                seesIndicators
+                  ? 'md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem]'
+                  : 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.9fr)_1.5rem]'
+              }`}
             >
               <span className="flex min-w-0 flex-1 flex-col gap-2 md:contents">
                 <span className="flex min-w-0 items-center gap-3 md:flex-none">
@@ -315,6 +375,11 @@ function RequestsTable({
                     >
                       {REQUEST_STATUS_LABELS[item.requestStatus] ?? item.requestStatus}
                     </span>
+                    {item.readAt === null && (
+                      <span className="inline-flex items-center rounded-pill border border-action px-3 py-1 text-chip font-medium text-action">
+                        Unread
+                      </span>
+                    )}
                     {item.followUpState !== 'NONE' && (
                       <span className="inline-flex items-center rounded-pill border border-hairline px-3 py-1 text-chip text-body">
                         {FOLLOW_UP_STATE_LABELS[item.followUpState]}
@@ -323,6 +388,28 @@ function RequestsTable({
                   </span>
                 </span>
               </span>
+              {/* A pointer to a separate record, not a second status for this
+                  one. Hidden below md like the other columns — and it can never
+                  be a link here, because the whole row is the button that opens
+                  the review dialog. The dialog carries the way through to the
+                  indicator instead. */}
+              {seesIndicators && (
+                <span className="hidden min-w-0 text-copy-sm md:block">
+                  {item.linkedIndicator ? (
+                    <span className="block truncate">
+                      <span className="text-heading">{item.linkedIndicator.triggerLabel}</span>
+                      <span className="text-muted">
+                        {' · '}
+                        {item.linkedIndicator.level
+                          ? `Level ${item.linkedIndicator.level}`
+                          : 'Unclassified'}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-muted">None linked</span>
+                  )}
+                </span>
+              )}
               <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted" />
             </button>
           </li>
@@ -381,6 +468,7 @@ function ReviewDialog({
   const [error, setError] = useState<string | null>(null)
   const [editingSchedule, setEditingSchedule] = useState(false)
   const [dueAt, setDueAt] = useState('')
+  const [openReceipt, setOpenReceipt] = useState<{ requestId: string; readAt: string } | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -392,11 +480,18 @@ function ReviewDialog({
     setEditingSchedule(false)
     setError(null)
     setSaving(false)
+    setOpenReceipt(null)
+    if (item.readAt === null) {
+      void markSupportRequestRead(item.id)
+        .then((receipt) => setOpenReceipt({ requestId: item.id, readAt: receipt.readAt }))
+        .catch(() => {})
+    }
   }, [item])
 
   if (!item) return null
 
   const studentName = shortName(item.student)
+  const readAt = openReceipt?.requestId === item.id ? openReceipt.readAt : item.readAt
   const changed = !isUnchangedDraft(draft, baseline)
   const arrangementMissing =
     draft.status === 'SCHEDULED' && (!draft.scheduledAt || !draft.locationLabel.trim())
@@ -421,6 +516,11 @@ function ReviewDialog({
       }
       const result = await reviewSupportRequest(item.id, body)
       setBaseline(draft)
+      if (readAt === null) {
+        void markSupportRequestRead(item.id)
+          .then((receipt) => setOpenReceipt({ requestId: item.id, readAt: receipt.readAt }))
+          .catch(() => {})
+      }
       onChanged('Review saved.')
       // Accepting opens the staff↔student chat — land straight in it.
       if (draft.status === 'ACCEPTED' && result.chatThreadId) {
@@ -499,6 +599,11 @@ function ReviewDialog({
       }
     >
       <div className="flex flex-col gap-4">
+        <p className="text-caption text-muted" aria-live="polite">
+          {readAt === null
+            ? 'Unread by you — opening this record does not mark it reviewed or acknowledge an escalation.'
+            : 'You have opened this request. Its review and escalation status remain unchanged.'}
+        </p>
         <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-copy-sm">
           <dt className="text-muted">Student</dt>
           <dd className="text-heading">
@@ -524,6 +629,33 @@ function ReviewDialog({
               {QUEUE_STATUS_LABELS[item.queueStatus]}
             </span>
           </dd>
+          {item.linkedIndicator && (
+            <>
+              <dt className="text-muted">Linked indicator</dt>
+              <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="min-w-0 truncate text-heading">
+                  {item.linkedIndicator.triggerLabel}
+                  <span className="text-muted">
+                    {' · '}
+                    {item.linkedIndicator.level
+                      ? `Level ${item.linkedIndicator.level}`
+                      : 'Unclassified'}
+                  </span>
+                </span>
+                {/* The row button cannot hold a link, so the way across lives
+                    here. Opening the indicator does not change this request,
+                    and reviewing it here does not change the indicator. */}
+                <Link
+                  to="/school/indicators"
+                  search={{ flagId: item.linkedIndicator.id }}
+                  onClick={onClose}
+                  className="text-chip font-medium text-action transition-colors hover:text-brand-4"
+                >
+                  Open in Support indicators
+                </Link>
+              </dd>
+            </>
+          )}
           <dt className="text-muted">Urgency</dt>
           <dd className="flex flex-wrap items-center gap-2 text-heading">
             {item.urgency === 'URGENT' ? (
