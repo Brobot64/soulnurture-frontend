@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowRight, Check, ChevronRight, Loader2, Mic, RefreshCw, Square, UserRound, X } from 'lucide-react'
 
-import { AiSupportSafetySheet } from '#/components/AiSupportSafetySheet'
-import { BoundaryNotice } from '#/components/BoundaryNotice'
+import { BoundaryNoticeDialog, BoundaryNoticeMarker } from '#/components/BoundaryNotice'
 import { CheckInSummary } from '#/components/CheckInSummary'
 import { ConsentGate, useAiConsent } from '#/components/ConsentGate'
 import { Flash, useFlash } from '#/components/Flash'
@@ -30,6 +29,7 @@ import {
   fetchCheckInHistory,
   fetchConversation,
   getCheckIn,
+  getMoodByFeeling,
   newId,
   readPendingOpening,
   sendMessage,
@@ -37,6 +37,7 @@ import {
   type CheckInHistoryEntry,
   type ConversationDetail,
   type ConversationStatus,
+  type AiBoundary,
   type HumanCareRecommendation,
   type Message,
   type QuickReplyValue,
@@ -98,6 +99,10 @@ function Reflection() {
   const [input, setInput] = useState('')
   const [composerError, setComposerError] = useState<string | null>(null)
   const [humanCare, setHumanCare] = useState<HumanCareRecommendation | null>(null)
+  const [boundaryNotice, setBoundaryNotice] = useState<{
+    messageId: string
+    boundary: AiBoundary
+  } | null>(null)
   const [closing, setClosing] = useState(false)
   const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'transcribing'>('idle')
   const [voiceElapsed, setVoiceElapsed] = useState(0)
@@ -154,6 +159,12 @@ function Reflection() {
     if (!next?.show || humanCareOfferedFor.current === conversationId) return
     humanCareOfferedFor.current = conversationId
     setHumanCare(next)
+  }
+
+  /** Re-opens the boundary notice from the marker left in the thread. */
+  const openBoundaryNotice = (entry: Message) => {
+    const boundary = entry.aiPayload?.boundary
+    if (boundary) setBoundaryNotice({ messageId: entry.id, boundary })
   }
 
   useEffect(() => {
@@ -415,6 +426,29 @@ function Reflection() {
     else dialog.close()
   }, [humanCare])
 
+  // A boundary interrupts once, for the turn that just happened — closing it
+  // returns the student to the same open chat. A conversation restored from
+  // history keeps its thread markers without reopening the popup.
+  const boundarySeen = useRef<{ conversationId: string; ids: Set<string> } | null>(null)
+  useEffect(() => {
+    if (loading) return
+    const notices = messages.flatMap((entry) => {
+      const boundary = entry.aiPayload?.boundary
+      if (entry.role !== 'ASSISTANT' || !boundary || entry.aiPayload?.asyncState === 'PENDING_AI') return []
+      return [{ messageId: entry.id, boundary }]
+    })
+    const seen = boundarySeen.current
+    if (!seen || seen.conversationId !== conversationId) {
+      boundarySeen.current = { conversationId, ids: new Set(notices.map((notice) => notice.messageId)) }
+      return
+    }
+    const fresh = notices.filter((notice) => !seen.ids.has(notice.messageId))
+    if (!fresh.length) return
+    const latest = fresh[fresh.length - 1]
+    seen.ids.add(latest.messageId)
+    setBoundaryNotice(latest)
+  }, [messages, loading, conversationId])
+
   // Restored placeholders and new sends use the same state-driven polling path.
   useEffect(() => {
     const sync = syncRef.current
@@ -445,6 +479,8 @@ function Reflection() {
   // — is therefore the only thing that can take the composer away.
   const readOnly = conversationStatus !== 'ACTIVE'
   const last = messages[messages.length - 1]
+  // The dialogs borrow the student's own mood face rather than a generic one.
+  const moodEmoji = (checkIn && getMoodByFeeling(checkIn.feeling)?.emoji) || '🙂'
 
   const send = async (raw: string, quickReply?: QuickReplyValue, viaVoice = false) => {
     const content = raw.trim()
@@ -752,7 +788,10 @@ function Reflection() {
                           </Reveal>
                         )}
                         {entry.aiPayload?.boundary && (
-                          <BoundaryNotice boundary={entry.aiPayload.boundary} />
+                          <BoundaryNoticeMarker
+                            boundary={entry.aiPayload.boundary}
+                            onOpen={() => openBoundaryNotice(entry)}
+                          />
                         )}
                         {!loadFailed && user?.role === 'STUDENT' && consentState === 'accepted' && entry.role === 'ASSISTANT' && entry.content &&
                           entry.aiPayload?.asyncState !== 'PENDING_AI' && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(entry.id) && (
@@ -1005,21 +1044,24 @@ function Reflection() {
         onClick={(event) => {
           if (event.target === event.currentTarget) setConfirmComplete(false)
         }}
-        className="m-auto w-[min(420px,calc(100%_-_32px))] rounded-panel border border-hairline bg-white p-6 text-body backdrop:bg-scrim/40"
+        className="m-auto w-[min(460px,calc(100%_-_32px))] rounded-panel border border-hairline bg-white p-7 text-center text-body backdrop:bg-scrim/45 backdrop:backdrop-blur-sm"
       >
-        <h2 id="complete-check-in-title" className="text-section text-heading">
+        <span aria-hidden="true" className="mx-auto grid size-16 place-items-center rounded-full bg-mint text-[30px] leading-none">
+          {moodEmoji}
+        </span>
+        <h2 id="complete-check-in-title" className="mt-5 text-section text-heading">
           Complete this reflection?
         </h2>
-        <p className="mt-2 text-copy-sm text-muted">
+        <p className="mt-3 text-copy-sm text-muted">
           The chat with the reflection guide ends. You can read it back any
           time, but you can't add messages to it — we'll ask how you're feeling
           now.
         </p>
-        <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+        <div className="mt-7 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-center">
           <button
             type="button"
             onClick={() => setConfirmComplete(false)}
-            className="inline-flex h-11 items-center justify-center rounded-pill bg-surface px-6 text-button-sm text-ink transition-colors hover:bg-neutral-10"
+            className="inline-flex h-11 items-center justify-center rounded-pill border border-hairline bg-white px-6 text-button-sm text-ink transition-colors hover:bg-panel"
           >
             Keep talking
           </button>
@@ -1042,16 +1084,19 @@ function Reflection() {
         onClick={(event) => {
           if (event.target === event.currentTarget) setHumanCare(null)
         }}
-        className="m-auto w-[min(460px,calc(100%_-_32px))] rounded-panel border border-accent bg-peach p-6 backdrop:bg-scrim/40"
+        className="m-auto w-[min(460px,calc(100%_-_32px))] rounded-panel border border-accent bg-peach p-7 text-center backdrop:bg-scrim/45 backdrop:backdrop-blur-sm"
       >
-        <h2 id="human-care-title" className="text-section text-peach-ink">
+        <span aria-hidden="true" className="mx-auto grid size-16 place-items-center rounded-full bg-white/70 text-[30px] leading-none">
+          {moodEmoji}
+        </span>
+        <h2 id="human-care-title" className="mt-5 text-section text-peach-ink">
           Would you like to talk to a person?
         </h2>
-        <p className="mt-2 text-copy-sm text-peach-ink">
+        <p className="mt-3 text-copy-sm text-peach-ink">
           {humanCare?.message ??
             'It might help to talk with someone at your school.'}
         </p>
-        <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+        <div className="mt-7 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-center">
           <button
             type="button"
             onClick={() => setHumanCare(null)}
@@ -1068,6 +1113,11 @@ function Reflection() {
           </Link>
         </div>
       </dialog>
+
+      <BoundaryNoticeDialog
+        boundary={boundaryNotice?.boundary ?? null}
+        onClose={() => setBoundaryNotice(null)}
+      />
 
       <Flash message={flashMessage} hiding={hiding} />
     </div>

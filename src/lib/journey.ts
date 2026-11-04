@@ -286,6 +286,15 @@ export async function fetchCheckInHistory(): Promise<{ items: CheckInHistoryEntr
   return apiFetch<{ items: CheckInHistoryEntry[] }>('/api/v1/check-ins/history')
 }
 
+/**
+ * The newest check-in — the same row the backend attaches to a new support
+ * chat when no checkInId is sent, so the student can see what goes with it.
+ */
+export async function fetchLatestCheckIn(): Promise<CheckIn | null> {
+  const { items } = await apiFetch<{ items: CheckIn[] }>('/api/v1/check-ins')
+  return items[0] ?? null
+}
+
 /* ── Post-check-in mood feedback ────────────────────────────────────────── */
 
 export interface CheckInFeedback {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, BookOpen, Check, ChevronRight, Database, MessageCircle, RefreshCw, ShieldCheck, Sparkles, TriangleAlert, UserRound, UsersRound, type LucideIcon } from 'lucide-react'
+import { ArrowRight, BookOpen, Check, ChevronRight, Database, MessageCircle, RefreshCw, ShieldCheck, Sparkles, TriangleAlert, UserRound, UsersRound, X, type LucideIcon } from 'lucide-react'
 
 import { StatusBadge, Spinner } from '#/components/StatusBadge'
 import { ApiError } from '#/lib/api'
@@ -9,6 +9,7 @@ import {
   fetchDisclosure,
   fetchDisclosureStatus,
   type AiDisclosure,
+  type AiDisclosureSection,
   type AiDisclosureStatus,
 } from '#/lib/consent'
 
@@ -73,6 +74,56 @@ const sectionIcons: Record<string, LucideIcon> = {
   'how-we-protect': ShieldCheck,
   'when-we-escalate': TriangleAlert,
   'human-support': UsersRound,
+}
+
+/**
+ * The three at-a-glance cards on the landing view. Their text still comes from
+ * the server disclosure payload — only the layout and the glyphs are chosen
+ * here, so the consent instrument itself is untouched.
+ */
+function GlyphCard({
+  section,
+  glyph,
+  tone,
+  labelledBy,
+}: {
+  section: AiDisclosureSection | undefined
+  glyph: 'check' | 'cross' | 'alert'
+  tone: 'plain' | 'warm'
+  labelledBy: string
+}) {
+  if (!section) return null
+  const Icon = glyph === 'check' ? Check : glyph === 'cross' ? X : TriangleAlert
+  return (
+    <section
+      aria-labelledby={`${labelledBy}-${section.id}`}
+      className={`rounded-card border p-5 sm:p-7 ${tone === 'warm' ? 'border-accent bg-peach' : 'border-hairline bg-white'}`}
+    >
+      <h3
+        id={`${labelledBy}-${section.id}`}
+        className={`flex items-center gap-2.5 text-card text-heading ${tone === 'warm' ? 'text-peach-ink' : ''}`}
+      >
+        {glyph === 'alert' && <TriangleAlert aria-hidden="true" className="size-5 shrink-0" />}
+        {section.heading}
+      </h3>
+      {/* The danger card is one calm block of text; ticking off each line with a
+          warning triangle reads as four separate alarms. */}
+      {glyph === 'alert' ? (
+        <div className="mt-3 flex flex-col gap-3 text-copy-sm text-body">
+          {section.items.map((item, index) => <p key={index} className="whitespace-pre-line">{item}</p>)}
+        </div>
+      ) : (
+        <ul className="mt-5 flex flex-col gap-4">
+          {section.items.map((item, index) => (
+            <li key={index} className="flex gap-3.5 text-copy-sm text-body">
+              <Icon aria-hidden="true" strokeWidth={2.5} className={`mt-0.5 size-4 shrink-0 ${tone === 'warm' ? 'text-peach-ink' : 'text-action'}`} />
+              <span className="whitespace-pre-line">{item}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
 }
 
 /** Shared canonical disclosure reader for the pre-chat dialog and /consent. */
@@ -245,6 +296,9 @@ export function ConsentGate({
     ? acceptedDate.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
     : record?.acceptedAt ?? 'Time unavailable'
 
+  const allSections = disclosure?.groups.flatMap((group) => group.sections) ?? []
+  const findSection = (sectionId: string) => allSections.find((section) => section.id === sectionId)
+
   return (
     <div className={isModal
       ? 'fixed inset-0 z-50 grid place-items-center bg-scrim/45 px-4 py-6'
@@ -334,13 +388,12 @@ export function ConsentGate({
                 <p className="mt-3 text-caption text-muted">Version {disclosure.version}</p>
               </div>
               {view === 'start' ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {disclosure.groups.map((group) => (
-                    <div key={group.id} className="rounded-card border border-hairline bg-white p-5 sm:p-6">
-                      <h3 className="text-card text-heading">{group.title}</h3>
-                      <p className="mt-3 whitespace-pre-line text-copy-sm text-body">{group.summary}</p>
-                    </div>
-                  ))}
+                <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+                  <GlyphCard section={findSection('what-it-supports')} glyph="check" tone="plain" labelledBy={id} />
+                  <div className="flex flex-col gap-4">
+                    <GlyphCard section={findSection('what-it-cannot-do')} glyph="cross" tone="warm" labelledBy={id} />
+                    <GlyphCard section={findSection('get-human-help')} glyph="alert" tone="warm" labelledBy={id} />
+                  </div>
                 </div>
               ) : (
                 <>
