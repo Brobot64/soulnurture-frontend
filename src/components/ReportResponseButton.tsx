@@ -3,7 +3,7 @@ import { Flag } from 'lucide-react'
 
 import { Button, Dialog, ErrorNote } from '#/components/dash/ui'
 import { ApiError } from '#/lib/api'
-import { submitAiResponseReport } from '#/lib/ai-response-reports'
+import { REPORT_REASONS, REPORT_REASON_LABELS, submitAiResponseReport, type ReportReason } from '#/lib/ai-response-reports'
 import type { Message } from '#/lib/journey'
 
 export function ReportResponseButton({ message, reported, onReported, onReload }: {
@@ -13,6 +13,7 @@ export function ReportResponseButton({ message, reported, onReported, onReload }
   onReload: () => void
 }) {
   const [selection, setSelection] = useState<string | null>(null)
+  const [reason, setReason] = useState<ReportReason | null>(null)
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [stale, setStale] = useState(false)
@@ -32,12 +33,12 @@ export function ReportResponseButton({ message, reported, onReported, onReload }
   }
 
   async function submit() {
-    if (inFlight.current || selection === null || stale) return
+    if (inFlight.current || selection === null || reason === null || stale) return
     inFlight.current = true
     setSaving(true)
     setError(null)
     try {
-      const result = await submitAiResponseReport({ messageId: message.id, expectedContent: selection, note })
+      const result = await submitAiResponseReport({ messageId: message.id, expectedContent: selection, reason, note })
       if (!mounted.current) return
       setSelection(null)
       onReported(result.alreadyReported)
@@ -58,7 +59,7 @@ export function ReportResponseButton({ message, reported, onReported, onReload }
       <button
         type="button"
         disabled={reported}
-        onClick={() => { setSelection(message.content); setNote(''); setError(null); setStale(false) }}
+        onClick={() => { setSelection(message.content); setReason(null); setNote(''); setError(null); setStale(false) }}
         className="mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-pill px-2 text-caption text-muted transition-colors hover:bg-panel hover:text-action focus-visible:outline-2 focus-visible:outline-action disabled:cursor-default disabled:hover:bg-transparent"
       >
         <Flag aria-hidden="true" className="size-3.5" />
@@ -72,6 +73,34 @@ export function ReportResponseButton({ message, reported, onReported, onReload }
           <blockquote className="max-h-44 overflow-y-auto whitespace-pre-wrap break-words rounded-card border-l-4 border-action bg-panel px-4 py-3 text-copy-sm text-heading">
             {selection}
           </blockquote>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-chip font-medium text-heading">What went wrong?</legend>
+            {REPORT_REASONS.map((value) => {
+              const picked = value === reason
+              return (
+                <label
+                  key={value}
+                  className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-card border px-4 py-3 text-copy-sm transition-colors ${
+                    picked ? 'border-action bg-panel text-heading' : 'border-hairline text-body hover:bg-panel'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`report-reason-${message.id}`}
+                    value={value}
+                    checked={picked}
+                    onChange={() => setReason(value)}
+                    disabled={saving || stale}
+                    className="size-4 shrink-0 accent-brand-4"
+                  />
+                  {REPORT_REASON_LABELS[value]}
+                </label>
+              )
+            })}
+          </fieldset>
+          <p className="text-copy-sm text-body">
+            A person reviews reported replies against our responsible-AI rules. Reporting does not change your support request.
+          </p>
           <div className="flex flex-col gap-2">
             <label htmlFor={noteId} className="text-chip font-medium text-heading">What would you like them to know? <span className="font-normal text-muted">(optional)</span></label>
             <textarea id={noteId} value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} rows={4} disabled={saving || stale}
@@ -84,7 +113,7 @@ export function ReportResponseButton({ message, reported, onReported, onReload }
           <div className="flex flex-wrap justify-end gap-3">
             <Button variant="ghost" onClick={close} disabled={saving}>Cancel</Button>
             {stale ? <Button onClick={() => { close(); onReload() }}>Reload reply</Button> :
-              <Button type="submit" disabled={saving}>{saving ? 'Submitting…' : 'Submit report'}</Button>}
+              <Button type="submit" disabled={saving || reason === null}>{saving ? 'Sending…' : 'Send report'}</Button>}
           </div>
         </form>
       </Dialog>
