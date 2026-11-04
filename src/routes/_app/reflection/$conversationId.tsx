@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowRight, Check, ChevronRight, Loader2, Mic, RefreshCw, Square, UserRound, X } from 'lucide-react'
 
+import { AiSupportSafetySheet } from '#/components/AiSupportSafetySheet'
 import { BoundaryNoticeDialog, BoundaryNoticeMarker } from '#/components/BoundaryNotice'
 import { CheckInSummary } from '#/components/CheckInSummary'
 import { ConsentGate, useAiConsent } from '#/components/ConsentGate'
@@ -33,11 +34,11 @@ import {
   newId,
   readPendingOpening,
   sendMessage,
+  type AiBoundary,
   type CheckIn,
   type CheckInHistoryEntry,
   type ConversationDetail,
   type ConversationStatus,
-  type AiBoundary,
   type HumanCareRecommendation,
   type Message,
   type QuickReplyValue,
@@ -103,6 +104,8 @@ function Reflection() {
     messageId: string
     boundary: AiBoundary
   } | null>(null)
+  /** True only once this visit has watched the chat end — see the read-only band. */
+  const [endedThisVisit, setEndedThisVisit] = useState(false)
   const [closing, setClosing] = useState(false)
   const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'transcribing'>('idle')
   const [voiceElapsed, setVoiceElapsed] = useState(0)
@@ -154,9 +157,12 @@ function Reflection() {
   // as a voice turn for the pilot analytics.
   const voiceDraftRef = useRef(false)
 
-  /** Offers the human-support popup once per conversation, from any AI turn. */
-  const offerHumanCare = (next: HumanCareRecommendation | null) => {
+  /** Offers the human-support popup once per conversation, from any AI turn. An
+   * acute route is the exception: that turn's own notice already says a person
+   * has been told and opens the same door, so a second popup would only stack. */
+  const offerHumanCare = (next: HumanCareRecommendation | null, turn?: Message) => {
     if (!next?.show || humanCareOfferedFor.current === conversationId) return
+    if (turn?.aiPayload?.boundary?.kind === 'ACUTE_SAFEGUARD_ROUTE') return
     humanCareOfferedFor.current = conversationId
     setHumanCare(next)
   }
@@ -281,6 +287,7 @@ function Reflection() {
       if (push.conversationId !== conversationId || !isCurrent()) return
       setEndedByExpiry(push.reason === 'IDLE')
       setConversationStatus('CLOSED')
+      setEndedThisVisit(true)
       if (push.reason === 'IDLE') {
         flash('Your reflection timed out — your words are saved. Finish with a quick mood check.')
       }
@@ -363,7 +370,7 @@ function Reflection() {
           ...prev.map((entry) => (entry.id === tempId ? result.userMessage : entry)),
           result.assistantMessage,
         ])
-        offerHumanCare(result.humanCareRecommendation)
+        offerHumanCare(result.humanCareRecommendation, result.assistantMessage)
       } catch (caught) {
         if (!isCurrent()) return
         setMessages([])
@@ -513,7 +520,7 @@ function Reflection() {
         ...prev.map((entry) => (entry.id === tempId ? result.userMessage : entry)),
         result.assistantMessage,
       ])
-      offerHumanCare(result.humanCareRecommendation)
+      offerHumanCare(result.humanCareRecommendation, result.assistantMessage)
     } catch (caught) {
       if (!sync.isCurrent()) return
       if (caught instanceof ApiError && caught.status === 401) {
@@ -535,6 +542,7 @@ function Reflection() {
       if (caught instanceof ApiError && caught.status === 409) {
         // the conversation was closed elsewhere — flip the screen to read-only
         setConversationStatus('CLOSED')
+        setEndedThisVisit(true)
       }
       setMessages((prev) => prev.filter((entry) => entry.id !== tempId))
       setInput(content)
@@ -882,7 +890,11 @@ function Reflection() {
               </div>
             )}
 
-            {!loading && !loadFailed && readOnly && (
+            {/* The end-of-chat band belongs to the visit that watched it end.
+                Opening an old reflection is reading history — the check-in is
+                long finished, so it gets no mood-check prompt and no new
+                check-in button; /history and the header are how you leave. */}
+            {!loading && !loadFailed && readOnly && endedThisVisit && (
               <div className="flex flex-col items-center gap-2.5 py-1.5 lg:gap-3 lg:py-2">
                 <p className="text-center text-copy text-muted">
                   {endedByExpiry

@@ -355,6 +355,58 @@ const notifications = [
   { id: 'ntf-4', type: 'ACCOUNT_VERIFIED', title: 'Email verified', body: 'A student verified their email address.', readAt: iso(days(3)), createdAt: iso(days(3)) },
 ]
 
+// --- History + deletion asks (Epic H) ---------------------------------------
+
+const HISTORY_ENTRIES = [
+  {
+    checkInId: 'ci-1',
+    createdAt: iso(hours(5)),
+    feeling: 'STRESSED',
+    intensity: 4,
+    triggers: ['EXAMS'],
+    reflection: { conversationId: 'conv-1', status: 'CLOSED', startedAt: iso(hours(4)), turnCount: 4, viaVoice: false, summary: 'Worked on a study-plan and a breathing exercise.' },
+    supportRequest: null,
+  },
+  {
+    checkInId: 'ci-2',
+    createdAt: iso(days(3)),
+    feeling: 'SAD_LOW',
+    intensity: 3,
+    triggers: ['FRIENDSHIP'],
+    reflection: { conversationId: 'conv-2', status: 'CLOSED', startedAt: iso(days(3)), turnCount: 6, viaVoice: true, summary: null },
+    supportRequest: { id: 'sr-1', createdAt: iso(days(3)), status: 'OPEN', queueStatus: 'REVIEWED', followUpState: 'REQUIRED', urgency: 'NORMAL' },
+  },
+  { checkInId: 'ci-3', createdAt: iso(days(9)), feeling: 'CALM', intensity: 2, triggers: [], reflection: null, supportRequest: null },
+]
+
+// Three of the four states the student can actually be in, so the page is
+// exercised rather than admired: a live countdown, one that already ran, and
+// one a cancel stopped. The held state is asserted by the backend specs.
+// `ask-boom` stays scheduled forever on purpose: its cancel answers 409, so the
+// page's "the server knows better than this row" branch is reachable at all.
+const DELETION_ASKS = [
+  {
+    id: 'ask-boom', scope: 'BEFORE_DATE', beforeDate: day(days(365)), checkInIds: [], note: null,
+    alertedAt: iso(hours(30)), scheduledPurgeAt: new Date(NOW + hours(18)).toISOString(), cancelledAt: null, purgedAt: null,
+    holdReason: null, removedCheckIns: 0, removedConversations: 0, createdAt: iso(hours(30)),
+  },
+  {
+    id: 'ask-live', scope: 'SELECTED_CHECK_INS', beforeDate: null, checkInIds: ['ci-3'], note: 'This one was a bad day.',
+    alertedAt: iso(hours(2)), scheduledPurgeAt: new Date(NOW + hours(23)).toISOString(), cancelledAt: null, purgedAt: null,
+    holdReason: null, removedCheckIns: 0, removedConversations: 0, createdAt: iso(hours(2)),
+  },
+  {
+    id: 'ask-gone', scope: 'BEFORE_DATE', beforeDate: day(days(30)), checkInIds: [], note: null,
+    alertedAt: iso(days(6)), scheduledPurgeAt: iso(days(5)), cancelledAt: null, purgedAt: iso(days(5)),
+    holdReason: null, removedCheckIns: 2, removedConversations: 1, createdAt: iso(days(6)),
+  },
+  {
+    id: 'ask-stopped', scope: 'ALL_HISTORY', beforeDate: null, checkInIds: [], note: null,
+    alertedAt: iso(days(12)), scheduledPurgeAt: iso(days(11)), cancelledAt: iso(days(11)), purgedAt: null,
+    holdReason: null, removedCheckIns: 0, removedConversations: 0, createdAt: iso(days(12)),
+  },
+]
+
 // --- Request handling -------------------------------------------------------
 
 const calls = []
@@ -590,6 +642,73 @@ async function handler(req, res, next) {
       res.end('2')
     }, 12_000)
     return
+  }
+
+  // History (Epic H) — the student's own aggregate, and the deletion asks.
+  if (path === '/api/v1/history') {
+    return ok(res, {
+      items: HISTORY_ENTRIES,
+      counts: {
+        all: HISTORY_ENTRIES.length,
+        checkIns: HISTORY_ENTRIES.length,
+        reflections: HISTORY_ENTRIES.filter((e) => e.reflection).length,
+        supportRequests: HISTORY_ENTRIES.filter((e) => e.supportRequest).length,
+      },
+    })
+  }
+
+  if (path === '/api/v1/history/deletion-requests' && req.method === 'POST') {
+    const body = JSON.parse((await readBody(req)) || '{}')
+    const receipt = {
+      id: `ask-${Date.now()}`,
+      scope: body.scope ?? 'ALL_HISTORY',
+      beforeDate: body.beforeDate ?? null,
+      checkInIds: body.checkInIds ?? [],
+      note: body.note ?? null,
+      alertedAt: new Date().toISOString(),
+      scheduledPurgeAt: new Date(Date.now() + 24 * 60 * 60_000).toISOString(),
+      cancelledAt: null,
+      purgedAt: null,
+      holdReason: null,
+      removedCheckIns: 0,
+      removedConversations: 0,
+      createdAt: new Date().toISOString(),
+    }
+    DELETION_ASKS.unshift(receipt)
+    return sendJson(res, 201, { success: true, statusCode: 201, message: 'Created', data: receipt, path: path, timestamp: new Date().toISOString() })
+  }
+
+  if (path === '/api/v1/history/deletion-requests') {
+    return ok(res, { items: DELETION_ASKS })
+  }
+
+  const cancelMatch = path.match(/^\/api\/v1\/history\/deletion-requests\/([^/]+)\/cancel$/)
+  if (cancelMatch && req.method === 'POST') {
+    const ask = DELETION_ASKS.find((a) => a.id === cancelMatch[1])
+    if (!ask) return fail(res, 404, 'Deletion request not found')
+    if (cancelMatch[1] === 'ask-boom') return fail(res, 409, 'The removal has already run — there is nothing left to undo.', 'ALREADY_REMOVED')
+    // Mirrors the server's precedence: an erasure that already ran is not
+    // unmade by a late cancel, and a second cancel says so instead of pretending.
+    if (ask.purgedAt) return fail(res, 409, 'The removal has already run — there is nothing left to undo.', 'ALREADY_REMOVED')
+    if (ask.cancelledAt) return fail(res, 409, 'This request was already cancelled.', 'ALREADY_CANCELLED')
+    ask.cancelledAt = new Date().toISOString()
+    return sendJson(res, 201, { success: true, statusCode: 201, message: 'Created', data: ask, path: path, timestamp: new Date().toISOString() })
+  }
+
+  const detailMatch = path.match(/^\/api\/v1\/history\/([\w-]+)$/)
+  if (detailMatch && req.method === 'GET') {
+    const entry = HISTORY_ENTRIES.find((e) => e.checkInId === detailMatch[1])
+    if (!entry) return fail(res, 404, 'History entry not found')
+    return ok(res, {
+      ...entry,
+      description: entry.reflection ? 'Felt heavy all week, exams coming up.' : null,
+      messages: entry.reflection
+        ? [
+            { id: 'm-1', role: 'USER', content: 'I could not sleep before the exams.', language: 'en', viaVoice: false, createdAt: entry.reflection.startedAt },
+            { id: 'm-2', role: 'ASSISTANT', content: 'That sounds draining. What has helped you get through a hard week before?', language: 'en', viaVoice: false, createdAt: entry.reflection.startedAt },
+          ]
+        : [],
+    })
   }
 
   // Session — role switchable via a `mockRole` cookie (SCHOOL_ADMIN | COUNSELLOR | STUDENT | FRESH_STUDENT | ANON)

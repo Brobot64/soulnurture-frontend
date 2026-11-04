@@ -647,6 +647,9 @@ function FlagDetail({
             <Link
               to="/school/requests/$conversationId"
               params={{ conversationId: systemMetadata.conversationId }}
+              // PE-05 (owner): not rendered — the alert shows a snippet, so the
+              // indicator surface stops there. Same treatment as the dashboard card.
+              style={{ display: 'none' }}
               className="mt-3 inline-flex min-h-11 items-center gap-2 text-chip font-medium text-action transition-colors hover:text-brand-4"
             >
               Open the conversation this indicator came from
@@ -828,6 +831,8 @@ function ReviewRecorded({
             to="/school/requests/$conversationId"
             params={{ conversationId }}
             onClick={onClose}
+            // PE-05 (owner): not rendered — see the indicator detail card.
+            style={{ display: 'none' }}
             className="inline-flex min-h-11 items-center gap-2 text-chip font-medium text-action transition-colors hover:text-brand-4"
           >
             Open the conversation this indicator came from
