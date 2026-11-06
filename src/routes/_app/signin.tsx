@@ -3,6 +3,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { LockKeyhole, UserRound } from 'lucide-react'
 
 import { AuthField, AuthShell } from '#/components/AuthShell'
+import { HumanSupportArtwork } from '#/components/HumanSupportArtwork'
 import { Spinner, StatusBadge } from '#/components/StatusBadge'
 import { ApiError } from '#/lib/api'
 import { homeForRole, signIn } from '#/lib/auth'
@@ -90,6 +91,7 @@ function SignIn() {
     <AuthShell
       illustrated
       chip="Welcome back"
+      illustration={<HumanSupportArtwork className="w-full max-w-[640px] rounded-hero" />}
       panel={{
         Icon: LockKeyhole,
         heading: 'Good to see you again',

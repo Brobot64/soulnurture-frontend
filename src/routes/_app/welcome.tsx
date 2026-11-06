@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 
-import { HeroArtwork } from '#/components/HeroArtwork'
+import { HumanSupportArtwork } from '#/components/HumanSupportArtwork'
 import { TextsReveal } from '#/components/TextsReveal'
 import { useSession } from '#/lib/auth'
 
@@ -83,9 +83,7 @@ function Welcome() {
           </p>
         </div>
         <div className="order-1 flex justify-center lg:order-2">
-          <div className="lg:grid lg:aspect-square lg:w-full lg:max-w-[560px] lg:place-items-center lg:rounded-hero lg:bg-panel">
-            <HeroArtwork className="w-[267px] max-w-[78vw] rounded-hero lg:w-3/4 lg:max-w-[400px]" />
-          </div>
+          <HumanSupportArtwork className="w-[267px] max-w-[78vw] rounded-hero lg:w-full lg:max-w-[560px]" />
         </div>
       </div>
     </div>

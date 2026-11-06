@@ -27,6 +27,8 @@ interface AuthShellProps {
   /** The small mint pill above the heading — "Student access", "Reset password". */
   chip?: string
   panel?: AuthPanel
+  /** Replaces the drawn circle motif in the mint panel with artwork that carries its own background. */
+  illustration?: ReactNode
 }
 
 export function AuthShell({
@@ -38,6 +40,7 @@ export function AuthShell({
   standalone = false,
   chip,
   panel = DEFAULT_PANEL,
+  illustration,
 }: AuthShellProps) {
   const content = (
     <>
@@ -91,18 +94,24 @@ export function AuthShell({
         <>
           <div className="w-full min-w-0 max-w-[520px]">{content}</div>
           <div
-            className="hidden min-h-[640px] flex-col items-center justify-center gap-10 self-stretch overflow-hidden rounded-hero bg-panel p-6 lg:flex"
+            className={
+              illustration
+                ? 'hidden min-h-[640px] flex-col items-center justify-center gap-10 self-stretch lg:flex'
+                : 'hidden min-h-[640px] flex-col items-center justify-center gap-10 self-stretch overflow-hidden rounded-hero bg-panel p-6 lg:flex'
+            }
           >
-            <div className="relative grid aspect-square w-full max-w-[300px] place-items-center rounded-full bg-surface">
-              <div className="grid size-[72%] place-items-center rounded-full bg-mint/50">
-                <div className="grid size-[61%] place-items-center rounded-full bg-action text-white">
-                  <panel.Icon className="size-14" strokeWidth={1.75} aria-hidden="true" />
+            {illustration ?? (
+              <div className="relative grid aspect-square w-full max-w-[300px] place-items-center rounded-full bg-surface">
+                <div className="grid size-[72%] place-items-center rounded-full bg-mint/50">
+                  <div className="grid size-[61%] place-items-center rounded-full bg-action text-white">
+                    <panel.Icon className="size-14" strokeWidth={1.75} aria-hidden="true" />
+                  </div>
                 </div>
+                <span className="absolute right-[7%] top-[10%] size-10 rounded-full bg-accent" />
+                <span className="absolute bottom-[17%] left-[8%] size-6 rounded-full bg-mint" />
+                <span className="absolute bottom-[23%] right-[3%] size-[18px] rounded-full bg-blush" />
               </div>
-              <span className="absolute right-[7%] top-[10%] size-10 rounded-full bg-accent" />
-              <span className="absolute bottom-[17%] left-[8%] size-6 rounded-full bg-mint" />
-              <span className="absolute bottom-[23%] right-[3%] size-[18px] rounded-full bg-blush" />
-            </div>
+            )}
             <div className="max-w-[420px] text-center">
               <h2 className="text-section text-heading">{panel.heading}</h2>
               <p className="mt-3 text-copy text-body">{panel.caption}</p>
