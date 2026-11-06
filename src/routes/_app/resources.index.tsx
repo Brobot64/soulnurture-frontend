@@ -356,7 +356,7 @@ function ResourcesEmpty({
       <EmptyState
         icon={Search}
         title="No approved resources here yet"
-        body={`We are still adding ideas to ${RESOURCE_CATEGORIES[filters.category].toLowerCase()}. A resource appears here only once it has been reviewed and approved, so this topic is empty for now. Try another topic, or ask to talk to a school counsellor if you would like support today.`}
+        body={`We are still adding ideas to “${RESOURCE_CATEGORIES[filters.category]}”. A resource appears here only once it has been reviewed and approved, so this topic is empty for now. Try another topic, or ask to talk to a school counsellor if you would like support today.`}
         action={
           <div className="flex flex-wrap items-center justify-center gap-3">
             {browseAll}

@@ -486,7 +486,7 @@ function RequestSent({ sent, otherThreads }: { sent: SentRequest; otherThreads: 
                 <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-action text-white"><BookOpen className="size-5" /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-card text-heading">While you wait: wellbeing resources</span>
-                  <span className="mt-1 block text-copy-sm text-body">Ideas for exam stress and better sleep</span>
+                  <span className="mt-1 block text-copy-sm text-body">Something to try while you wait</span>
                 </span>
                 <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-action" />
               </Link>

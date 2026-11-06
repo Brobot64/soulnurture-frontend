@@ -5,13 +5,13 @@ import {
   BookOpen,
   Bookmark,
   BookmarkCheck,
-  BriefcaseBusiness,
   ChevronRight,
   Clock3,
   Headphones,
   Heart,
   MousePointer2,
   RefreshCw,
+  Sprout,
   UserRound,
   Volume2,
   Wind,
@@ -22,7 +22,6 @@ import { SUPPORT_EMERGENCY_NOTICE, SUPPORT_RESPONSE_NOTICE } from '#/lib/support
 import {
   RESOURCE_CATEGORIES,
   RESOURCE_FEEDBACK_OPTIONS,
-  RESOURCE_TYPES,
   resourceDuration,
   resourceSteps,
   safeResourceUrl,
@@ -41,7 +40,7 @@ const TYPE_ICONS = {
   INTERACTIVE: MousePointer2,
   SOUNDSCAPE: Volume2,
   AFFIRMATION: Heart,
-  TOOLKIT_ITEM: BriefcaseBusiness,
+  TOOLKIT_ITEM: Sprout,
 } satisfies Record<ResourceType, typeof BookOpen>
 
 /** Shared resource presentation for the catalogue and the full detail screen. */
@@ -105,7 +104,6 @@ export function ResourceCard({
         </h3>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-chip text-body">
-        <span>{RESOURCE_TYPES[resource.type] ?? 'Resource'}</span>
         {duration && (
           <span className="inline-flex items-center gap-1.5">
             <Clock3 aria-hidden="true" className="size-4 shrink-0" />
