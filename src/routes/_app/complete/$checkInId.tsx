@@ -18,7 +18,7 @@ export const Route = createFileRoute('/_app/complete/$checkInId')({
       {
         name: 'description',
         content:
-          'Your check-in is saved. See what might help next — wellbeing resources, ideas for exam stress and better sleep, or talking to a school counsellor.',
+          'Your check-in is saved. See what might help next — wellbeing resources, a reviewed idea for whatever is on your mind, or talking to a school counsellor.',
       },
     ],
   }),
@@ -169,7 +169,7 @@ function CheckInComplete() {
                   See wellbeing resources
                 </span>
                 <span className="mt-1 block text-copy text-body">
-                  Ideas for exam stress and better sleep
+                  A reviewed idea for whatever is on your mind
                 </span>
               </span>
               <ChevronRight className="size-5 shrink-0 text-muted" />

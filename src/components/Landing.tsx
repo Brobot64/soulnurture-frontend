@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 
-import { HeroIllustration } from '#/components/HeroIllustration'
+import { HeroArtwork } from '#/components/HeroArtwork'
 import { TextsReveal } from '#/components/TextsReveal'
 import { Button, Dialog } from '#/components/dash/ui'
 
@@ -65,7 +65,7 @@ export function Landing() {
         </div>
         <div className="order-1 flex justify-center lg:order-2">
           <div className="lg:grid lg:aspect-square lg:w-full lg:max-w-[560px] lg:place-items-center lg:rounded-hero lg:bg-panel">
-            <HeroIllustration className="w-[267px] max-w-[78vw] lg:w-3/4 lg:max-w-[400px]" />
+            <HeroArtwork className="w-[267px] max-w-[78vw] rounded-hero lg:w-3/4 lg:max-w-[400px]" />
           </div>
         </div>
       </section>

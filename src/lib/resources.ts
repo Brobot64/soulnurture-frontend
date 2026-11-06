@@ -15,18 +15,19 @@ export const RESOURCE_TYPES = {
   TOOLKIT_ITEM: 'Toolbox resource',
 } as const
 
+/**
+ * Doc B §3 — the eight approved category labels, quoted. The legacy enum
+ * values are deliberately absent: they are not the approved taxonomy.
+ */
 export const RESOURCE_CATEGORIES = {
-  EXAM_STRESS: 'Exam stress',
-  FRIENDSHIPS: 'Friendships',
-  FAMILY: 'Family',
-  IDENTITY: 'Identity',
-  ANXIETY: 'Anxiety',
-  GROUNDING: 'Grounding',
-  SLEEP: 'Sleep',
-  FOCUS: 'Focus',
-  CULTURAL_WISDOM: 'Cultural wisdom',
-  PEER_DYNAMICS: 'Peer dynamics',
-  GENERAL: 'General wellbeing',
+  FEELINGS: 'Understand my feelings',
+  STEADIER: 'Help me feel steadier',
+  ONE_STEP: 'Take one small step',
+  KINDNESS: 'Be kinder to myself',
+  DIFFICULT_MOMENT: 'Handle a difficult moment',
+  HEAVY: 'When things feel heavy',
+  ASK_FOR_SUPPORT: 'Talk to someone',
+  REST: 'Prepare for rest',
 } as const
 
 export type ResourceType = keyof typeof RESOURCE_TYPES
