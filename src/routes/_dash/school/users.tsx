@@ -10,8 +10,10 @@ import { DashHeader } from '#/components/dash/DashHeader'
 import { SchoolUsersTable } from '#/components/dash/SchoolUsersTable'
 import {
   EditSchoolUserDialog,
+  EraseUserDialog,
   OnboardProfessionalDialog,
   OnboardStudentDialog,
+  ResendVerificationDialog,
   ResetUserPasswordDialog,
   UserStatusDialog,
 } from '#/components/dash/school-user-dialogs'
@@ -62,6 +64,8 @@ function SchoolUsersContent({
   const [editUser, setEditUser] = useState<SchoolUserRow | null>(null)
   const [statusUser, setStatusUser] = useState<SchoolUserRow | null>(null)
   const [resetUser, setResetUser] = useState<SchoolUserRow | null>(null)
+  const [eraseUser, setEraseUser] = useState<SchoolUserRow | null>(null)
+  const [verifyUser, setVerifyUser] = useState<SchoolUserRow | null>(null)
 
   const usersQuery = useApiQuery(() => fetchSchoolUsers(school.id), [school.id])
 
@@ -145,6 +149,8 @@ function SchoolUsersContent({
                 onEdit: (row) => setEditUser(row),
                 onResetPassword: (row) => setResetUser(row),
                 onToggleStatus: (row) => setStatusUser(row),
+                onResendVerification: (row) => setVerifyUser(row),
+                onErase: (row) => setEraseUser(row),
               }}
               emptyAction={
                 <Button onClick={() => setStudentOpen(true)}>
@@ -202,6 +208,22 @@ function SchoolUsersContent({
           school={school}
           user={resetUser}
           onClose={() => setResetUser(null)}
+          onDone={reload}
+        />
+      )}
+      {verifyUser && (
+        <ResendVerificationDialog
+          school={school}
+          user={verifyUser}
+          onClose={() => setVerifyUser(null)}
+          onDone={reload}
+        />
+      )}
+      {eraseUser && (
+        <EraseUserDialog
+          school={school}
+          user={eraseUser}
+          onClose={() => setEraseUser(null)}
           onDone={reload}
         />
       )}

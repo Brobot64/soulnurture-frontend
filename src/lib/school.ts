@@ -112,6 +112,43 @@ export function resetSchoolUserPassword(
   )
 }
 
+/**
+ * Re-send the verification link for an enrolled account that has not clicked
+ * it. `sent: false, alreadyVerified: true` is a success, not an error — the
+ * admin surface says so rather than showing a tick for an email that never
+ * went out.
+ */
+export function resendSchoolUserVerification(
+  schoolId: string,
+  userId: string,
+): Promise<{ id: string; sent: boolean; alreadyVerified: boolean }> {
+  return apiFetch(
+    `/api/v1/schools/${schoolId}/users/${userId}/resend-verification`,
+    { method: 'POST' },
+  )
+}
+
+/**
+ * The permanent one, and not the same action as deactivating: this removes the
+ * account and every trace of it, with no undo and no 24-hour window.
+ * `confirm: true` is required by the API, so the caller must have shown the
+ * warning first.
+ */
+export function eraseSchoolUser(
+  schoolId: string,
+  userId: string,
+): Promise<{
+  id: string
+  erased: boolean
+  removedCheckIns: number
+  removedConversations: number
+}> {
+  return apiFetch(`/api/v1/schools/${schoolId}/users/${userId}/erase`, {
+    method: 'POST',
+    body: JSON.stringify({ confirm: true }),
+  })
+}
+
 // --- Settings ---------------------------------------------------------------
 
 export function updateSchoolDefaultPassword(

@@ -19,9 +19,11 @@ import {
 import type { SchoolUserRow } from '#/lib/admin'
 import {
   deactivateSchoolUser,
+  eraseSchoolUser,
   onboardProfessional,
   onboardStudent,
   reactivateSchoolUser,
+  resendSchoolUserVerification,
   resetSchoolUserPassword,
   updateSchoolUser,
   LANGUAGE_OPTIONS,
@@ -681,6 +683,182 @@ export function ResetUserPasswordDialog({
           on {school.name}&apos;s default password and signs out every session
           immediately. They&apos;ll choose a personal password at next
           sign-in.
+        </p>
+      )}
+      {error && <ErrorNote className="mt-4">{error}</ErrorNote>}
+    </Dialog>
+  )
+}
+
+// --- Delete permanently -----------------------------------------------------
+
+/**
+ * Deliberately not the Deactivate item's synonym: deactivating keeps the
+ * history, this removes the person. The warning says so, and the confirmation
+ * this click produces is the one the API requires — the deletion itself is
+ * recorded, nothing else about the person survives it.
+ */
+export function EraseUserDialog({
+  school,
+  user,
+  onClose,
+  onDone,
+}: {
+  school: SchoolIdentity
+  user: SchoolUserRow
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [removedCheckIns, setRemovedCheckIns] = useState<number | null>(null)
+
+  const submit = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await eraseSchoolUser(school.id, user.id)
+      setRemovedCheckIns(result.removedCheckIns)
+      onDone()
+    } catch (caught) {
+      setError(messageOf(caught))
+      setBusy(false)
+    }
+  }
+
+  if (removedCheckIns !== null) {
+    return (
+      <Dialog open onClose={onClose} title="Account deleted">
+        <SuccessPanel title={`${user.name} is removed from ${school.name}`}>
+          <p className="text-copy-sm text-body">
+            Their account, and everything the system held about them, is gone.
+            {removedCheckIns > 0
+              ? ` ${removedCheckIns} check-in(s) and the reflections built on them went with it.`
+              : ''}
+          </p>
+          <p className="text-copy-sm text-muted">
+            The deletion itself stays in your school’s records — that is the
+            proof this happened, and it is the only record that does.
+          </p>
+        </SuccessPanel>
+      </Dialog>
+    )
+  }
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title="Delete this account permanently?"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={() => void submit()} disabled={busy}>
+            {busy ? 'Deleting…' : 'Delete permanently'}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive-soft text-destructive">
+          <TriangleAlert aria-hidden="true" className="size-5" />
+        </span>
+        <div className="flex flex-col gap-2 text-copy-sm text-body">
+          <p>
+            Deleting{' '}
+            <span className="font-semibold text-heading">{user.name}</span>{' '}
+            removes the account and everything recorded under it — check-ins,
+            reflections, chats, consent records, and the entries that named
+            them.
+          </p>
+          <p className="text-muted">
+            This cannot be undone and there is no waiting period: the account
+            is gone when you confirm. If they only need to stop signing in,
+            choose Deactivate instead — that keeps their history.
+          </p>
+        </div>
+      </div>
+      {error && <ErrorNote className="mt-4">{error}</ErrorNote>}
+    </Dialog>
+  )
+}
+
+// --- Resend verification ----------------------------------------------------
+
+export function ResendVerificationDialog({
+  school,
+  user,
+  onClose,
+  onDone,
+}: {
+  school: SchoolIdentity
+  user: SchoolUserRow
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [outcome, setOutcome] = useState<'sent' | 'already' | 'failed' | null>(
+    null,
+  )
+
+  const submit = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await resendSchoolUserVerification(school.id, user.id)
+      setOutcome(result.alreadyVerified ? 'already' : result.sent ? 'sent' : 'failed')
+      onDone()
+    } catch (caught) {
+      setError(messageOf(caught))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title="Send the verification email again?"
+      footer={
+        outcome ? (
+          <Button onClick={onClose}>Done</Button>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onClose} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={() => void submit()} disabled={busy}>
+              {busy ? 'Sending…' : 'Send email'}
+            </Button>
+          </>
+        )
+      }
+    >
+      {outcome === 'sent' ? (
+        <p className="text-copy-sm text-body">
+          A fresh verification link is on its way to{' '}
+          <span className="font-semibold text-heading">{user.email}</span>.
+        </p>
+      ) : outcome === 'already' ? (
+        <p className="text-copy-sm text-body">
+          {user.name} has already verified this address, so no new link was
+          sent.
+        </p>
+      ) : outcome === 'failed' ? (
+        <p className="text-copy-sm text-body">
+          The email could not be sent. Nothing about the account changed — try
+          again, or use Reset password to hand them the school default.
+        </p>
+      ) : (
+        <p className="text-copy-sm text-body">
+          Sends a new verification link to{' '}
+          <span className="font-semibold text-heading">{user.email}</span>.
+          Until they open it, {user.name.split(' ')[0]} cannot finish joining{' '}
+          {school.name}.
         </p>
       )}
       {error && <ErrorNote className="mt-4">{error}</ErrorNote>}

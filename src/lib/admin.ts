@@ -282,3 +282,31 @@ export function fetchAdminUsers(params: {
     `/api/v1/admin/users${suffix}`,
   )
 }
+
+/**
+ * Delete any account platform-wide — the same irreversible erasure the
+ * backend runs for a student's own deletion request, on the owner's
+ * authority. Refused for the caller's own account and for the last platform
+ * admin left.
+ */
+export function erasePlatformUser(
+  userId: string,
+): Promise<{
+  id: string
+  erased: boolean
+  removedCheckIns: number
+  removedConversations: number
+}> {
+  return apiFetch(`/api/v1/admin/users/${userId}/erase`, {
+    method: 'POST',
+    body: JSON.stringify({ confirm: true }),
+  })
+}
+
+export function resendPlatformUserVerification(
+  userId: string,
+): Promise<{ id: string; sent: boolean; alreadyVerified: boolean }> {
+  return apiFetch(`/api/v1/admin/users/${userId}/resend-verification`, {
+    method: 'POST',
+  })
+}
