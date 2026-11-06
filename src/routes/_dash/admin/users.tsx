@@ -3,19 +3,29 @@
 
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { ChevronLeft, ChevronRight, SearchX } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Mail, SearchX, Trash2 } from 'lucide-react'
 
 import { DashHeader } from '#/components/dash/DashHeader'
 import {
   AvatarInitials,
   Button,
   Card,
+  Dialog,
   ErrorNote,
+  RowMenu,
   SelectField,
   Skeleton,
   Tag,
+  type RowMenuItem,
 } from '#/components/dash/ui'
-import { fetchAdminUsers, fetchSchools } from '#/lib/admin'
+import { messageOf } from '#/components/dash/school-dialogs'
+import {
+  erasePlatformUser,
+  fetchAdminUsers,
+  fetchSchools,
+  resendPlatformUserVerification,
+  type AdminUserRow,
+} from '#/lib/admin'
 import { roleLabel } from '#/lib/auth'
 import {
   formatNumber,
@@ -48,6 +58,32 @@ function AdminUsersPage() {
   const [role, setRole] = useState('')
   const [schoolId, setSchoolId] = useState('')
   const [offset, setOffset] = useState(0)
+  const [action, setAction] = useState<{
+    user: AdminUserRow
+    kind: 'erase' | 'verify'
+  } | null>(null)
+
+  const rowMenu = (row: AdminUserRow): RowMenuItem[] => [
+    ...(row.emailVerified || row.id === user?.id
+      ? []
+      : [
+          {
+            label: 'Resend verification email',
+            icon: Mail,
+            onSelect: () => setAction({ user: row, kind: 'verify' }),
+          },
+        ]),
+    ...(row.id === user?.id
+      ? []
+      : [
+          {
+            label: 'Delete permanently',
+            icon: Trash2,
+            tone: 'danger' as const,
+            onSelect: () => setAction({ user: row, kind: 'erase' }),
+          },
+        ]),
+  ]
   const debouncedSearch = useDebouncedValue(search, 300)
 
   const schools = useApiQuery(() => fetchSchools(), [])
@@ -174,6 +210,7 @@ function AdminUsersPage() {
                         {timeAgo(row.createdAt)}
                       </p>
                     </div>
+                    <RowMenu label={`Actions for ${row.name}`} items={rowMenu(row)} />
                   </li>
                 ))}
               </ul>
@@ -186,6 +223,9 @@ function AdminUsersPage() {
                     <th className="py-3 pr-4 font-semibold">School</th>
                     <th className="py-3 pr-4 font-semibold">Joined</th>
                     <th className="py-3 pr-6 font-semibold">Status</th>
+                    <th className="py-3 pr-6 font-semibold">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
@@ -231,6 +271,9 @@ function AdminUsersPage() {
                           <Tag tone="info">Unverified</Tag>
                         )}
                       </td>
+                      <td className="py-3.5 pr-6 text-right">
+                        <RowMenu label={`Actions for ${row.name}`} items={rowMenu(row)} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -268,6 +311,125 @@ function AdminUsersPage() {
           </div>
         </div>
       </main>
+
+      {action && (
+        <PlatformUserActionDialog
+          row={action.user}
+          kind={action.kind}
+          onClose={() => setAction(null)}
+          onDone={() => usersQuery.reload()}
+        />
+      )}
     </>
+  )
+}
+
+/**
+ * The two account-level actions the platform owner has and a school does not:
+ * re-sending a verification link, and erasing an account outright. The erasure
+ * is the backend's Epic H path — the same removal a student gets for
+ * themselves — so this says what actually leaves, not that the account is
+ * "disabled".
+ */
+function PlatformUserActionDialog({
+  row,
+  kind,
+  onClose,
+  onDone,
+}: {
+  row: AdminUserRow
+  kind: 'erase' | 'verify'
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [outcome, setOutcome] = useState<string | null>(null)
+
+  const submit = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      if (kind === 'erase') {
+        const result = await erasePlatformUser(row.id)
+        setOutcome(
+          result.removedCheckIns > 0
+            ? `${row.name} and everything recorded under the account are gone, including ${result.removedCheckIns} check-in(s).`
+            : `${row.name} and everything recorded under the account are gone.`,
+        )
+      } else {
+        const result = await resendPlatformUserVerification(row.id)
+        setOutcome(
+          result.alreadyVerified
+            ? `${row.name} has already verified this address, so no new link was sent.`
+            : result.sent
+              ? `A fresh verification link is on its way to ${row.email}.`
+              : 'The email could not be sent. The account is unchanged — try again.',
+        )
+      }
+      onDone()
+    } catch (caught) {
+      setError(messageOf(caught))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (outcome) {
+    return (
+      <Dialog open onClose={onClose} title={kind === 'erase' ? 'Account deleted' : 'Verification email'}>
+        <p className="text-copy-sm text-body">{outcome}</p>
+      </Dialog>
+    )
+  }
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={kind === 'erase' ? 'Delete this account permanently?' : 'Send the verification email again?'}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            variant={kind === 'erase' ? 'danger' : 'primary'}
+            onClick={() => void submit()}
+            disabled={busy}
+          >
+            {busy
+              ? kind === 'erase'
+                ? 'Deleting…'
+                : 'Sending…'
+              : kind === 'erase'
+                ? 'Delete permanently'
+                : 'Send email'}
+          </Button>
+        </>
+      }
+    >
+      {kind === 'erase' ? (
+        <div className="flex flex-col gap-2 text-copy-sm text-body">
+          <p>
+            <span className="font-semibold text-heading">{row.name}</span> is a{' '}
+            {roleLabel(row.role)}
+            {row.school ? ` at ${row.school.name}` : ' with no school'}
+            {' — '}deleting removes the account and every record held under it:
+            history, chats, consent records and the entries that named them.
+          </p>
+          <p className="text-muted">
+            This cannot be undone and there is no waiting period. Their own
+            school keeps the audit record that the account was deleted.
+          </p>
+        </div>
+      ) : (
+        <p className="text-copy-sm text-body">
+          Sends a new verification link to{' '}
+          <span className="font-semibold text-heading">{row.email}</span>.
+        </p>
+      )}
+      {error && <ErrorNote className="mt-4">{error}</ErrorNote>}
+    </Dialog>
   )
 }

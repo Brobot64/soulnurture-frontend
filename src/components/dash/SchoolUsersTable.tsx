@@ -3,7 +3,7 @@
 // destructive ones never render on your own row.
 
 import type { ReactNode } from 'react'
-import { KeyRound, Pencil, UserCheck, UserX } from 'lucide-react'
+import { KeyRound, Mail, Pencil, Trash2, UserCheck, UserX } from 'lucide-react'
 
 import { userDetail } from '#/components/dash/panels'
 import {
@@ -20,6 +20,8 @@ export interface SchoolUsersTableActions {
   onEdit: (user: SchoolUserRow) => void
   onResetPassword: (user: SchoolUserRow) => void
   onToggleStatus: (user: SchoolUserRow) => void
+  onResendVerification: (user: SchoolUserRow) => void
+  onErase: (user: SchoolUserRow) => void
 }
 
 function stateTags(user: SchoolUserRow) {
@@ -90,6 +92,27 @@ export function SchoolUsersTable({
                 onSelect: () => actions.onToggleStatus(user),
               },
             ]),
+      // Only offered while there is something to verify — an account that has
+      // already clicked its link gets no second one, and the API says so too.
+      ...(isSelf || user.emailVerified
+        ? []
+        : [
+            {
+              label: 'Resend verification email',
+              icon: Mail,
+              onSelect: () => actions.onResendVerification(user),
+            },
+          ]),
+      ...(isSelf
+        ? []
+        : [
+            {
+              label: 'Delete permanently',
+              icon: Trash2,
+              tone: 'danger' as const,
+              onSelect: () => actions.onErase(user),
+            },
+          ]),
     ]
   }
 
