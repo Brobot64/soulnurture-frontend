@@ -651,7 +651,10 @@ function queueRows() {
         studentRef: null,
         email: student.email,
       },
-      supportPerson: queueStatus === 'NEW' ? null : { id: SESSION_USER.id, name: 'Kiki Amuta', type: 'COUNSELLOR' },
+      // `SupportRequest.supportPersonId` is required with onDelete: Restrict, so
+      // no real row is ever without one. A null here is a harness lie, and the
+      // staff overview reads `.name` off it and takes the whole page down.
+      supportPerson: { id: SESSION_USER.id, name: 'Kiki Amuta', type: 'COUNSELLOR', title: 'Counsellor' },
     }
   })
 }
@@ -1243,7 +1246,32 @@ async function handler(req, res, next) {
   // The staff overview — the page chat staff now land on. Its counts are the
   // same facts the rail badges quote, read from the same rows.
   if (path === '/api/v1/dashboard/counsellor' && req.method === 'GET') {
-    const awaiting = queueRows().filter((row) => row.requestStatus === 'PENDING')
+    // Projected into the dashboard's own row shape, with `urgency` derived the
+    // way `deriveUrgency()` does it, so the urgent card and the "review these
+    // first" panel read one field instead of two different predicates. Handing
+    // the queue rows through raw left the panel empty while the card said 1.
+    const awaiting = queueRows()
+      .filter((row) => row.requestStatus === 'PENDING')
+      .map((row) => ({
+        id: row.id,
+        status: row.requestStatus,
+        timing: row.timing,
+        urgency:
+          row.timing === 'URGENT_UNSAFE' || row.requestStatus === 'ESCALATED' ? 'URGENT' : 'NORMAL',
+        note: row.note,
+        initialMessage: row.initialMessage,
+        initialMessageAt: row.initialMessageAt,
+        createdAt: row.requestedAt,
+        readAt: row.readAt,
+        conversationId: row.conversationId,
+        supportPerson: row.supportPerson,
+        student: row.student,
+      }))
+      .sort(
+        (a, b) =>
+          (a.urgency === b.urgency ? 0 : a.urgency === 'URGENT' ? -1 : 1) ||
+          b.createdAt.localeCompare(a.createdAt),
+      )
     const flags = INDICATOR_FLAGS.filter((f) => ['OPEN', 'IN_REVIEW', 'ACKNOWLEDGED'].includes(f.status))
       .sort((a, b) => b.severity.localeCompare(a.severity) || b.createdAt.localeCompare(a.createdAt))
       .slice(0, 20)
@@ -1274,7 +1302,7 @@ async function handler(req, res, next) {
       supportRequests: awaiting.slice(0, 20),
       pendingRequestCount: awaiting.length,
       escalatedRequestCount: 0,
-      urgentRequestCount: awaiting.filter((row) => row.timing === 'URGENT_UNSAFE').length,
+      urgentRequestCount: awaiting.filter((row) => row.urgency === 'URGENT').length,
       unreadRequestCount: awaiting.filter((row) => row.readAt === null).length,
       openFlagCount: INDICATOR_FLAGS.filter((f) => f.status === 'OPEN').length,
       upcomingDropIn: null,
