@@ -101,6 +101,29 @@ for (const school of SCHOOL_SEEDS) {
 
 const schools = SCHOOL_SEEDS.map((school) => ({ ...school, threads: [] }))
 
+// The owner's "infinity scroll" complaint on the admin register can only be
+// re-checked in the browser if the register is longer than one page. These fill
+// the list past the default take of 25 so "Load earlier schools" actually renders.
+for (let i = 0; i < 30; i++) {
+  schools.push({
+    id: `sch-fill-${i}`,
+    name: `Ridgeway Secondary ${String.fromCharCode(65 + (i % 26))}${i}`,
+    shortCode: `R${String.fromCharCode(65 + (i % 26))}${i}`,
+    domain: `ridge${i}.edu.ng`,
+    status: i % 7 === 0 ? 'SUSPENDED' : 'ACTIVE',
+    createdAt: iso(days(45 + i * 4)),
+    students: 0,
+    professionals: 0,
+    admins: 0,
+    lastActivityAt: null,
+    hasDefaultPassword: false,
+    seed: 200 + i,
+    deactivatedStudents: [],
+    threads: [],
+    empty: true,
+  })
+}
+
 // F5 onboarding: a provisioned student still holding the school's starter
 // password — lands on /first-password until they choose their own.
 const FRESH_STUDENT = pushUser({ school: SCHOOL_SEEDS[0], role: 'STUDENT', mustChangePassword: true, emailVerified: true, name: 'Chidi Onwura', email: 'chidi.onwura@miva.edu.ng' })
@@ -379,6 +402,38 @@ const HISTORY_ENTRIES = [
   { checkInId: 'ci-3', createdAt: iso(days(9)), feeling: 'CALM', intensity: 2, triggers: [], reflection: null, supportRequest: null },
 ]
 
+// A timeline long enough that "Load earlier" is the only way to reach the end,
+// so the page is verified as never fetching it whole. The three hand-written
+// rows above stay at the top: `ci-3` is the one a live deletion ask names.
+for (let i = 0; i < 60; i++) {
+  HISTORY_ENTRIES.push({
+    checkInId: `ci-old-${i}`,
+    createdAt: iso(days(12 + i * 3)),
+    feeling: ['CALM', 'SAD_LOW', 'STRESSED', 'ANGRY'][i % 4],
+    intensity: 1 + (i % 5),
+    triggers: i % 3 === 0 ? ['EXAMS'] : [],
+    reflection:
+      i % 7 === 0
+        ? { conversationId: `conv-old-${i}`, status: 'CLOSED', startedAt: iso(days(12 + i * 3)), turnCount: 3, viaVoice: i % 2 === 0, summary: null }
+        : null,
+    supportRequest: null,
+  })
+}
+
+/**
+ * Requests are read by student, not by the check-in they may or may not hang
+ * off — most filed requests have no `checkInId` at all, because an escalation
+ * from a conversation never links back to a check-in. `sr-unlinked-1` proves
+ * the tab lists them anyway, and the window being shorter than the total
+ * proves the page says so instead of implying it showed everything.
+ */
+const HISTORY_SUPPORT_REQUESTS = [
+  { id: 'sr-1', createdAt: iso(days(3)), status: 'IN_REVIEW', timing: 'TODAY_STUDY_PERIOD', checkInId: 'ci-2', followUps: [{ status: 'SCHEDULED' }] },
+  { id: 'sr-2', createdAt: iso(days(1)), status: 'PENDING', timing: 'URGENT_UNSAFE', checkInId: null, followUps: [] },
+  { id: 'sr-3', createdAt: iso(days(21)), status: 'CLOSED', timing: 'GENTLE_1_2_DAYS', checkInId: null, followUps: [{ status: 'COMPLETED' }] },
+]
+const HISTORY_REQUESTS_TOTAL = 9
+
 // Three of the four states the student can actually be in, so the page is
 // exercised rather than admired: a live countdown, one that already ran, and
 // one a cancel stopped. The held state is asserted by the backend specs.
@@ -406,6 +461,215 @@ const DELETION_ASKS = [
     holdReason: null, removedCheckIns: 0, removedConversations: 0, createdAt: iso(days(12)),
   },
 ]
+
+// --- Indicators + AI reports (the rail's needs-attention badges) ------------
+
+/**
+ * Miva's flag register. Prod currently holds 73 flags with `level` NULL on
+ * every row — no indicator rule is approved yet — so the mixed A/B/C/U spread
+ * here exists only so the level chips and the per-row level cell have something
+ * to render. `openCount` is OPEN + IN_REVIEW, which is the predicate the
+ * indicators page prints and the predicate /dashboard/attention must copy.
+ */
+const INDICATOR_FLAGS = (() => {
+  const miva = schools.find((school) => school.id === 'sch-miva')
+  const pool = studentsOf(miva)
+  const SEED = [
+    ['A', 'OPEN', 'SELF_HARM_IDEATION', 'Thoughts of hurting myself', 6],
+    ['B', 'IN_REVIEW', 'BULLYING', 'Targeted by other students', 30],
+    ['C', 'OPEN', 'FAMILY_CONFLICT', 'Something happening at home', 52],
+    ['U', 'ACKNOWLEDGED', 'EXAM_PRESSURE', 'Overwhelmed by schoolwork', 96],
+    [null, 'OPEN', 'UNCLASSIFIED_RULE', 'Feeling low most days', 8],
+    [null, 'OPEN', 'UNCLASSIFIED_RULE', 'Cannot stop worrying', 20],
+    [null, 'IN_REVIEW', 'UNCLASSIFIED_RULE', 'Argument with a friend', 44],
+    [null, 'RESOLVED', 'UNCLASSIFIED_RULE', 'Bad day, feeling better', 120],
+  ]
+  return SEED.map(([level, status, category, triggerLabel, hoursAgo], index) => {
+    const student = pool[index % pool.length]
+    const profile = student.studentProfile ?? {}
+    return {
+      id: `flag-${index}`,
+      studentId: student.id,
+      studentRef: profile.studentCode ?? student.email,
+      classLabel: profile.classLabel ?? null,
+      conversationId: index < 2 ? `conv-${index}` : null,
+      assigneeId: null,
+      triggerLabel,
+      category,
+      intentId: null,
+      severity: level === 'A' ? 'TIER_3_ACUTE' : level === 'B' ? 'TIER_2_HIGH' : 'TIER_1_MODERATE',
+      level,
+      ruleId: level ? `rule-${level.toLowerCase()}` : 'rule-unapproved',
+      ruleVersion: level ? 'v1' : null,
+      reviewDecision: status === 'ACKNOWLEDGED' ? 'NO_FURTHER_ACTION' : null,
+      studentStatementSnapshot: 'I wanted to write it down the way it actually felt.',
+      status,
+      source: 'AI_CONVERSATION',
+      aiContextSummary: index < 3 ? 'The student described the situation over several turns.' : null,
+      autoActions: [],
+      createdAt: iso(hours(hoursAgo)),
+      updatedAt: iso(hours(hoursAgo)),
+      resolvedAt: status === 'RESOLVED' ? iso(hours(hoursAgo - 2)) : null,
+      linkedRequest: index === 0 ? { id: 'sreq-0', status: 'PENDING' } : null,
+    }
+  })
+})()
+
+/** Pending review = `reviewOutcome` still null, the same predicate the badge uses. */
+const AI_REPORTS = [
+  { outcome: null, reason: 'DID_NOT_UNDERSTAND', hoursAgo: 4 },
+  { outcome: null, reason: 'DIAGNOSIS_OR_MEDICAL_ADVICE', hoursAgo: 26 },
+  { outcome: null, reason: null, hoursAgo: 50 },
+  { outcome: 'NO_CHANGE_NEEDED', reason: 'UNSAFE_OR_UNKIND', hoursAgo: 74 },
+  { outcome: 'FOLLOWED_UP_WITH_STUDENT', reason: 'OTHER', hoursAgo: 120 },
+].map(({ outcome, reason, hoursAgo }, index) => ({
+  id: `rep-${index}`,
+  messageId: `msg-rep-${index}`,
+  conversationId: `conv-${index}`,
+  responseContent: 'Here is something you could try tonight before bed.',
+  responseLanguage: 'en',
+  reason,
+  note: reason === 'OTHER' ? 'It was not what I needed.' : null,
+  reviewOutcome: outcome,
+  reviewedAt: outcome ? iso(hours(hoursAgo - 2)) : null,
+  reviewedBy: outcome ? { name: 'Kiki Amuta', role: 'COUNSELLOR' } : null,
+  createdAt: iso(hours(hoursAgo)),
+}))
+
+const OPEN_FLAG_STATUSES = ['OPEN', 'IN_REVIEW']
+const attentionCountsFor = (viewer) => {
+  const isReviewer = ['COUNSELLOR', 'PSYCHOLOGIST'].includes(viewer.role)
+  const isAdmin = viewer.role === 'SCHOOL_ADMIN' || viewer.role === 'PLATFORM_ADMIN'
+  if (!isReviewer && !isAdmin) return { indicators: null, reports: null, roster: null }
+  const roster =
+    viewer.role === 'PLATFORM_ADMIN'
+      ? users
+      : users.filter((u) => u.schoolId === viewer.schoolId)
+  return {
+    indicators: isReviewer ? INDICATOR_FLAGS.filter((f) => OPEN_FLAG_STATUSES.includes(f.status)).length : null,
+    reports: isReviewer ? AI_REPORTS.filter((r) => !r.reviewOutcome).length : null,
+    roster: isAdmin
+      ? roster.filter((u) => !u.deactivatedAt && (u.mustChangePassword || !u.emailVerified)).length
+      : null,
+  }
+}
+
+// --- Wellbeing resources (Doc B §3/§4, as the seed publishes them) ----------
+
+/**
+ * Mirrors `prisma/seed.ts` exactly: twelve approved rows carrying only title,
+ * the "Use when" sentence as the description, and the estimated time. The
+ * reviewed instruction sequences, reflection prompts, safety notes and media
+ * were never delivered, so every one of those columns is null here — which is
+ * the state the detail screen has to be honest about.
+ */
+const WN_LIBRARY = [
+  ['WN-01', 'Name What You’re Feeling', 'When feelings feel confusing, mixed or hard to explain', '2–4 minutes', 'FEELINGS'],
+  ['WN-02', 'Grounding: Notice the Present', 'When overwhelmed, distracted or caught in a stressful moment', '1–3 minutes', 'STEADIER'],
+  ['WN-03', 'Gentle Breathing Pause', 'When the body feels tense or hurried', '1–2 minutes', 'STEADIER'],
+  ['WN-04', 'Break a Problem into Smaller Steps', 'When schoolwork, responsibilities or decisions feel too big', '3–5 minutes', 'ONE_STEP'],
+  ['WN-05', 'Respond to Yourself with Kindness', 'After a mistake, disappointment or harsh self-criticism', '2–4 minutes', 'KINDNESS'],
+  ['WN-06', 'When Anger Is Rising', 'When irritation or anger is getting stronger', '2–5 minutes', 'DIFFICULT_MOMENT'],
+  ['WN-07', 'A Small Step Through Sadness', 'When feeling low, disappointed, lonely or unmotivated', '3–10 minutes', 'HEAVY'],
+  ['WN-08', 'Grief and Missing Someone', 'After a death, separation or another significant loss', 'Flexible', 'HEAVY'],
+  ['WN-09', 'Handling Peer Conflict or Bullying', 'When experiencing exclusion, insults, harassment or conflict', '3–5 minutes', 'DIFFICULT_MOMENT'],
+  ['WN-10', 'Ask for Support: A Message Starter', 'When it is hard to tell someone you need help', '2 minutes', 'ASK_FOR_SUPPORT'],
+  ['WN-11', 'A Simple Sleep Wind-Down', 'When preparing for rest and thoughts are busy', '5–10 minutes', 'REST'],
+  ['WN-12', 'Choose a Coping Plan for the Next Hour', 'When unsure what kind of help is needed', '2–3 minutes', 'ONE_STEP'],
+]
+const RESOURCES = WN_LIBRARY.map(([code, title, description, durationLabel, category], index) => ({
+  id: `res-${code.toLowerCase()}`,
+  title,
+  description,
+  type: 'TOOLKIT_ITEM',
+  category,
+  badge: null,
+  durationMinutes: null,
+  durationLabel,
+  ctaLabel: null,
+  mediaUrl: null,
+  tags: [],
+  contentCode: code,
+  intendedSituation: null,
+  instructions: null,
+  reflectionPrompt: null,
+  safetyNote: null,
+  active: true,
+  approved: true,
+  createdAt: iso(days(4 - index * 0.1)),
+  updatedAt: iso(days(4 - index * 0.1)),
+}))
+const savedResourceIds = new Set(['res-wn-02'])
+const toolboxPayload = () => {
+  const items = RESOURCES.filter((r) => savedResourceIds.has(r.id))
+  return { items, count: items.length }
+}
+
+// One builder for every queue-shaped read in the app: the review list, its
+// chips, the rail badge and the staff overview all come from these rows, so
+// the harness cannot be the reason two numbers disagree.
+function queueRows() {
+  const miva = schools.find((school) => school.id === 'sch-miva')
+  const queueStudents = studentsOf(miva)
+  const QUEUE = [
+    ['NEW', 'REVIEW_SUGGESTED', 'URGENT_UNSAFE', hours(3)],
+    ['NEW', 'NONE', 'TODAY_STUDY_PERIOD', hours(7)],
+    ['REVIEWED', 'REVIEW_SUGGESTED', 'GENTLE_1_2_DAYS', hours(20)],
+    ['FOLLOW_UP_REQUIRED', 'NONE', 'GENTLE_1_2_DAYS', days(2)],
+    ['FOLLOW_UP_COMPLETED', 'REVIEW_SUGGESTED', 'TODAY_STUDY_PERIOD', days(4)],
+  ]
+  return QUEUE.map(([queueStatus, prompt, timing, msAgo], i) => {
+    const student = queueStudents[i % queueStudents.length]
+    const profile = student.studentProfile
+    return {
+      id: `sreq-${i}`,
+      requestedAt: iso(msAgo),
+      timing,
+      note: 'I keep worrying about exams and I cannot sleep.',
+      initialMessage: i % 2 === 0 ? 'Can I talk to someone today?' : null,
+      initialMessageAt: i % 2 === 0 ? iso(msAgo) : null,
+      reviewNote: queueStatus === 'NEW' ? null : 'Spoke during break, booked a follow-up.',
+      requestStatus: queueStatus === 'NEW' ? 'PENDING' : 'IN_REVIEW',
+      queueStatus,
+      prompt,
+      followUpId: queueStatus.startsWith('FOLLOW_UP') ? `fu-${i}` : null,
+      followUpStatus: queueStatus === 'FOLLOW_UP_REQUIRED' ? 'SCHEDULED' : queueStatus === 'FOLLOW_UP_COMPLETED' ? 'COMPLETED' : null,
+      canManageFollowUp: queueStatus === 'FOLLOW_UP_REQUIRED',
+      followUpDueAt: queueStatus === 'FOLLOW_UP_REQUIRED' ? iso(days(-1)) : null,
+      followUpCompletedAt: queueStatus === 'FOLLOW_UP_COMPLETED' ? iso(days(1)) : null,
+      conversationId: `conv-${i}`,
+      // The UNREAD predicate: a request nobody has opened yet, and nothing
+      // cancelled. The rail's badge reads the same field the page filters on.
+      readAt: queueStatus === 'NEW' ? null : iso(msAgo - hours(1)),
+      student: {
+        id: student.id,
+        firstName: profile?.firstName ?? student.name.split(' ')[0],
+        lastName: profile?.lastName ?? null,
+        displayName: null,
+        classLabel: profile?.classLabel ?? null,
+        studentCode: profile?.studentCode ?? null,
+        studentRef: null,
+        email: student.email,
+      },
+      supportPerson: queueStatus === 'NEW' ? null : { id: SESSION_USER.id, name: 'Kiki Amuta', type: 'COUNSELLOR' },
+    }
+  })
+}
+
+const queueCountsFor = (items) => ({
+  all: items.length,
+  new: items.filter((i) => i.queueStatus === 'NEW').length,
+  reviewed: items.filter((i) => i.queueStatus === 'REVIEWED').length,
+  followUpRequired: items.filter((i) => i.queueStatus === 'FOLLOW_UP_REQUIRED').length,
+  followUpCompleted: items.filter((i) => i.queueStatus === 'FOLLOW_UP_COMPLETED').length,
+  unread: items.filter((i) => i.readAt === null).length,
+  awaitingUnread: items.filter(
+    (i) => i.readAt === null && ['PENDING', 'ESCALATED'].includes(i.requestStatus),
+  ).length,
+  completedThisWeek: items.filter(
+    (i) => i.followUpCompletedAt && Date.parse(i.followUpCompletedAt) >= NOW - 7 * 86_400_000,
+  ).length,
+})
 
 // --- Request handling -------------------------------------------------------
 
@@ -644,16 +908,25 @@ async function handler(req, res, next) {
     return
   }
 
-  // History (Epic H) — the student's own aggregate, and the deletion asks.
-  if (path === '/api/v1/history') {
+  // History (Epic H) — the student's own aggregate, paged by cursor, and the
+  // deletion asks.
+  if (path === '/api/v1/history' && req.method === 'GET') {
+    const take = Math.min(Math.max(Number(url.searchParams.get('take')) || 25, 1), 100)
+    const before = url.searchParams.get('before')
+    const pool = before ? HISTORY_ENTRIES.filter((e) => e.createdAt < before) : HISTORY_ENTRIES
+    const rows = pool.slice(0, take + 1)
+    const items = rows.slice(0, take)
+    const last = items.at(-1)
     return ok(res, {
-      items: HISTORY_ENTRIES,
+      items,
+      supportRequests: HISTORY_SUPPORT_REQUESTS,
       counts: {
         all: HISTORY_ENTRIES.length,
         checkIns: HISTORY_ENTRIES.length,
         reflections: HISTORY_ENTRIES.filter((e) => e.reflection).length,
-        supportRequests: HISTORY_ENTRIES.filter((e) => e.supportRequest).length,
+        supportRequests: HISTORY_REQUESTS_TOTAL,
       },
+      page: { take, hasMore: rows.length > take, nextBefore: last ? last.createdAt : null },
     })
   }
 
@@ -914,56 +1187,12 @@ async function handler(req, res, next) {
 
   // Staff review queue (figma PNA-4). One item per queue status so every pill,
   // filter chip and row shape on /school/requests renders at mobile width.
-  if (path === '/api/v1/support-requests/queue' && req.method === 'GET') {
-    const miva = schools.find((x) => x.id === 'sch-miva')
-    const queueStudents = studentsOf(miva)
-    const QUEUE = [
-      ['NEW', 'REVIEW_SUGGESTED', 'URGENT_UNSAFE', hours(3)],
-      ['NEW', 'NONE', 'TODAY_STUDY_PERIOD', hours(7)],
-      ['REVIEWED', 'REVIEW_SUGGESTED', 'GENTLE_1_2_DAYS', hours(20)],
-      ['FOLLOW_UP_REQUIRED', 'NONE', 'GENTLE_1_2_DAYS', days(2)],
-      ['FOLLOW_UP_COMPLETED', 'REVIEW_SUGGESTED', 'TODAY_STUDY_PERIOD', days(4)],
-    ]
-    const items = QUEUE.map(([queueStatus, prompt, timing, msAgo], i) => {
-      const student = queueStudents[i % queueStudents.length]
-      const profile = student.studentProfile
-      return {
-        id: `sreq-${i}`,
-        requestedAt: iso(msAgo),
-        timing,
-        note: 'I keep worrying about exams and I cannot sleep.',
-        initialMessage: i % 2 === 0 ? 'Can I talk to someone today?' : null,
-        initialMessageAt: i % 2 === 0 ? iso(msAgo) : null,
-        reviewNote: queueStatus === 'NEW' ? null : 'Spoke during break, booked a follow-up.',
-        requestStatus: queueStatus === 'NEW' ? 'PENDING' : 'IN_REVIEW',
-        queueStatus,
-        prompt,
-        followUpId: queueStatus.startsWith('FOLLOW_UP') ? `fu-${i}` : null,
-        followUpStatus: queueStatus === 'FOLLOW_UP_REQUIRED' ? 'SCHEDULED' : queueStatus === 'FOLLOW_UP_COMPLETED' ? 'COMPLETED' : null,
-        canManageFollowUp: queueStatus === 'FOLLOW_UP_REQUIRED',
-        followUpDueAt: queueStatus === 'FOLLOW_UP_REQUIRED' ? iso(days(-1)) : null,
-        followUpCompletedAt: queueStatus === 'FOLLOW_UP_COMPLETED' ? iso(days(1)) : null,
-        conversationId: `conv-${i}`,
-        student: {
-          id: student.id,
-          firstName: profile?.firstName ?? student.name.split(' ')[0],
-          lastName: profile?.lastName ?? null,
-          displayName: null,
-          classLabel: profile?.classLabel ?? null,
-          studentCode: profile?.studentCode ?? null,
-          studentRef: null,
-          email: student.email,
-        },
-        supportPerson: queueStatus === 'NEW' ? null : { id: SESSION_USER.id, name: 'Kiki Amuta', type: 'COUNSELLOR' },
-      }
-    })
-    const counts = {
-      all: items.length,
-      new: items.filter((i) => i.queueStatus === 'NEW').length,
-      reviewed: items.filter((i) => i.queueStatus === 'REVIEWED').length,
-      followUpRequired: items.filter((i) => i.queueStatus === 'FOLLOW_UP_REQUIRED').length,
-      followUpCompleted: items.filter((i) => i.queueStatus === 'FOLLOW_UP_COMPLETED').length,
-    }
+  if (path.startsWith('/api/v1/support-requests/queue') && req.method === 'GET') {
+    const items = queueRows()
+    const counts = queueCountsFor(items)
+    // The rail asks this lane for one number; the list endpoint is the same
+    // builder, so the badge and the chip cannot drift apart here either.
+    if (path === '/api/v1/support-requests/queue/counts') return ok(res, counts)
     const status = url.searchParams.get('status')
     const q = (url.searchParams.get('q') ?? '').trim().toLowerCase()
     return ok(res, {
@@ -974,6 +1203,168 @@ async function handler(req, res, next) {
           (!q || `${item.student.firstName} ${item.student.lastName ?? ''}`.toLowerCase().includes(q)),
       ),
     })
+  }
+  // Wellbeing resources — the catalogue, the toolbox and the tailored band.
+  if (path === '/api/v1/resources' && req.method === 'GET') {
+    const category = url.searchParams.get('category') ?? ''
+    const needle = (url.searchParams.get('search') ?? '').trim().toLowerCase()
+    const savedOnly = url.searchParams.get('savedOnly') === 'true'
+    let items = [...RESOURCES].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    if (category) items = items.filter((r) => r.category === category)
+    if (needle) {
+      items = items.filter((r) => `${r.title} ${r.description}`.toLowerCase().includes(needle))
+    }
+    if (savedOnly) items = items.filter((r) => savedResourceIds.has(r.id))
+    return ok(res, { items, savedCount: savedResourceIds.size })
+  }
+
+  if (path === '/api/v1/resources/tailored' && req.method === 'GET') {
+    const picks = RESOURCES.filter((r) => ['STEADIER', 'ONE_STEP'].includes(r.category)).slice(0, 3)
+    return ok(res, {
+      title: 'Picked for you',
+      rationale: 'Based on what you told us in your last check-in.',
+      basis: 'STATED_NEED',
+      items: picks,
+    })
+  }
+
+  if (path === '/api/v1/resources/toolbox' && req.method === 'GET') return ok(res, toolboxPayload())
+  if (path === '/api/v1/resources/toolbox' && req.method === 'POST') {
+    const body = JSON.parse((await readBody(req)) || '{}')
+    const resource = RESOURCES.find((r) => r.id === body.resourceId)
+    if (!resource) return fail(res, 404, 'Resource not found')
+    savedResourceIds.add(resource.id)
+    return ok(res, toolboxPayload())
+  }
+  if (path === '/api/v1/resources/feedback' && req.method === 'POST') {
+    return ok(res, { recorded: true })
+  }
+
+  // The staff overview — the page chat staff now land on. Its counts are the
+  // same facts the rail badges quote, read from the same rows.
+  if (path === '/api/v1/dashboard/counsellor' && req.method === 'GET') {
+    const awaiting = queueRows().filter((row) => row.requestStatus === 'PENDING')
+    const flags = INDICATOR_FLAGS.filter((f) => ['OPEN', 'IN_REVIEW', 'ACKNOWLEDGED'].includes(f.status))
+      .sort((a, b) => b.severity.localeCompare(a.severity) || b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 20)
+      .map((f) => ({
+        id: f.id,
+        studentRef: f.studentRef,
+        classLabel: f.classLabel,
+        triggerLabel: f.triggerLabel,
+        category: f.category,
+        severity: f.severity,
+        level: f.level,
+        status: f.status,
+        conversationId: f.conversationId,
+        createdAt: f.createdAt,
+      }))
+    const distribution = HISTORY_ENTRIES.reduce((acc, entry) => {
+      acc[entry.feeling] = (acc[entry.feeling] ?? 0) + 1
+      return acc
+    }, {})
+    return ok(res, {
+      flags,
+      barometer: {
+        total: HISTORY_ENTRIES.length,
+        dominant: Object.entries(distribution).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
+        distribution,
+        notes: 'Based on the most recent 100 check-ins from your school.',
+      },
+      supportRequests: awaiting.slice(0, 20),
+      pendingRequestCount: awaiting.length,
+      escalatedRequestCount: 0,
+      urgentRequestCount: awaiting.filter((row) => row.timing === 'URGENT_UNSAFE').length,
+      unreadRequestCount: awaiting.filter((row) => row.readAt === null).length,
+      openFlagCount: INDICATOR_FLAGS.filter((f) => f.status === 'OPEN').length,
+      upcomingDropIn: null,
+    })
+  }
+
+  // The rail's needs-attention badges. Same role gate and the same predicates
+  // as AttentionService, so a badge can be held against the page it decorates.
+  if (path === '/api/v1/dashboard/attention') {
+    return ok(res, attentionCountsFor(sessionUserFor(req)))
+  }
+
+  // Safeguarding indicators (Epic D). Level chips count the set the rest of the
+  // filters leave, which is why the level itself is not part of that set.
+  if (path === '/api/v1/support-flags' && req.method === 'GET') {
+    const viewer = sessionUserFor(req)
+    if (!['COUNSELLOR', 'PSYCHOLOGIST'].includes(viewer.role)) {
+      return fail(res, 403, 'Insufficient permissions for this resource')
+    }
+    const level = url.searchParams.get('level') ?? ''
+    const severity = url.searchParams.get('severity') ?? ''
+    const status = url.searchParams.get('status') ?? ''
+    const q = (url.searchParams.get('q') ?? '').trim().toLowerCase()
+    if (level && !['A', 'B', 'C', 'U', 'UNCLASSIFIED'].includes(level)) {
+      return fail(res, 400, `Unknown indicator level ${level}; expected A, B, C, U or UNCLASSIFIED`)
+    }
+    const matches = (flag) =>
+      (!severity || flag.severity === severity) &&
+      (!status || flag.status === status) &&
+      (!q || `${flag.studentRef} ${flag.triggerLabel}`.toLowerCase().includes(q))
+    const levelCounts = { A: 0, B: 0, C: 0, U: 0, UNCLASSIFIED: 0 }
+    for (const flag of INDICATOR_FLAGS.filter(matches)) {
+      levelCounts[flag.level ?? 'UNCLASSIFIED'] += 1
+    }
+    const items = INDICATOR_FLAGS.filter(
+      (flag) => matches(flag) && (!level || (level === 'UNCLASSIFIED' ? flag.level === null : flag.level === level)),
+    )
+    return ok(res, {
+      items,
+      openCount: INDICATOR_FLAGS.filter((f) => OPEN_FLAG_STATUSES.includes(f.status)).length,
+      levelCounts,
+    })
+  }
+
+  const flagDetailMatch = path.match(/^\/api\/v1\/support-flags\/([^/]+)$/)
+  if (flagDetailMatch && req.method === 'GET') {
+    const flag = INDICATOR_FLAGS.find((f) => f.id === flagDetailMatch[1])
+    if (!flag) return fail(res, 404, 'Indicator not found')
+    return ok(res, {
+      studentReported: { statement: flag.studentStatementSnapshot, triggerLabel: flag.triggerLabel },
+      systemMetadata: {
+        id: flag.id,
+        level: flag.level,
+        severity: flag.severity,
+        status: flag.status,
+        source: flag.source,
+        category: flag.category,
+        intentId: flag.intentId,
+        autoActions: flag.autoActions,
+        createdAt: flag.createdAt,
+        updatedAt: flag.updatedAt,
+        resolvedAt: flag.resolvedAt,
+        conversationId: flag.conversationId,
+        linkedRequest: flag.linkedRequest,
+        ruleId: flag.ruleId,
+        ruleVersion: flag.ruleVersion,
+        ruleLabel: flag.level ? `Approved level ${flag.level} rule` : 'Rule with no approved level',
+        ruleConfigured: flag.level !== null,
+        ruleBlockedOn: flag.level === null ? 'Psychologist decision on Doc A D1/D5/D8' : null,
+      },
+      aiSummary: flag.aiContextSummary,
+      humanDecision: {
+        reviewDecision: flag.reviewDecision,
+        decisions: ['NO_FURTHER_ACTION', 'FOLLOW_UP_WITH_STUDENT', 'FOLLOW_SAFEGUARDING_PROCEDURE'],
+      },
+      student: { ref: flag.studentRef, classLabel: flag.classLabel },
+    })
+  }
+
+  // Reported AI replies (Epic G). The pending count the badge quotes is the
+  // number of rows here still without a review outcome.
+  if (path === '/api/v1/ai-response-reports' && req.method === 'GET') {
+    const viewer = sessionUserFor(req)
+    if (!['COUNSELLOR', 'PSYCHOLOGIST'].includes(viewer.role)) {
+      return fail(res, 403, 'Insufficient permissions for this resource')
+    }
+    const limit = Number(url.searchParams.get('limit') ?? 20) || 20
+    const offset = Number(url.searchParams.get('offset') ?? 0) || 0
+    const items = AI_REPORTS.slice(offset, offset + limit)
+    return ok(res, { items, nextOffset: offset + items.length < AI_REPORTS.length ? offset + items.length : null })
   }
 
   // Platform overview
@@ -1098,10 +1489,34 @@ async function handler(req, res, next) {
     })
   }
 
-  // Schools register
+  // Schools register — paged by cursor, with the search and status filter
+  // answered server-side, exactly like the backend. A page of 25 must not be
+  // able to hide a match, so the mock filters before it slices.
   if (path === '/api/v1/schools' && req.method === 'GET') {
-    const items = [...schools].sort((a, b) => a.name.localeCompare(b.name)).map(schoolRow)
-    return ok(res, { items })
+    const take = Math.min(Math.max(Number(url.searchParams.get('take')) || 25, 1), 100)
+    const before = url.searchParams.get('before')
+    const needle = (url.searchParams.get('q') ?? '').trim().toLowerCase()
+    const status = url.searchParams.get('status') ?? ''
+    if (status && !['ACTIVE', 'SUSPENDED'].includes(status)) {
+      return fail(res, 400, `Unknown school status: ${status}`)
+    }
+    let pool = [...schools].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+    if (before) pool = pool.filter((x) => x.createdAt < before)
+    if (status) pool = pool.filter((x) => x.status === status)
+    if (needle) {
+      pool = pool.filter(
+        (x) => x.name.toLowerCase().includes(needle) || x.shortCode.toLowerCase().includes(needle),
+      )
+    }
+    const total = pool.length
+    const rows = pool.slice(0, take + 1)
+    const items = rows.slice(0, take)
+    const last = items.at(-1)
+    return ok(res, {
+      items: items.map(schoolRow),
+      total,
+      page: { take, hasMore: rows.length > take, nextBefore: last ? last.createdAt : null },
+    })
   }
   if (path === '/api/v1/schools' && req.method === 'POST') {
     const body = JSON.parse((await readBody(req)) || '{}')

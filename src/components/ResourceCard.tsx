@@ -62,6 +62,14 @@ export function ResourceCard({
   const saving = toolbox.savingId === resource.id
   const error = toolbox.saveError?.resourceId === resource.id ? toolbox.saveError.error : null
   const url = safeResourceUrl(resource.mediaUrl)
+  // A resource has a body beyond the card if any guided section or an external
+  // asset exists. For the approved WN-* rows none do, so the detail screen says
+  // that plainly instead of hiding four sections and promising a "full version".
+  const hasGuidedContent =
+    steps.length > 0 ||
+    Boolean(resource.intendedSituation?.trim()) ||
+    Boolean(resource.reflectionPrompt?.trim()) ||
+    Boolean(resource.safetyNote?.trim())
   const saveLabel = saved
     ? 'Saved'
     : saving
@@ -179,12 +187,30 @@ export function ResourceCard({
                 <span className="sr-only"> (opens in a new tab)</span>
               </a>
             </>
+          ) : hasGuidedContent ? (
+            <>
+              <h2 className="text-card text-heading">That is the whole resource</h2>
+              <p className="mt-2 text-copy-sm text-body">
+                There is nothing to open somewhere else. Try the steps above at any point in your day, and save this
+                page to your toolbox if you want to find it again.
+              </p>
+            </>
           ) : (
             <>
-              <h2 className="text-card text-heading">Full resource content is not yet available</h2>
+              <h2 className="text-card text-heading">Try this on your own time</h2>
               <p className="mt-2 text-copy-sm text-body">
-                You can save this listing to your toolbox or browse other resources. If you need support now, you can talk to a school counsellor.
+                {duration
+                  ? `This one is a ${duration} prompt to sit with, not a step-by-step exercise — we do not have an approved set of steps for it yet.`
+                  : 'This one is a prompt to sit with, not a step-by-step exercise — we do not have an approved set of steps for it yet.'}{' '}
+                You can save it to your toolbox to find it again, or talk to someone at your school and work through it
+                together.
               </p>
+              <Link
+                to="/support"
+                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-pill text-button-sm text-action hover:underline underline-offset-4"
+              >
+                Talk to a school counsellor <ChevronRight aria-hidden="true" className="size-4" />
+              </Link>
             </>
           )}
         </section>
@@ -356,7 +382,7 @@ export function ResourceStillHeavy({ resource }: { resource: Resource }) {
         Still feeling heavy?
       </h2>
       <p className="mt-3 text-copy-sm text-peach-ink">
-        These steps can help, but a real person can help more. You can ask to talk to someone at your school.
+        It is okay if this was not enough. A real person can help more, and you can ask to talk to someone at your school.
       </p>
       <Link
         to="/support"

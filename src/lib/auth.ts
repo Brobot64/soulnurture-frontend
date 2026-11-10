@@ -70,7 +70,6 @@ export function isChatStaff(role?: string | null): boolean {
 export type HomePath =
   | '/admin'
   | '/school'
-  | '/school/inbox'
   | '/welcome'
   | '/first-password'
   | '/signin'
@@ -87,7 +86,10 @@ export function homeForRole(
     case 'SCHOOL_ADMIN':
       return '/school'
     default:
-      return isChatStaff(user.role) ? '/school/inbox' : '/welcome'
+      // Chat staff land on the dashboard, not the inbox: the inbox is one of
+      // the things the dashboard reports, and opening it first made staff
+      // arrive mid-task instead of with the full picture.
+      return isChatStaff(user.role) ? '/school' : '/welcome'
   }
 }
 

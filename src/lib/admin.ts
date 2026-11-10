@@ -115,8 +115,29 @@ export interface SchoolRow {
   lastActivityAt: string | null
 }
 
-export function fetchSchools(): Promise<{ items: SchoolRow[] }> {
-  return apiFetch<{ items: SchoolRow[] }>('/api/v1/schools')
+export interface SchoolsResponse {
+  items: SchoolRow[]
+  /** Schools matching the filters, across every page — not this page's rows. */
+  total: number
+  page: { take: number; hasMore: boolean; nextBefore: string | null }
+}
+
+/**
+ * One page of the register. Search and status are server-side because a filter
+ * applied to one page of 25 silently hides the schools that did not make the
+ * page — which is what the "no schools match" state used to mean.
+ */
+export function fetchSchools(opts: {
+  before?: string | null
+  q?: string
+  status?: SchoolStatus
+} = {}): Promise<SchoolsResponse> {
+  const params = new URLSearchParams()
+  if (opts.before) params.set('before', opts.before)
+  if (opts.q?.trim()) params.set('q', opts.q.trim())
+  if (opts.status) params.set('status', opts.status)
+  const suffix = params.size > 0 ? `?${params.toString()}` : ''
+  return apiFetch<SchoolsResponse>(`/api/v1/schools${suffix}`)
 }
 
 export interface CreatedSchool {

@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { ArrowRight, BookOpenText, CalendarFold, Info, ShieldCheck, Trash2 } from 'lucide-react'
+import { ArrowRight, BookOpen, BookOpenText, CalendarFold, HeartHandshake, ShieldCheck, Trash2 } from 'lucide-react'
 
 import { HistoryDeletionDialog } from '#/components/HistoryDeletionDialog'
 import { Button, ErrorNote, Skeleton } from '#/components/dash/ui'
 import {
+  DELETION_SCOPE_LABELS,
   HISTORY_EMPTY,
   HISTORY_INTRO,
   HISTORY_NOT_EMERGENCY,
   HISTORY_RETENTION_TRUTH,
   HISTORY_TABS,
-  DELETION_SCOPE_LABELS,
   cancelHistoryDeletion,
   deletionState,
   deletionStateLine,
@@ -22,6 +22,7 @@ import {
   type DeletionReceipt,
   type HistoryEntry,
   type HistoryResponse,
+  type HistorySupportRequest,
   type HistoryTab,
 } from '#/lib/history'
 import { useStudentSupportAccess } from '#/lib/support'
@@ -51,8 +52,14 @@ function rowDate(createdAt: string): { day: string; month: string; full: string 
 function HistoryPage() {
   const student = useStudentSupportAccess('/history')
   const [data, setData] = useState<HistoryResponse | null>(null)
+  // The timeline is accumulated across pages; `data` alone only ever holds the
+  // newest page, so rendering from it would replace what is on screen instead of
+  // extending it.
+  const [entries, setEntries] = useState<HistoryEntry[]>([])
   const [receipts, setReceipts] = useState<DeletionReceipt[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [moreError, setMoreError] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [tab, setTab] = useState<HistoryTab>('all')
   const [askOpen, setAskOpen] = useState(false)
   const [cancelling, setCancelling] = useState<string | null>(null)
@@ -64,10 +71,11 @@ function HistoryPage() {
     try {
       const [history, asks] = await Promise.all([fetchHistory(), fetchDeletionRequests()])
       setData(history)
+      setEntries(history.items)
       setReceipts(asks.items)
       // The countdown is measured against the moment the schedule was read, not
       // against when the page first mounted — otherwise an ask filed a minute
-      // after load reads "24 hours 1 minute".
+      // after load reads "24 hours and 1 minute".
       setClock(Date.now())
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Your history could not be loaded.')
@@ -78,6 +86,32 @@ function HistoryPage() {
     if (!student) return
     void load()
   }, [student, load])
+
+  /**
+   * Older entries are fetched only when asked for. Nothing on this page ever
+   * fetched on scroll: an unbounded list grew the document forever, and a
+   * student on a phone scrolled through a page that never stopped getting
+   * longer.
+   */
+  async function loadEarlier() {
+    const before = data?.page.nextBefore
+    if (!before || loadingMore) return
+    setLoadingMore(true)
+    setMoreError(null)
+    try {
+      const older = await fetchHistory({ before })
+      setData((current) =>
+        current
+          ? { ...current, items: older.items, counts: older.counts, page: older.page }
+          : older,
+      )
+      setEntries((current) => [...current, ...older.items])
+    } catch (cause) {
+      setMoreError(cause instanceof Error ? cause.message : 'Older entries could not be loaded.')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   // The countdown only needs a clock while something is still on the timer.
   const anythingScheduled = receipts.some((receipt) => deletionState(receipt) === 'scheduled')
@@ -107,7 +141,7 @@ function HistoryPage() {
   }
 
   if (!student) {
-    return <p role="status" className="mx-auto w-full max-w-[1160px] px-6 py-12 text-copy text-body">Checking your access…</p>
+    return <p role="status" className="mx-auto w-full max-w-[1160px] px-5 py-12 text-copy text-body sm:px-6">Checking your access…</p>
   }
   if (error) {
     return (
@@ -119,22 +153,20 @@ function HistoryPage() {
   }
   if (!data) {
     return (
-      <div aria-label="Loading your history" className="mx-auto w-full max-w-[1160px] flex-1 flex-col gap-4 px-5 py-8 sm:px-8 lg:py-12">
+      <div aria-label="Loading your history" className="mx-auto flex w-full max-w-[1160px] flex-1 flex-col gap-4 px-5 py-8 sm:px-8 lg:py-12">
         <Skeleton className="h-24" />
         <Skeleton className="h-72" />
       </div>
     )
   }
 
-  const shown = data.items.filter((entry) =>
-    tab === 'all'
-      ? true
-      : tab === 'reflections'
-        ? entry.reflection !== null
-        : tab === 'support'
-          ? entry.supportRequest !== null
-          : true,
-  )
+  const loaded = entries.length
+  const shown =
+    tab === 'support'
+      ? []
+      : entries.filter((entry) =>
+          tab === 'all' ? true : tab === 'reflections' ? entry.reflection !== null : true,
+        )
   const now = clock
   const thisWeek = shown.filter((entry) => withinWeek(entry.createdAt, now))
   const earlier = shown.filter((entry) => !withinWeek(entry.createdAt, now))
@@ -157,23 +189,31 @@ function HistoryPage() {
                 aria-pressed={active}
                 onClick={() => setTab(option.id)}
                 className={`min-h-11 rounded-pill border px-5 text-chip font-semibold transition-colors ${
-                  active ? 'border-action bg-panel text-brand-4' : 'border-hairline text-action hover:bg-panel'
+                  active ? 'border-brand-4 bg-brand-1 text-brand-4' : 'border-hairline bg-white text-body hover:bg-brand-1'
                 }`}
               >
                 {option.label}
-                <span className="ml-2 text-caption font-normal text-muted">{countFor(option.id, data)}</span>
+                <span className="ml-2 text-caption font-normal text-muted">
+                  {countFor(option.id, data)}
+                </span>
               </button>
             )
           })}
         </nav>
 
-        <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="flex flex-col gap-8">
-            {data.items.length === 0 ? (
+        <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="flex min-w-0 flex-col gap-8">
+            {tab === 'support' ? (
+              data.counts.supportRequests === 0 ? (
+                <NoRequests />
+              ) : (
+                <RequestGroup requests={data.supportRequests} total={data.counts.supportRequests} />
+              )
+            ) : entries.length === 0 ? (
               <EmptyState />
             ) : shown.length === 0 ? (
               <p className="text-copy-sm text-muted">
-                Nothing of this kind yet — choose “All” to see everything you have done.
+                Nothing of this kind yet — choose “All” to see everything you have.
               </p>
             ) : (
               <>
@@ -181,18 +221,27 @@ function HistoryPage() {
                 {earlier.length > 0 && <Group title="Earlier" entries={earlier} />}
               </>
             )}
+
+            {tab !== 'support' && data.page.hasMore && (
+              <div className="flex flex-col items-start gap-2">
+                <Button variant="ghost" disabled={loadingMore} onClick={() => void loadEarlier()}>
+                  {loadingMore ? 'Loading…' : `Load earlier entries (${Math.max(0, data.counts.checkIns - loaded)})`}
+                </Button>
+                {moreError && <ErrorNote>{moreError}</ErrorNote>}
+              </div>
+            )}
           </div>
 
-          <aside className="flex flex-col gap-4">
+          <aside className="flex min-w-0 flex-col gap-4">
             <section aria-labelledby="about-history" className="rounded-card border border-hairline bg-white p-6">
               <div className="flex items-center gap-3">
-                <Info aria-hidden="true" className="size-5 shrink-0 text-action" />
+                <BookOpen aria-hidden="true" className="size-5 shrink-0 text-brand-4" />
                 <h2 id="about-history" className="text-card text-heading">About your history</h2>
               </div>
-              <p className="mt-3 text-copy-sm text-body">What is stored, who can see it, and how to ask for it to be removed.</p>
+              <p className="mt-3 text-copy-sm text-muted">What is stored, who can see it, and how to ask for it to be removed.</p>
               <Link
                 to="/history/about"
-                className="mt-4 inline-flex min-h-11 items-center gap-2 text-button-sm text-action hover:underline"
+                className="mt-4 inline-flex min-h-11 items-center gap-2 text-button-sm text-brand-4 hover:underline"
               >
                 How your history is kept <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
@@ -200,7 +249,7 @@ function HistoryPage() {
 
             <section aria-labelledby="delete-history" className="rounded-card border border-hairline bg-white p-6">
               <div className="flex items-center gap-3">
-                <Trash2 aria-hidden="true" className="size-5 shrink-0 text-action" />
+                <Trash2 aria-hidden="true" className="size-5 shrink-0 text-brand-4" />
                 <h2 id="delete-history" className="text-card text-heading">Delete your history</h2>
               </div>
               <p className="mt-3 text-copy-sm text-body">
@@ -213,7 +262,7 @@ function HistoryPage() {
               </Button>
 
               {deletionNotice && (
-                <p role="status" className="mt-4 rounded-card border border-hairline bg-panel p-3 text-caption text-heading">
+                <p role="status" className="mt-4 rounded-card border border-hairline bg-brand-1 p-3 text-caption text-heading">
                   {deletionNotice}
                 </p>
               )}
@@ -237,7 +286,7 @@ function HistoryPage() {
                       }`}>
                         {deletionStateLine(receipt, now)}
                       </p>
-                      {/* alertedAt stays its own line: it says whether a person was
+                      {/* alertedAt keeps its own line: it says whether a person was
                           actually told, which is a different fact from the schedule. */}
                       {receipt.alertedAt === null && deletionState(receipt) === 'scheduled' && (
                         <p className="mt-1 text-caption text-peach-ink">
@@ -275,7 +324,7 @@ function HistoryPage() {
 
       <HistoryDeletionDialog
         open={askOpen}
-        entries={data.items}
+        entries={entries}
         onClose={() => setAskOpen(false)}
         onFiled={() => void load()}
       />
@@ -283,6 +332,10 @@ function HistoryPage() {
   )
 }
 
+/**
+ * Totals come from `counts`, never from the rows on hand: the tab says how many
+ * exist, not how many this page has fetched so far.
+ */
 function countFor(tab: HistoryTab, data: HistoryResponse): number {
   if (tab === 'all') return data.counts.all
   if (tab === 'check-ins') return data.counts.checkIns
@@ -301,6 +354,78 @@ function Group({ title, entries }: { title: string; entries: HistoryEntry[] }) {
   )
 }
 
+/**
+ * Support requests are listed from the student's own rows, fetched by student
+ * rather than reached through the check-in link. Most requests have no link —
+ * the escalation path files one against the conversation — so the old rendering
+ * (entries that happened to carry a request) hid exactly the requests a student
+ * was most likely to ask about.
+ */
+function RequestGroup({ requests, total }: { requests: HistorySupportRequest[]; total: number }) {
+  return (
+    <section aria-labelledby="group-requests">
+      <h2 id="group-requests" className="text-chip font-semibold uppercase tracking-wide text-muted">
+        Requests you sent
+      </h2>
+      {total > requests.length && (
+        <p className="mt-2 text-caption text-muted">
+          Showing the {requests.length} most recent of {total}.
+        </p>
+      )}
+      <ul className="mt-4 flex flex-col gap-3">
+        {requests.map((request) => {
+          const date = rowDate(request.createdAt)
+          const stage = requestStage(request)
+          return (
+            <li key={request.id}>
+              <div className="flex items-start gap-4 rounded-card border border-hairline bg-white p-5">
+                <span className="flex w-12 shrink-0 flex-col items-center rounded-panel bg-brand-1 py-2" aria-hidden="true">
+                  <span className="text-card font-bold text-heading">{date.day}</span>
+                  <span className="text-caption text-muted">{date.month}</span>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-card text-heading">
+                    {request.urgency === 'URGENT' ? 'You asked for help right away' : 'You asked for support'}
+                  </span>
+                  <span className="mt-1.5 block text-copy-sm text-muted">{stage.detail}</span>
+                  <span className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-2 rounded-pill bg-brand-1 px-3 py-1 text-chip text-brand-4">
+                      <HeartHandshake aria-hidden="true" className="size-3.5" />
+                      {stage.label}
+                    </span>
+                    {request.checkInId && (
+                      <Link
+                        to="/history/$checkInId"
+                        params={{ checkInId: request.checkInId }}
+                        className="text-chip text-brand-4 hover:underline"
+                      >
+                        From a check-in
+                      </Link>
+                    )}
+                  </span>
+                  <span className="sr-only">{date.full}</span>
+                </span>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
+function NoRequests() {
+  return (
+    <section className="rounded-card border border-hairline bg-white p-8">
+      <h2 className="text-title-sm text-heading">No support requests yet</h2>
+      <p className="mt-3 max-w-[620px] text-copy-sm text-body">
+        If you ask a person at your school for support, that request appears here with what happened to it. The
+        school’s review notes are never shown on this page.
+      </p>
+    </section>
+  )
+}
+
 function HistoryRow({ entry }: { entry: HistoryEntry }) {
   const date = rowDate(entry.createdAt)
   const lane = reflectionLane(entry)
@@ -309,22 +434,22 @@ function HistoryRow({ entry }: { entry: HistoryEntry }) {
       <Link
         to="/history/$checkInId"
         params={{ checkInId: entry.checkInId }}
-        className="flex items-start gap-4 rounded-card border border-hairline bg-white p-5 transition-colors hover:border-action/40"
+        className="flex items-start gap-4 rounded-card border border-hairline bg-white p-5 transition-colors hover:border-brand-4/40"
       >
-        <span className="flex w-12 shrink-0 flex-col items-center rounded-panel bg-panel-2 py-2" aria-hidden="true">
+        <span className="flex w-12 shrink-0 flex-col items-center rounded-panel bg-brand-1 py-2" aria-hidden="true">
           <span className="text-card font-bold text-heading">{date.day}</span>
           <span className="text-caption text-muted">{date.month}</span>
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-card text-heading">Feeling {feelingTitle(entry.feeling)}</span>
-          {/* No resource count: nothing in the data ties a resource to a check-in,
-              so the row states only what is stored. */}
+          {/* No resource count: nothing in the data ties a resource to a check-in, so
+              this row states only what is stored. */}
           <span className="mt-1.5 block text-copy-sm text-muted">
             Check-in{lane ? ` · ${lane}` : ' only'}
             {entry.reflection && entry.reflection.turnCount > 1 ? ` · ${entry.reflection.turnCount} turns` : ''}
           </span>
           {entry.supportRequest && (
-            <span className="mt-2 inline-flex items-center gap-2 rounded-pill bg-panel px-3 py-1 text-chip text-brand-4">
+            <span className="mt-2 inline-flex items-center gap-2 rounded-pill bg-brand-1 px-3 py-1 text-chip text-brand-4">
               Support request · {requestStage(entry.supportRequest).label}
             </span>
           )}
@@ -342,10 +467,10 @@ function EmptyState() {
       <h2 className="text-title-sm text-heading">No history yet</h2>
       <p className="mt-3 max-w-[620px] text-copy-sm text-body">{HISTORY_EMPTY}</p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link to="/check-in" className="inline-flex min-h-11 items-center rounded-pill bg-action px-6 text-button-sm font-semibold text-white hover:bg-brand-4">
+        <Link to="/check-in" className="inline-flex min-h-11 items-center rounded-pill bg-brand-4 px-6 text-button-sm font-semibold text-white hover:bg-brand-5">
           Start a check-in
         </Link>
-        <Link to="/history/about" className="inline-flex min-h-11 items-center rounded-pill bg-surface px-6 text-button-sm text-brand-4 hover:bg-neutral-10">
+        <Link to="/history/about" className="inline-flex min-h-11 items-center rounded-pill bg-brand-1 px-6 text-button-sm text-brand-4 hover:bg-brand-2">
           How your history is kept
         </Link>
       </div>

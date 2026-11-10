@@ -188,6 +188,8 @@ async function main() {
     // renders FullPageLoader until /users/me resolves. Wait for real text.
     let chars = 0
     let landed = ''
+    let previousChars = -1
+    let stable = 0
     for (let attempt = 0; attempt < 40; attempt++) {
       await sleep(500)
       // Page.navigate resolves before the document is replaced, so polling text
@@ -199,7 +201,13 @@ async function main() {
       landed = snap[0]
       if (landed !== path) continue
       chars = snap[1]
-      if (chars > 200) break
+      // 200 chars is the shell, not the page: the lists the owner complained
+      // about arrive after that. Only trust the layout once the text stops growing.
+      if (chars > 200) {
+        stable = chars === previousChars ? stable + 1 : 0
+        previousChars = chars
+        if (stable >= 3) break
+      }
     }
     // Cold-compiled routes can exceed the 20s budget on their first hit; give
     // an almost-blank page one more stretch before calling it blank.

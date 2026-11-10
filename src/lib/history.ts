@@ -24,6 +24,8 @@ export interface HistorySupportRequest {
   createdAt: string
   /** The raw lifecycle status, for the status chip. */
   status: string
+  /** Null far more often than not: see `HistoryPage` — never read as "no request". */
+  checkInId: string | null
   /** Derived by the server with the same functions the staff queue uses. */
   queueStatus: 'NEW' | 'REVIEWED'
   followUpState: 'NONE' | 'REQUIRED' | 'COMPLETED'
@@ -42,7 +44,20 @@ export interface HistoryEntry {
 
 export interface HistoryResponse {
   items: HistoryEntry[]
-  counts: { all: number; checkIns: number; reflections: number; supportRequests: number }
+  /**
+   * The student's requests read from `support_request` by student, not through
+   * the check-in link. The link is nullable and the escalation path never fills
+   * it, so counting requests off `items` reported zero for students who had
+   * asked for help.
+   */
+  supportRequests: HistorySupportRequest[]
+  counts: {
+    all: number
+    checkIns: number
+    reflections: number
+    supportRequests: number
+  }
+  page: { take: number; hasMore: boolean; nextBefore: string | null }
 }
 
 export interface HistoryMessage {
@@ -68,13 +83,23 @@ export const HISTORY_TABS: { id: HistoryTab; label: string }[] = [
   { id: 'support', label: 'Support requests' },
 ]
 
-export function fetchHistory(): Promise<HistoryResponse> {
-  return apiFetch<HistoryResponse>('/api/v1/history')
+/**
+ * One page of the timeline. `before` is the cursor the previous response handed
+ * back: the list is walked backwards a page at a time rather than fetched whole,
+ * which is what let a long history grow the page forever.
+ */
+export function fetchHistory(cursor?: { before?: string | null }): Promise<HistoryResponse> {
+  const params = new URLSearchParams()
+  if (cursor?.before) params.set('before', cursor.before)
+  const suffix = params.size > 0 ? `?${params.toString()}` : ''
+  return apiFetch<HistoryResponse>(`/api/v1/history${suffix}`)
 }
 
 export function fetchHistoryEntry(checkInId: string): Promise<HistoryDetail> {
   return apiFetch<HistoryDetail>(`/api/v1/history/${checkInId}`)
 }
+
+
 
 /**
  * The student's own words for a feeling. `MOODS` in lib/journey covers only the
