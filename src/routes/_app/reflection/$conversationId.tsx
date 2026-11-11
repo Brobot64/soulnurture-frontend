@@ -43,7 +43,16 @@ import {
   type Message,
   type QuickReplyValue,
 } from '#/lib/journey'
-import { VoiceRecorder, isVoiceSupported, transcribeVoice } from '#/lib/voice'
+import {
+  VOICE_LANGUAGE_OPTIONS,
+  VoiceRecorder,
+  isVoiceSupported,
+  readStoredVoiceLanguage,
+  storeVoiceLanguage,
+  transcribeVoice,
+  warmVoiceModel,
+  type VoiceLanguage,
+} from '#/lib/voice'
 
 export const Route = createFileRoute('/_app/reflection/$conversationId')({
   head: () => ({
@@ -110,6 +119,10 @@ function Reflection() {
   const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'transcribing'>('idle')
   const [voiceElapsed, setVoiceElapsed] = useState(0)
   const [voiceReady, setVoiceReady] = useState(false)
+  /** Null means "not chosen yet", which keeps the old profile-based route. */
+  const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage | null>(
+    readStoredVoiceLanguage,
+  )
   const [history, setHistory] = useState<CheckInHistoryEntry[]>([])
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const reportScope = `${user?.id}:${conversationId}`
@@ -489,6 +502,13 @@ function Reflection() {
   // The dialogs borrow the student's own mood face rather than a generic one.
   const moodEmoji = (checkIn && getMoodByFeeling(checkIn.feeling)?.emoji) || '🙂'
 
+  // Warming a vernacular replica takes minutes, so it starts when the mic
+  // appears rather than when it is pressed. Re-warms on a new choice.
+  useEffect(() => {
+    if (!voiceReady || readOnly) return
+    warmVoiceModel(voiceLanguage)
+  }, [voiceReady, readOnly, voiceLanguage])
+
   const send = async (raw: string, quickReply?: QuickReplyValue, viaVoice = false) => {
     const content = raw.trim()
     if (!content || thinking || readOnly || consentStateRef.current !== 'accepted') return
@@ -603,7 +623,7 @@ function Reflection() {
       return
     }
     try {
-      const result = await transcribeVoice(clip)
+      const result = await transcribeVoice(clip, voiceLanguage)
       setVoiceState('idle')
       const text = result.text.trim()
       if (!text) {
@@ -950,6 +970,32 @@ function Reflection() {
                   <Square className="size-4 fill-current" />
                 </button>
               </div>
+            )}
+
+            {/* The account language is what replies are WRITTEN in, which is not
+                always what someone speaks — so the note can say for itself, and
+                remembers the answer. Unset keeps the old account-based route. */}
+            {!loading && !loadFailed && !readOnly && voiceReady && voiceState !== 'recording' && (
+              <label className="mb-2 flex items-center justify-end gap-2 text-caption text-muted">
+                <span>I’m speaking</span>
+                <select
+                  value={voiceLanguage ?? ''}
+                  disabled={consentState !== 'accepted'}
+                  className="h-8 min-w-0 rounded-pill border border-hairline bg-white px-3 text-caption text-ink outline-none transition-colors focus:border-action disabled:opacity-40"
+                  onChange={(event) => {
+                    const next = (event.target.value || null) as VoiceLanguage | null
+                    setVoiceLanguage(next)
+                    storeVoiceLanguage(next)
+                  }}
+                >
+                  <option value="">Same as my account</option>
+                  {VOICE_LANGUAGE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
 
             {!loading && !loadFailed && !readOnly && voiceState !== 'recording' && (

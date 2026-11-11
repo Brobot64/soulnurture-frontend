@@ -7,8 +7,10 @@
 // libsndfile, which cannot read the webm container, and Safari/iOS cannot
 // record webm at all. PCM capture works in every browser, and the Whisper
 // lane reads WAV too.
-// Routing (en/pcm → Whisper chain, yo/ha/ig → N-ATLaS) is the backend's call;
-// it uses the student's preferredLanguage by default.
+// Routing (en/pcm → Whisper chain, yo/ha/ig → N-ATLaS) is the backend's call.
+// It falls back to the student's preferredLanguage, which is the language we
+// WRITE replies in — often not the language someone SPEAKS, so a note can
+// carry its own language instead. See VOICE_LANGUAGE_OPTIONS.
 
 import { apiFetch } from './api'
 
@@ -212,8 +214,52 @@ export class VoiceRecorder {
   }
 }
 
-export function transcribeVoice(clip: VoiceClip): Promise<VoiceTranscript> {
+/** The five languages the backend will accept in the `language` field. */
+export type VoiceLanguage = 'en' | 'pcm' | 'yo' | 'ha' | 'ig'
+
+export const VOICE_LANGUAGE_OPTIONS: ReadonlyArray<{ value: VoiceLanguage; label: string }> = [
+  { value: 'en', label: 'English' },
+  { value: 'pcm', label: 'Nigerian Pidgin' },
+  { value: 'yo', label: 'Yoruba' },
+  { value: 'ha', label: 'Hausa' },
+  { value: 'ig', label: 'Igbo' },
+]
+
+const VOICE_LANGUAGE_STORAGE_KEY = 'natlas.voice.language'
+
+/** The remembered spoken language, or null meaning "fall back to my account
+ * language" — the behaviour before this control existed, and the only safe
+ * default: an en profile that speaks Yoruba and a yo profile that speaks
+ * English are both real, and guessing either way breaks one of them. */
+export function readStoredVoiceLanguage(): VoiceLanguage | null {
+  if (typeof window === 'undefined') return null
+  const stored = window.localStorage.getItem(VOICE_LANGUAGE_STORAGE_KEY)
+  return VOICE_LANGUAGE_OPTIONS.some((option) => option.value === stored)
+    ? (stored as VoiceLanguage)
+    : null
+}
+
+export function storeVoiceLanguage(language: VoiceLanguage | null): void {
+  if (language) window.localStorage.setItem(VOICE_LANGUAGE_STORAGE_KEY, language)
+  else window.localStorage.removeItem(VOICE_LANGUAGE_STORAGE_KEY)
+}
+
+/** Start the vernacular model warming up. Fire-and-forget: a cold replica is
+ * minutes to come up and no request can wait for that, so the wait happens
+ * while the student reads the chat instead of after they press the mic. */
+export function warmVoiceModel(language: VoiceLanguage | null): void {
+  void apiFetch('/api/v1/ai/transcribe/warm', {
+    method: 'POST',
+    body: JSON.stringify(language ? { language } : {}),
+  }).catch(() => undefined)
+}
+
+export function transcribeVoice(
+  clip: VoiceClip,
+  language: VoiceLanguage | null,
+): Promise<VoiceTranscript> {
   const form = new FormData()
   form.append('audio', clip.blob, clip.filename)
+  if (language) form.append('language', language)
   return apiFetch<VoiceTranscript>('/api/v1/ai/transcribe', { method: 'POST', body: form })
 }

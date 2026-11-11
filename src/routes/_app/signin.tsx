@@ -90,7 +90,6 @@ function SignIn() {
   return (
     <AuthShell
       illustrated
-      chip="Welcome back"
       illustration={<HumanSupportArtwork className="w-full max-w-[640px] rounded-hero" />}
       panel={{
         Icon: LockKeyhole,
