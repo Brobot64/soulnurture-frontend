@@ -52,8 +52,11 @@ function DashLayout() {
       <RailNav />
       {/* overflow-x-hidden is the hard guarantee the rail never slides off:
           one wide descendant used to widen the whole page and drag the bottom
-          nav sideways with it. */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-page">
+          nav sideways with it. `relative` keeps sr-only (position:absolute,
+          top:auto -> static position) anchored inside this scroller instead of
+          the initial containing block, which is what stretched the document
+          into a second scrollbar on the student shell. */}
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-page">
         <Outlet />
       </div>
     </div>

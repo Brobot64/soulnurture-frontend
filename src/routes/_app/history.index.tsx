@@ -189,7 +189,7 @@ function HistoryPage() {
                 aria-pressed={active}
                 onClick={() => setTab(option.id)}
                 className={`min-h-11 rounded-pill border px-5 text-chip font-semibold transition-colors ${
-                  active ? 'border-brand-4 bg-brand-1 text-brand-4' : 'border-hairline bg-white text-body hover:bg-brand-1'
+                  active ? 'border-brand-4 bg-panel text-brand-4' : 'border-hairline bg-white text-body hover:bg-panel'
                 }`}
               >
                 {option.label}
@@ -262,7 +262,7 @@ function HistoryPage() {
               </Button>
 
               {deletionNotice && (
-                <p role="status" className="mt-4 rounded-card border border-hairline bg-brand-1 p-3 text-caption text-heading">
+                <p role="status" className="mt-4 rounded-card border border-hairline bg-panel p-3 text-caption text-heading">
                   {deletionNotice}
                 </p>
               )}
@@ -379,7 +379,7 @@ function RequestGroup({ requests, total }: { requests: HistorySupportRequest[]; 
           return (
             <li key={request.id}>
               <div className="flex items-start gap-4 rounded-card border border-hairline bg-white p-5">
-                <span className="flex w-12 shrink-0 flex-col items-center rounded-panel bg-brand-1 py-2" aria-hidden="true">
+                <span className="flex w-12 shrink-0 flex-col items-center rounded-panel bg-panel py-2" aria-hidden="true">
                   <span className="text-card font-bold text-heading">{date.day}</span>
                   <span className="text-caption text-muted">{date.month}</span>
                 </span>
@@ -389,7 +389,7 @@ function RequestGroup({ requests, total }: { requests: HistorySupportRequest[]; 
                   </span>
                   <span className="mt-1.5 block text-copy-sm text-muted">{stage.detail}</span>
                   <span className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-2 rounded-pill bg-brand-1 px-3 py-1 text-chip text-brand-4">
+                    <span className="inline-flex items-center gap-2 rounded-pill bg-panel px-3 py-1 text-chip text-brand-4">
                       <HeartHandshake aria-hidden="true" className="size-3.5" />
                       {stage.label}
                     </span>
@@ -436,7 +436,7 @@ function HistoryRow({ entry }: { entry: HistoryEntry }) {
         params={{ checkInId: entry.checkInId }}
         className="flex items-start gap-4 rounded-card border border-hairline bg-white p-5 transition-colors hover:border-brand-4/40"
       >
-        <span className="flex w-12 shrink-0 flex-col items-center rounded-panel bg-brand-1 py-2" aria-hidden="true">
+        <span className="flex w-12 shrink-0 flex-col items-center rounded-panel bg-panel py-2" aria-hidden="true">
           <span className="text-card font-bold text-heading">{date.day}</span>
           <span className="text-caption text-muted">{date.month}</span>
         </span>
@@ -449,7 +449,7 @@ function HistoryRow({ entry }: { entry: HistoryEntry }) {
             {entry.reflection && entry.reflection.turnCount > 1 ? ` · ${entry.reflection.turnCount} turns` : ''}
           </span>
           {entry.supportRequest && (
-            <span className="mt-2 inline-flex items-center gap-2 rounded-pill bg-brand-1 px-3 py-1 text-chip text-brand-4">
+            <span className="mt-2 inline-flex items-center gap-2 rounded-pill bg-panel px-3 py-1 text-chip text-brand-4">
               Support request · {requestStage(entry.supportRequest).label}
             </span>
           )}
@@ -470,7 +470,7 @@ function EmptyState() {
         <Link to="/check-in" className="inline-flex min-h-11 items-center rounded-pill bg-brand-4 px-6 text-button-sm font-semibold text-white hover:bg-brand-5">
           Start a check-in
         </Link>
-        <Link to="/history/about" className="inline-flex min-h-11 items-center rounded-pill bg-brand-1 px-6 text-button-sm text-brand-4 hover:bg-brand-2">
+        <Link to="/history/about" className="inline-flex min-h-11 items-center rounded-pill bg-panel px-6 text-button-sm text-brand-4 hover:bg-brand-11">
           How your history is kept
         </Link>
       </div>
