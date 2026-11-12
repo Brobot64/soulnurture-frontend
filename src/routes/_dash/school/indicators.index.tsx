@@ -295,9 +295,12 @@ function IndicatorList({
         search filters; the list itself returns the {LIST_LIMIT} newest. A search matches the
         student code or email a reviewer already has, and narrows the chip counts with it — an
         “Open for review” tile above does not, because that one is a school-wide fact.
-        “Unclassified” is a real bucket — a flag no rule with an approved level produced, not a
-        mild one. Level U means the evidence is unclear or conflicting; it is never a softer
-        shade of Level A. Indicator counts say nothing about support requests, which are
+        “Unclassified” is a real bucket — a flag nothing has graded, not a mild one. Level U
+        means the evidence is unclear or conflicting; it is never a softer shade of Level A. A
+        level that names the condition that fired sits on its own axis; a level that had no
+        condition to name was read off the alert tier, and the indicator says which of the two it
+        is. What reached a colleague about an indicator was always its alert tier, a separate
+        field. Indicator counts say nothing about support requests, which are
         separate records on their own page: “Linked request” only means a request the student
         sent shares this indicator’s conversation. It has its own status, and the link makes an
         indicator into neither a request nor a decision.
@@ -669,12 +672,33 @@ function FlagDetail({
             {systemMetadata.ruleLabel && (
               <p className="mt-1 text-copy-sm text-body">“{systemMetadata.ruleLabel}”</p>
             )}
+            {/* A level on this screen has to name what produced it. No indicator
+                rule is switched on, so an automatic level came either from the
+                condition that fired or from the AI's own alert tier, and the two
+                are different claims about a student. */}
+            {systemMetadata.levelSource === 'INTENT_MAPPING' && (
+              <p className="mt-2 text-caption text-muted">
+                Level {systemMetadata.level} came from the condition-to-level mapping
+                {systemMetadata.levelSourceVersion
+                  ? ` (${systemMetadata.levelSourceVersion})`
+                  : ''}, which no reviewer has signed yet.
+              </p>
+            )}
+            {systemMetadata.levelSource === 'AI_TIER' && (
+              <p className="mt-2 flex items-start gap-2 text-caption text-peach-ink">
+                <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                Level {systemMetadata.level} was read off the alert tier (
+                {systemMetadata.severity}), because no condition in the mapping
+                covered this flag. It says how urgent the model thought the message
+                was — not what the student disclosed, and no reviewer has signed it.
+              </p>
+            )}
             {systemMetadata.ruleConfigured === false ? (
               <p className="mt-2 flex items-start gap-2 text-caption text-peach-ink">
                 <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                 This rule is not switched on. {systemMetadata.ruleBlockedOn ?? ''}
               </p>
-            ) : (
+            ) : systemMetadata.levelSource ? null : (
               <p className="mt-2 text-caption text-muted">
                 No rule configuration is shown for this indicator.
               </p>

@@ -107,6 +107,13 @@ export interface IndicatorFlagDetail {
     ruleLabel: string | null
     ruleConfigured: boolean | null
     ruleBlockedOn: string | null
+    /** What graded `level`. No IND-* rule is switched on, so the automatic
+     * writers are `INTENT_MAPPING` — the §3 condition that fired — and
+     * `AI_TIER`, the alert tier the AI asserted for a flag no condition graded.
+     * Both name a mapping no reviewer has signed, never a clinical assessment.
+     * Null means the flag has no level. */
+    levelSource: 'INDICATOR_RULE' | 'INTENT_MAPPING' | 'AI_TIER' | null
+    levelSourceVersion: string | null
   }
   aiSummary: string | null
   humanDecision: { reviewDecision: ReviewDecision | null; decisions: ReviewDecision[] }
