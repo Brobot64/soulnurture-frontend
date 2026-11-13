@@ -465,26 +465,32 @@ const DELETION_ASKS = [
 // --- Indicators + AI reports (the rail's needs-attention badges) ------------
 
 /**
- * Miva's flag register. Prod currently holds 73 flags with `level` NULL on
- * every row — no indicator rule is approved yet — so the mixed A/B/C/U spread
- * here exists only so the level chips and the per-row level cell have something
- * to render. `openCount` is OPEN + IN_REVIEW, which is the predicate the
- * indicators page prints and the predicate /dashboard/attention must copy.
+ * Miva's flag register, shaped like what prod now holds: `indicator-levels.ts`
+ * grades a flag from the intent that raised it, and no IND-* rule is switched on,
+ * so every graded row carries a level with `ruleId` null beside it. The last row
+ * is the one the mapping does not recognise, which is what keeps the
+ * "Unclassified" chip real. `openCount` is OPEN + IN_REVIEW, which is the
+ * predicate the indicators page prints and the predicate /dashboard/attention
+ * must copy.
  */
 const INDICATOR_FLAGS = (() => {
   const miva = schools.find((school) => school.id === 'sch-miva')
   const pool = studentsOf(miva)
+  // intentId, level, severity, status, triggerLabel, hoursAgo — the pairs the
+  // mapping actually produces. `ACUTE_PANIC` sits at B under a TIER_3 alert on
+  // purpose so the screen can be checked for the one thing it must never imply:
+  // that the level chip and the alert tier are the same field.
   const SEED = [
-    ['A', 'OPEN', 'SELF_HARM_IDEATION', 'Thoughts of hurting myself', 6],
-    ['B', 'IN_REVIEW', 'BULLYING', 'Targeted by other students', 30],
-    ['C', 'OPEN', 'FAMILY_CONFLICT', 'Something happening at home', 52],
-    ['U', 'ACKNOWLEDGED', 'EXAM_PRESSURE', 'Overwhelmed by schoolwork', 96],
-    [null, 'OPEN', 'UNCLASSIFIED_RULE', 'Feeling low most days', 8],
-    [null, 'OPEN', 'UNCLASSIFIED_RULE', 'Cannot stop worrying', 20],
-    [null, 'IN_REVIEW', 'UNCLASSIFIED_RULE', 'Argument with a friend', 44],
-    [null, 'RESOLVED', 'UNCLASSIFIED_RULE', 'Bad day, feeling better', 120],
+    ['SUICIDAL_IDEATION', 'C', 'TIER_3_ACUTE', 'OPEN', 'Possible suicidal intent', 6],
+    ['SELF_HARM', 'C', 'TIER_3_ACUTE', 'IN_REVIEW', 'Thoughts of hurting myself', 18],
+    ['ABUSE_DISCLOSURE', 'C', 'TIER_3_ACUTE', 'OPEN', 'Something happening at home', 52],
+    ['THREAT_OR_COERCION', 'C', 'TIER_3_ACUTE', 'ACKNOWLEDGED', 'Someone threatened them', 70],
+    ['PROLONGED_LOW_MOOD', 'B', 'TIER_2_HIGH', 'OPEN', 'Feeling low most days', 30],
+    ['ACUTE_PANIC', 'B', 'TIER_3_ACUTE', 'IN_REVIEW', 'Could not breathe before an exam', 96],
+    [null, 'U', 'TIER_2_HIGH', 'OPEN', 'It might be nothing. It might be everything.', 8],
+    ['EXAM_PRESSURE', null, 'TIER_1_MODERATE', 'RESOLVED', 'Bad day, feeling better', 120],
   ]
-  return SEED.map(([level, status, category, triggerLabel, hoursAgo], index) => {
+  return SEED.map(([intentId, level, severity, status, triggerLabel, hoursAgo], index) => {
     const student = pool[index % pool.length]
     const profile = student.studentProfile ?? {}
     return {
@@ -495,16 +501,19 @@ const INDICATOR_FLAGS = (() => {
       conversationId: index < 2 ? `conv-${index}` : null,
       assigneeId: null,
       triggerLabel,
-      category,
-      intentId: null,
-      severity: level === 'A' ? 'TIER_3_ACUTE' : level === 'B' ? 'TIER_2_HIGH' : 'TIER_1_MODERATE',
+      category: intentId ?? 'MODEL_CANDIDATE',
+      intentId,
+      severity,
       level,
-      ruleId: level ? `rule-${level.toLowerCase()}` : 'rule-unapproved',
-      ruleVersion: level ? 'v1' : null,
+      // Never the intent id: that would make a keyword-floor flag read as if a
+      // graded rule produced it, which is the misrepresentation Doc A §17 warns
+      // against and what `levelSource` below now says out loud instead.
+      ruleId: null,
+      ruleVersion: null,
       reviewDecision: status === 'ACKNOWLEDGED' ? 'NO_FURTHER_ACTION' : null,
       studentStatementSnapshot: 'I wanted to write it down the way it actually felt.',
       status,
-      source: 'AI_CONVERSATION',
+      source: intentId ? 'SERVER_POLICY' : 'AI_CANDIDATE',
       aiContextSummary: index < 3 ? 'The student described the situation over several turns.' : null,
       autoActions: [],
       createdAt: iso(hours(hoursAgo)),
@@ -557,11 +566,9 @@ const attentionCountsFor = (viewer) => {
 // --- Wellbeing resources (Doc B §3/§4, as the seed publishes them) ----------
 
 /**
- * Mirrors `prisma/seed.ts` exactly: twelve approved rows carrying only title,
- * the "Use when" sentence as the description, and the estimated time. The
- * reviewed instruction sequences, reflection prompts, safety notes and media
- * were never delivered, so every one of those columns is null here — which is
- * the state the detail screen has to be honest about.
+ * Mirrors `prisma/seed.ts`: twelve approved rows carrying the title, the
+ * "Use when" sentence as the description, the estimated time and the guided
+ * content in WN_GUIDED below.
  */
 const WN_LIBRARY = [
   ['WN-01', 'Name What You’re Feeling', 'When feelings feel confusing, mixed or hard to explain', '2–4 minutes', 'FEELINGS'],
@@ -577,6 +584,129 @@ const WN_LIBRARY = [
   ['WN-11', 'A Simple Sleep Wind-Down', 'When preparing for rest and thoughts are busy', '5–10 minutes', 'REST'],
   ['WN-12', 'Choose a Coping Plan for the Next Hour', 'When unsure what kind of help is needed', '2–3 minutes', 'ONE_STEP'],
 ]
+/**
+ * Mirrors the guided content that `prisma/seed.ts` now writes from Doc B §3:
+ * the numbered steps and the reflection question, copied verbatim. `safetyNote`
+ * stays null because the seed leaves it null — §3 writes those notes in the
+ * responding adult's voice ("do not encourage a student to confront…"), and the
+ * detail screen renders that column to the student. `mediaUrl` is null too.
+ */
+const WN_GUIDED = {
+  'WN-01': {
+    steps: [
+      'Pause for a moment. You do not have to explain everything perfectly.',
+      'Choose one or more words that come close to what you feel: sad, worried, angry, lonely, embarrassed, relieved, excited, numb, confused, or “something else.”',
+      'Notice how strong the feeling seems right now: a little, medium, or a lot. There is no right answer.',
+      'If it helps, finish this sentence: “I think I may be feeling ___ because ___.” You can leave the reason blank.',
+    ],
+    reflection:
+      'What would help you most right now: to be heard, to understand the feeling, to calm your body, to solve a problem, or to reach someone?',
+  },
+  'WN-02': {
+    steps: [
+      'If it feels comfortable, place both feet on the floor or notice where your body is supported.',
+      'Name five things you can see, four things you can feel, three things you can hear, two things you can smell, and one thing you can taste. You can adapt or skip any step.',
+      'Look around and name where you are and one thing that tells you about the present moment.',
+      'Ask yourself: “What is one small, safe next step I can take?”',
+    ],
+    reflection: 'Did anything change in your attention or comfort level? It is okay if it did not.',
+  },
+  'WN-03': {
+    steps: [
+      'Sit or stand in a comfortable position. Let your shoulders rest if you can.',
+      'Breathe naturally. If comfortable, breathe in gently and let the breath out slowly, without forcing or holding it.',
+      'Repeat for a few breaths while noticing the chair, floor or other support beneath you.',
+      'Stop whenever you want and return to normal breathing.',
+    ],
+    reflection:
+      'Would a quiet pause, a drink of water, a short walk, or talking to someone be more helpful now?',
+  },
+  'WN-04': {
+    steps: [
+      'Write or think of the problem in one sentence.',
+      'Separate what you can influence from what you cannot control right now.',
+      'Choose one action that takes about five to ten minutes, such as opening the assignment, listing questions, or asking a teacher for clarification.',
+      'Decide when you will try that action. If you need help, identify one person to ask.',
+    ],
+    reflection: 'What is the smallest useful next step—not the whole solution?',
+  },
+  'WN-05': {
+    steps: [
+      'Notice the words you are using toward yourself, without judging yourself for having them.',
+      'Ask: “Would I say this exact thing to a friend who was struggling?”',
+      'Try a more balanced sentence: “This is difficult, and I can learn one thing from it,” or “One mistake does not describe my whole self.”',
+      'Choose one supportive action: rest, practise, apologise if needed, ask for help, or try again later.',
+    ],
+    reflection: 'What would be both kind and honest to tell yourself about this situation?',
+  },
+  'WN-06': {
+    steps: [
+      'If safe, pause the conversation or move to a calmer place.',
+      'Notice early body signals such as a tight jaw, hot face, fast heartbeat or clenched hands.',
+      'Give yourself time before sending a message or making a decision. Try walking, drinking water, or slowly counting while you settle.',
+      'When ready, describe the issue using “I” language: “I felt ___ when ___ happened. I need ___.”',
+      'If anyone may be hurt, create distance and contact a trusted adult or appropriate support person.',
+    ],
+    reflection: 'What boundary, need or concern might the anger be pointing to?',
+  },
+  'WN-07': {
+    steps: [
+      'You do not need to force yourself to feel happy. Name what today feels like.',
+      'Choose one manageable action: wash your face, eat or drink something if needed, step outside safely, listen to calming music, or complete one small task.',
+      'Consider one connection: message a trusted person, sit near someone safe, or ask for company.',
+      'Notice whether you need rest, practical help, a conversation, or professional support.',
+    ],
+    reflection: 'What is one gentle thing you can do for yourself in the next ten minutes?',
+  },
+  'WN-08': {
+    steps: [
+      'There is no single correct way to grieve. You may feel sad, angry, numb, confused, relieved, or different feelings at different times.',
+      'If you want, choose a way to remember the person or what was lost: write a memory, draw, say a prayer if that fits your beliefs, look at a meaningful object, or talk with someone safe.',
+      'Let yourself take breaks. You do not have to share details before you are ready.',
+      'Think of one person who could listen without pressuring you to “move on.”',
+    ],
+    reflection:
+      'Would you like to share a memory, talk about what feels hardest, or find someone supportive to speak with?',
+  },
+  'WN-09': {
+    steps: [
+      'First ask: “Am I safe right now?” If not, move toward a safer place and seek adult help.',
+      'If it is safe, write down what happened, when it happened and who was present. Keep records only in a way that does not put you at further risk.',
+      'Choose a trusted adult, teacher, counsellor, caregiver or designated safeguarding contact to tell.',
+      'You do not have to handle repeated bullying alone or prove that you can tolerate it.',
+      'If online, consider saving relevant evidence and using platform reporting/blocking tools when safe to do so.',
+    ],
+    reflection: 'Who is one adult or support person you could tell, and what would make it easier to start?',
+  },
+  'WN-10': {
+    steps: [
+      'Choose someone who is likely to listen and help you stay safe.',
+      'Use or adapt this message: “I have been finding things difficult lately. I do not need you to solve everything immediately, but I would like you to listen and help me work out what to do next.”',
+      'If speaking feels difficult, consider writing a note or asking another trusted person to join the conversation.',
+      'If the first person does not respond helpfully, try another trusted adult or appropriate professional.',
+    ],
+    reflection: 'Would you like help choosing words for a teacher, counsellor, caregiver or friend?',
+  },
+  'WN-11': {
+    steps: [
+      'If possible, choose a roughly consistent time to begin winding down.',
+      'Put school tasks or worries on paper and write one small next step for tomorrow.',
+      'Try a quiet activity such as reading, gentle stretching, calm audio or preparing clothes and materials for the next day.',
+      'If thoughts return, remind yourself: “I have written this down; I can return to it tomorrow.”',
+    ],
+    reflection: 'What is one thing you can set aside for tomorrow, and one thing that helps you feel settled?',
+  },
+  'WN-12': {
+    steps: [
+      'Choose what feels closest: I need to calm my body; understand a feeling; solve a practical problem; connect with someone; or get help to stay safe.',
+      'Choose one small action that matches your need.',
+      'Choose a person or service you can contact if the first step is not enough.',
+      'After trying it, check: “Am I a little safer or more supported? What do I need next?”',
+    ],
+    reflection: 'Which next step feels manageable right now?',
+  },
+}
+
 const RESOURCES = WN_LIBRARY.map(([code, title, description, durationLabel, category], index) => ({
   id: `res-${code.toLowerCase()}`,
   title,
@@ -591,8 +721,8 @@ const RESOURCES = WN_LIBRARY.map(([code, title, description, durationLabel, cate
   tags: [],
   contentCode: code,
   intendedSituation: null,
-  instructions: null,
-  reflectionPrompt: null,
+  instructions: WN_GUIDED[code].steps,
+  reflectionPrompt: WN_GUIDED[code].reflection,
   safetyNote: null,
   active: true,
   approved: true,
@@ -698,6 +828,46 @@ function readBody(req) {
     req.on('end', () => resolve(raw))
   })
 }
+
+// The AI disclosure IS the consent instrument, and the reflection route shows
+// the declined band until /ai/disclosure/status says accepted — so without
+// these three endpoints the chat composer, and the voice control inside it,
+// cannot be reached in this harness at all.
+const DISCLOSURE_VERSION = 'mock-v3'
+const DISCLOSURE_VIEW = {
+  version: DISCLOSURE_VERSION,
+  consentVersion: `ai-disclosure-${DISCLOSURE_VERSION}`,
+  title: 'Before you chat with Soul Nurture AI',
+  intro: 'Soul Nurture AI is here to listen. Please read how it works and what it cannot do.',
+  groups: [
+    {
+      id: 'read-before-you-start',
+      title: 'Read before you start',
+      summary: 'The important safety, privacy and AI-use points.',
+      sections: [
+        {
+          id: 'what-it-is',
+          heading: 'What Soul Nurture AI is',
+          items: [
+            'It listens, reflects back what you share, and suggests small healthy steps.',
+            'It is not a psychologist, counsellor, doctor or an emergency service.',
+          ],
+        },
+      ],
+    },
+  ],
+  agreements: [
+    { id: 'not-therapy', label: 'I understand this is not therapy or medical advice.' },
+    { id: 'safe-adult', label: 'I understand an adult at school may be told if I am not safe.' },
+  ],
+  confirmLabel: 'I understand, let me chat',
+  declineLabel: 'Not now',
+  text: 'It is not a psychologist. It is not an emergency service.',
+}
+// The harness starts already accepted: the gate is its own surface, and
+// leaving it shut would hide every chat screen behind it. POST acknowledge
+// still works for a pass that wants to watch the gate close.
+let disclosureAccepted = true
 
 const overviewPayload = () => {
   const roleCount = (role) => users.filter((u) => u.role === role).length
@@ -909,6 +1079,70 @@ async function handler(req, res, next) {
       res.end('2')
     }, 12_000)
     return
+  }
+
+  // Reflection chat — an ACTIVE conversation, so the composer (and the voice
+  // control) renders instead of the read-only band.
+  {
+    const conversationMatch = /^\/api\/v1\/conversations\/([^/]+)$/.exec(path)
+    if (conversationMatch && req.method === 'GET') {
+      const id = decodeURIComponent(conversationMatch[1])
+      return ok(res, {
+        id,
+        checkInId: null,
+        status: 'ACTIVE',
+        messages: [
+          { id: `${id}-m0`, role: 'USER', content: 'I have been feeling heavy lately.', createdAt: iso(minutes(12)) },
+          {
+            id: `${id}-m1`,
+            role: 'ASSISTANT',
+            content: 'Thank you for telling me that. What has been weighing on you most?',
+            aiPayload: { asyncState: 'COMPLETE', boundary: null },
+            createdAt: iso(minutes(11)),
+          },
+        ],
+      })
+    }
+  }
+
+  // AI consent gate — see DISCLOSURE_VIEW above.
+  if (path === '/api/v1/ai/disclosure' && req.method === 'GET') {
+    return ok(res, DISCLOSURE_VIEW)
+  }
+  if (path === '/api/v1/ai/disclosure/status' && req.method === 'GET') {
+    // The client compares this version against the disclosure's
+    // consentVersion and calls a mismatch a load error, so it is the consent
+    // version here, not the bare disclosure version.
+    return ok(res, {
+      version: DISCLOSURE_VIEW.consentVersion,
+      accepted: disclosureAccepted,
+      acceptedAt: disclosureAccepted ? iso(minutes(5)) : null,
+    })
+  }
+  if (path === '/api/v1/ai/disclosure/acknowledge' && req.method === 'POST') {
+    const body = JSON.parse((await readBody(req)) || '{}')
+    const missing = DISCLOSURE_VIEW.agreements
+      .map((a) => a.id)
+      .filter((id) => !body.agreements?.includes(id))
+    if (missing.length > 0) {
+      return fail(res, 400, 'Every statement must be accepted before you can chat.', 'VALIDATION_ERROR')
+    }
+    disclosureAccepted = true
+    return ok(res, { acknowledged: true, record: { id: 'consent-mock-1' } })
+  }
+
+  // Voice transcription — echoes the parts it received, which is what lets a
+  // browser pass prove that the client actually sends `language`.
+  if (path === '/api/v1/ai/transcribe' && req.method === 'POST') {
+    const raw = await readBody(req)
+    const field = (name) => {
+      const m = new RegExp(`name="${name}"\\r?\\n\\r?\\n([^\\r]*)`).exec(raw)
+      return m ? m[1] : null
+    }
+    return ok(res, {
+      text: `[mock] language=${field('language') ?? '<absent>'} bytes=${raw.length}`,
+      durationSeconds: 1,
+    })
   }
 
   // History (Epic H) — the student's own aggregate, paged by cursor, and the
@@ -1369,9 +1603,16 @@ async function handler(req, res, next) {
         linkedRequest: flag.linkedRequest,
         ruleId: flag.ruleId,
         ruleVersion: flag.ruleVersion,
-        ruleLabel: flag.level ? `Approved level ${flag.level} rule` : 'Rule with no approved level',
-        ruleConfigured: flag.level !== null,
-        ruleBlockedOn: flag.level === null ? 'Psychologist decision on Doc A D1/D5/D8' : null,
+        // Mirrors `support-flags.service.ts` exactly: no rule id means no rule
+        // label and no configured flag, and the level then has to name the
+        // mapping that produced it instead.
+        ruleLabel: null,
+        ruleConfigured: null,
+        ruleBlockedOn: null,
+        levelSource: flag.level ? 'INTENT_MAPPING' : null,
+        levelSourceVersion: flag.level
+          ? 'intent-level-mapping-v1-2026-11-11-pending-psychology-signature'
+          : null,
       },
       aiSummary: flag.aiContextSummary,
       humanDecision: {
@@ -1397,6 +1638,38 @@ async function handler(req, res, next) {
 
   // Platform overview
   if (path === '/api/v1/admin/overview') return ok(res, overviewPayload())
+
+  // Hosted inference endpoints. The GET is configuration-only in the real
+  // backend and never contacts a replica, so the fixture has no state column;
+  // only the wake POST answers with states, and it shows all four outcomes at
+  // once so every chip in the panel renders in one run.
+  const AI_ENDPOINTS = [
+    { id: 'asr-yo', purpose: 'asr', language: 'yo', label: 'Yoruba voice notes', model: 'NCAIR1 whisper-small fine-tune' },
+    { id: 'asr-ha', purpose: 'asr', language: 'ha', label: 'Hausa voice notes', model: 'NCAIR1 whisper-small fine-tune' },
+    { id: 'asr-ig', purpose: 'asr', language: 'ig', label: 'Igbo voice notes', model: 'NCAIR1 whisper-small fine-tune' },
+    { id: 'llm-n-atlas', purpose: 'llm', language: null, label: 'N-ATLaS replies', model: 'NCAIR1/N-ATLaS' },
+  ]
+  const AI_ENDPOINT_CONFIGURED = { 'asr-yo': true, 'asr-ha': true, 'asr-ig': false, 'llm-n-atlas': true }
+  const AI_ENDPOINT_STATES = {
+    'asr-yo': ['awake', 200, 318],
+    'asr-ha': ['waking', 503, 41],
+    'asr-ig': ['not_configured', null, null],
+    'llm-n-atlas': ['unreachable', null, 5002],
+  }
+
+  if (path === '/api/v1/admin/ai/endpoints' && req.method === 'GET') {
+    return ok(res, AI_ENDPOINTS.map((row) => ({
+      ...row,
+      configured: AI_ENDPOINT_CONFIGURED[row.id] === true,
+    })))
+  }
+
+  if (path === '/api/v1/admin/ai/endpoints/wake' && req.method === 'POST') {
+    return ok(res, AI_ENDPOINTS.map((row) => {
+      const [state, httpStatus, latencyMs] = AI_ENDPOINT_STATES[row.id]
+      return { ...row, state, httpStatus, latencyMs }
+    }))
+  }
 
   // Platform analytics
   if (path === '/api/v1/admin/analytics') {

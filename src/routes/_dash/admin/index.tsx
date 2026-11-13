@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 
 import { DashHeader } from '#/components/dash/DashHeader'
+import { HfEndpointsPanel } from '#/components/dash/HfEndpointsPanel'
 import { ProgressBar, Sparkline } from '#/components/dash/charts'
 import {
   ActivityPanel,
@@ -208,6 +209,8 @@ function AdminOverviewPage() {
             }
           />
         </PanelCard>
+
+        <HfEndpointsPanel />
       </main>
 
       {createOpen && (
