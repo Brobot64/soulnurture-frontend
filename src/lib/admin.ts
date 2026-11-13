@@ -331,3 +331,52 @@ export function resendPlatformUserVerification(
     method: 'POST',
   })
 }
+
+// --- Hosted inference endpoints ---------------------------------------------
+
+/**
+ * What an endpoint answered to a probe. The backend can only see the data
+ * plane, so `waking` covers "still scaling up" as much as "configured but
+ * broken" — the two are told apart by trying again, not by this call.
+ */
+export type AiEndpointState =
+  | 'awake'
+  | 'waking'
+  | 'reached'
+  | 'unreachable'
+  | 'not_configured'
+
+interface AiEndpointIdentity {
+  id: string
+  purpose: 'asr' | 'llm'
+  language: string | null
+  label: string
+  model: string
+}
+
+export interface AiEndpointInfo extends AiEndpointIdentity {
+  configured: boolean
+}
+
+export interface AiEndpointStatus extends AiEndpointIdentity {
+  state: AiEndpointState
+  httpStatus: number | null
+  latencyMs: number | null
+}
+
+/** Reads configuration only — contacts nothing, so it cannot wake a replica. */
+export function fetchAiEndpoints(): Promise<AiEndpointInfo[]> {
+  return apiFetch<AiEndpointInfo[]>('/api/v1/admin/ai/endpoints')
+}
+
+/**
+ * Ask every endpoint for a replica. This is the paid action: it starts GPU that
+ * then bills until it idles back to zero, and the backend records it in the
+ * audit trail. Returns what each endpoint said straight away — the replicas
+ * themselves take minutes to load.
+ */
+export function wakeAiEndpoints(): Promise<AiEndpointStatus[]> {
+  return apiFetch<AiEndpointStatus[]>('/api/v1/admin/ai/endpoints/wake', {
+    method: 'POST',
+  })
+}
